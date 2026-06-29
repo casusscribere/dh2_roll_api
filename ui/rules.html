@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DH2 Roll Servitor — Rules</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav>
+  <a class="brand" href="index.html">DH2 Roll Servitor</a>
+  <div class="links">
+    <a href="index.html">Home</a>
+    <a href="roll.html">Roll</a>
+    <a href="rules.html" class="active">Rules</a>
+  </div>
+</nav>
+
+<h1>Rules</h1>
+<div class="sub">Built-in rules are read-only. Your custom rules are stored in this browser and applied automatically when you <a href="roll.html">roll</a>.</div>
+
+<div class="grid">
+  <!-- ===================== BUILT-IN ===================== -->
+  <fieldset>
+    <legend>Built-in rules</legend>
+    <p class="note">Codified DH2 rules compiled into the engine. <strong class="gold">Click a rule to toggle</strong> whether it is applied when you roll — active rules are highlighted, inactive (dashed) ones are skipped.</p>
+    <div id="builtin-rules"><p class="note">Loading…</p></div>
+  </fieldset>
+
+  <!-- ===================== ADD ===================== -->
+  <fieldset>
+    <legend>Add a custom rule</legend>
+    <label>Write one or more rules in the DSL. They are validated by the engine before being saved.</label>
+    <textarea id="add-dsl" rows="8" placeholder='talent "Hatred" {
+  on MODIFIERS
+  when has_talent("Hatred")
+  then add modifier "hatred" = 10
+}'></textarea>
+    <button onclick="addRule()">Validate &amp; Add</button>
+    <div class="result" id="add-result">&mdash;</div>
+    <p class="note">See the full <a href="#dsl-reference">DSL reference</a> below for every checkpoint, variable, function and action.</p>
+  </fieldset>
+</div>
+
+<!-- ===================== YOUR RULES ===================== -->
+<fieldset style="margin-top:1rem">
+  <legend>Your rules (<span id="ucount">0</span>)</legend>
+  <div id="user-rules"><p class="note">No custom rules yet — add one above.</p></div>
+</fieldset>
+
+<!-- ===================== ACTIVE / INACTIVE ===================== -->
+<fieldset style="margin-top:1rem" id="active-inactive-section">
+  <legend>Active / inactive rules</legend>
+  <details>
+    <summary class="toggle">Show / hide active &amp; inactive rules <span class="hint" id="ai-counts"></span></summary>
+    <div id="active-inactive" style="margin-top:.6rem"></div>
+  </details>
+</fieldset>
+
+<!-- ===================== ACTIVE DSL ===================== -->
+<fieldset style="margin-top:1rem" id="active-dsl">
+  <legend>Active DSL</legend>
+  <details>
+    <summary class="toggle">Show / hide all active rules in DSL form <span class="hint" id="active-count"></span></summary>
+    <div id="active-dsl-body" style="margin-top:.6rem"><p class="note">Loading…</p></div>
+  </details>
+</fieldset>
+
+<!-- ===================== DSL REFERENCE ===================== -->
+<fieldset style="margin-top:1rem" id="dsl-reference">
+  <legend>DSL reference</legend>
+  <details>
+    <summary class="toggle">Show / hide reference <span class="hint">checkpoints · variables · functions · actions</span></summary>
+    <div id="docs" style="margin-top:.6rem"><p class="note">Loading reference…</p></div>
+  </details>
+</fieldset>
+
+<script src="rules-store.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+let BUILTIN = [];          // per-rule list from /api/rules/source
+let BUILTIN_SOURCES = [];   // raw DSL file sources
+
+async function loadSource() {
+  const d = await fetch('/api/rules/source').then(r => r.json()).catch(() => ({ builtins: [], rules: [] }));
+  BUILTIN = d.rules || [];
+  BUILTIN_SOURCES = d.builtins || [];
+  renderBuiltin();
+  renderActiveDsl();
+  renderActiveInactive();
+}
+
+// Built-in rules as clickable toggle boxes, grouped by category.
+function renderBuiltin() {
+  const box = $('builtin-rules');
+  if (!BUILTIN.length) { box.innerHTML = '<p class="note">none</p>'; return; }
+  const groups = {};
+  for (const r of BUILTIN) (groups[r.category] ??= []).push(r);
+  let h = '';
+  for (const [cat, list] of Object.entries(groups)) {
+    h += `<label class="gold" style="margin-top:.6rem">${esc(cat)}</label><div class="chips">`;
+    for (const r of list) {
+      const active = RulesStore.isBuiltinActive(r.id);
+      h += `<span class="toggle-box ${active ? 'active' : 'inactive'}" data-id="${r.id}" title="${esc(r.kind)} @ ${r.checkpoint}">${esc(r.name)}</span>`;
+    }
+    h += '</div>';
+  }
+  box.innerHTML = h;
+  box.querySelectorAll('.toggle-box').forEach(el => {
+    el.onclick = () => {
+      RulesStore.setBuiltinActive(el.dataset.id, !RulesStore.isBuiltinActive(el.dataset.id));
+      renderBuiltin();
+      renderActiveInactive();
+    };
+  });
+}
+
+// Two-column name-only list of which rules are active vs inactive.
+function renderActiveInactive() {
+  const box = $('active-inactive');
+  if (!box) return;
+  const active = [], inactive = [];
+  for (const r of BUILTIN) (RulesStore.isBuiltinActive(r.id) ? active : inactive).push(r.name);
+  for (const u of RulesStore.load()) {
+    const names = (u.valid && u.effects.length) ? u.effects.map(e => e.name).join(', ') : '(invalid)';
+    (u.valid && u.enabled ? active : inactive).push(names);
+  }
+  active.sort((a, b) => a.localeCompare(b));
+  inactive.sort((a, b) => a.localeCompare(b));
+  const col = (title, cls, items) =>
+    `<div><h3 class="${cls}">${title} (${items.length})</h3><ul class="namelist">` +
+    (items.length ? items.map(n => `<li>${esc(n)}</li>`).join('') : '<li class="dim">none</li>') +
+    '</ul></div>';
+  box.innerHTML = `<div class="twocol">${col('Active', 'ok', active)}${col('Inactive', 'dim', inactive)}</div>`;
+  $('ai-counts').textContent = `(${active.length} active · ${inactive.length} inactive)`;
+}
+
+function effectsSummary(e) {
+  return `${e.name} <span class="dim">${e.source} @ ${e.checkpoint} (p${e.priority})</span>`;
+}
+
+function renderUserRules() {
+  const rules = RulesStore.load();
+  const box = $('user-rules');
+  $('ucount').textContent = rules.length;
+  box.innerHTML = '';
+  renderActiveDsl();        // keep the Active DSL view in sync
+  renderActiveInactive();   // keep the active/inactive summary in sync
+  if (!rules.length) { box.innerHTML = '<p class="note">No custom rules yet — add one above.</p>'; return; }
+
+  for (const entry of rules) {
+    const card = document.createElement('div');
+    const state = !entry.valid ? 'invalid' : (entry.enabled ? 'active' : 'inactive');
+    card.className = 'rule-card ' + state;
+
+    const names = entry.valid && entry.effects.length
+      ? entry.effects.map(e => e.name).join(', ')
+      : '(invalid rule)';
+    const badge = !entry.valid ? '<span class="badge err">invalid</span>'
+      : entry.enabled ? '<span class="badge on">active</span>'
+      : '<span class="badge off">inactive — click to enable</span>';
+
+    const head = document.createElement('div');
+    head.className = 'head';
+    head.innerHTML = `<span class="name">${esc(names)}</span>${badge}`;
+
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+    // Buttons stop propagation so they don't toggle the card.
+    const mkBtn = (label, cls, fn) => {
+      const b = document.createElement('button');
+      if (cls) b.className = cls;
+      b.textContent = label;
+      b.onclick = (ev) => { ev.stopPropagation(); fn(b); };
+      return b;
+    };
+    actions.append(
+      mkBtn('Save', '', async (b) => { b.disabled = true; await RulesStore.update(entry.id, card.querySelector('textarea').value, entry.enabled); renderUserRules(); }),
+      mkBtn('Re-validate', 'ghost', async (b) => { b.disabled = true; await RulesStore.revalidate(entry.id); renderUserRules(); }),
+      mkBtn('Remove', 'danger', () => { RulesStore.remove(entry.id); renderUserRules(); }),
+    );
+    head.append(actions);
+
+    const ta = document.createElement('textarea');
+    ta.rows = Math.min(10, Math.max(3, entry.dsl.split('\n').length));
+    ta.value = entry.dsl;
+    ta.onclick = (ev) => ev.stopPropagation(); // editing must not toggle the card
+
+    const status = document.createElement('div');
+    status.className = 'note';
+    status.style.marginTop = '.4rem';
+    status.innerHTML = entry.valid
+      ? '<span class="ok">valid</span> — ' + entry.effects.map(effectsSummary).join('; ')
+      : `<span class="bad">error</span> ${entry.line ? `<span class="dim">(line ${entry.line}, col ${entry.col})</span>` : ''} — ${esc(entry.error)}`;
+
+    // Click the card (outside the textarea/buttons) to toggle active state.
+    if (entry.valid) {
+      card.style.cursor = 'pointer';
+      card.onclick = () => { RulesStore.setEnabled(entry.id, !entry.enabled); renderUserRules(); };
+    }
+
+    card.append(head, ta, status);
+    box.append(card);
+  }
+}
+
+async function addRule() {
+  const dsl = $('add-dsl').value.trim();
+  const out = $('add-result');
+  if (!dsl) { out.innerHTML = '<span class="dim">— nothing to add —</span>'; return; }
+  const entry = await RulesStore.add(dsl);
+  if (entry.valid) {
+    out.innerHTML = `<span class="ok">ADDED &amp; ACTIVE</span> — ${entry.effects.length} effect${entry.effects.length !== 1 ? 's' : ''}`;
+    $('add-dsl').value = '';
+  } else {
+    out.innerHTML = `<span class="bad">NOT SAVED — PARSE ERROR</span> ${entry.line ? `<span class="dim">(line ${entry.line}, col ${entry.col})</span>` : ''}\n${entry.error}`;
+    // remove the invalid entry that add() stored so the list only holds it intentionally? Keep it so the user can fix it.
+  }
+  renderUserRules();
+}
+
+async function loadDocs() {
+  const d = await fetch('/api/dsl-docs').then(r => r.json()).catch(() => null);
+  const box = $('docs');
+  if (!d) { box.innerHTML = '<p class="bad">Could not load reference.</p>'; return; }
+
+  // --- rule structure ---
+  let h = '<div class="docsection"><h3>Rule structure</h3>';
+  h += `<pre class="tmpl">${esc(d.structure.template)}</pre>`;
+  h += '<table class="doctable"><tr><th>Kind</th><th>Meaning</th></tr>';
+  for (const k of d.structure.kinds) h += `<tr><td><code>${k.name}</code></td><td>${esc(k.note)}</td></tr>`;
+  h += '</table>';
+  h += '<ul class="tight">' + d.structure.notes.map(n => `<li>${esc(n)}</li>`).join('') + '</ul></div>';
+
+  // --- checkpoints (grouped) ---
+  h += '<div class="docsection"><h3>Checkpoints — <code>on &lt;CHECKPOINT&gt;</code></h3>';
+  h += '<table class="doctable"><tr><th>Checkpoint</th><th>When it fires</th><th>Typical use</th></tr>';
+  let lastGroup = null;
+  for (const c of d.checkpoints) {
+    if (c.group !== lastGroup) { h += `<tr class="grouprow"><td colspan="3">${esc(c.group)}</td></tr>`; lastGroup = c.group; }
+    h += `<tr><td><code>${c.name}</code></td><td>${esc(c.summary)}</td><td class="dim">${esc(c.use)}</td></tr>`;
+  }
+  h += '</table></div>';
+
+  // --- facts ---
+  h += '<div class="docsection"><h3>Variables — facts usable in <code>when</code> &amp; expressions</h3>';
+  h += '<table class="doctable"><tr><th>Name</th><th>Type</th><th>Meaning</th></tr>';
+  for (const f of d.facts) h += `<tr><td><code>${f.name}</code></td><td class="dim">${f.type}</td><td>${esc(f.summary)}</td></tr>`;
+  h += '</table></div>';
+
+  // --- functions ---
+  h += '<div class="docsection"><h3>Functions</h3>';
+  h += '<table class="doctable"><tr><th>Signature</th><th>Returns</th><th>Meaning</th></tr>';
+  for (const f of d.functions) h += `<tr><td><code>${esc(f.signature)}</code></td><td class="dim">${f.returns}</td><td>${esc(f.summary)}</td></tr>`;
+  h += '</table></div>';
+
+  // --- actions ---
+  h += '<div class="docsection"><h3>Actions — <code>then &lt;action&gt;</code></h3>';
+  h += '<table class="doctable"><tr><th>Syntax</th><th>Checkpoint(s)</th><th>Effect</th></tr>';
+  for (const a of d.actions) h += `<tr><td><code>${esc(a.syntax)}</code></td><td class="dim">${esc(a.at)}</td><td>${esc(a.summary)}</td></tr>`;
+  h += '</table></div>';
+
+  // --- expressions & operators ---
+  h += '<div class="docsection"><h3>Expressions &amp; operators</h3>';
+  h += '<ul class="tight">' + d.expressions.map(e => `<li>${esc(e)}</li>`).join('') + '</ul>';
+  h += '<p class="note" style="margin-top:.5rem">' +
+    `<strong>Logical:</strong> ${d.operators.logical.map(o => `<code>${o}</code>`).join(' ')} &nbsp; ` +
+    `<strong>Comparison:</strong> ${d.operators.comparison.map(o => `<code>${esc(o)}</code>`).join(' ')} &nbsp; ` +
+    `<strong>Arithmetic:</strong> ${d.operators.arithmetic.map(o => `<code>${esc(o)}</code>`).join(' ')} &nbsp; ` +
+    `<strong>Grouping:</strong> ${d.operators.grouping.map(o => `<code>${esc(o)}</code>`).join(' ')}</p></div>`;
+
+  box.innerHTML = h;
+}
+
+function renderActiveDsl() {
+  const box = $('active-dsl-body');
+  if (!box) return;
+  const userRules = RulesStore.load().filter(r => r.enabled && r.valid);
+
+  const builtinCount = BUILTIN_SOURCES.length;
+  $('active-count').textContent =
+    `(${builtinCount} built-in file${builtinCount !== 1 ? 's' : ''}` +
+    `${userRules.length ? `, ${userRules.length} custom rule${userRules.length !== 1 ? 's' : ''}` : ''})`;
+
+  let h = '<p class="note">The full DSL of the built-in rule set (compiled at startup) plus your active custom rules. Built-in rules toggled off on this page are skipped at roll time — see the active/inactive list above.</p>';
+
+  for (const b of BUILTIN_SOURCES) {
+    h += `<div class="docsection"><h3>${esc(b.category)} <span class="dim">— ${esc(b.file)}</span></h3>`;
+    h += `<pre class="tmpl">${esc(b.source.trim())}</pre></div>`;
+  }
+
+  h += '<div class="docsection"><h3>Your active rules</h3>';
+  if (userRules.length) {
+    for (const r of userRules) {
+      const names = r.effects.map(e => e.name).join(', ');
+      h += `<div class="note" style="margin-top:.5rem">${esc(names)}</div><pre class="tmpl">${esc(r.dsl.trim())}</pre>`;
+    }
+  } else {
+    h += '<p class="note">No custom rules active — add some above.</p>';
+  }
+  h += '</div>';
+
+  box.innerHTML = h;
+}
+
+loadSource();              // built-in toggles, active DSL, active/inactive summary
+renderUserRules();
+loadDocs();
+</script>
+</body>
+</html>

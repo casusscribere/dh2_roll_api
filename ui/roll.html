@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DH2 Roll Servitor — Roll</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav>
+  <a class="brand" href="index.html">DH2 Roll Servitor</a>
+  <div class="links">
+    <a href="index.html">Home</a>
+    <a href="roll.html" class="active">Roll</a>
+    <a href="rules.html">Rules</a>
+  </div>
+</nav>
+
+<h1>Roll</h1>
+<div class="sub">d100 tests &amp; weapon attack resolution &middot; <span class="gold" id="wcount"></span> &middot; <span id="activeRules" class="dim"></span></div>
+
+<div class="grid">
+
+  <!-- ===================== d100 TEST ===================== -->
+  <fieldset>
+    <legend>d100 Test</legend>
+    <div class="row3">
+      <div><label>Target (characteristic / skill)</label><input type="number" id="t-target" value="35"></div>
+      <div><label>Difficulty</label>
+        <select id="t-difficulty">
+          <option value="40">Simple (+40)</option><option value="30">Easy (+30)</option>
+          <option value="20">Routine (+20)</option><option value="10">Ordinary (+10)</option>
+          <option value="0" selected>Challenging (+0)</option><option value="-10">Difficult (-10)</option>
+          <option value="-20">Hard (-20)</option><option value="-30">Very Difficult (-30)</option>
+          <option value="-40">Arduous (-40)</option>
+        </select></div>
+      <div><label>Other modifier</label><input type="number" id="t-mod" value="0"></div>
+    </div>
+    <button onclick="doTest()">Roll Test</button>
+    <div class="result" id="t-result">&mdash;</div>
+  </fieldset>
+
+  <!-- ===================== DAMAGE ===================== -->
+  <fieldset>
+    <legend>Damage Roll</legend>
+    <div class="row3">
+      <div><label>Formula (XdY+Z)</label><input id="d-formula" value="1d10+5"></div>
+      <div><label>Damage type</label>
+        <select id="d-type"><option>Impact</option><option>Energy</option><option>Explosive</option><option>Rending</option></select></div>
+      <div><label>Location (for Fury)</label>
+        <select id="d-location"><option>Body</option><option>Head</option><option>Right Arm</option><option>Left Arm</option><option>Right Leg</option><option>Left Leg</option></select></div>
+    </div>
+    <div class="row3">
+      <div><label>+SB &times;</label><input type="number" id="d-sbtimes" value="0" min="0" max="2"></div>
+      <div><label>Strength Bonus</label><input type="number" id="d-sb" value="3"></div>
+      <div><label>DoS (for Accurate)</label><input type="number" id="d-dos" value="1"></div>
+    </div>
+    <div class="checks">
+      <label><input type="checkbox" id="d-tearing"> Tearing</label>
+      <label><input type="checkbox" id="d-proven"> Proven (3)</label>
+      <label><input type="checkbox" id="d-primitive"> Primitive (7)</label>
+      <label><input type="checkbox" id="d-accurate"> Accurate</label>
+    </div>
+    <button onclick="doDamage()">Roll Damage</button>
+    <div class="result" id="d-result">&mdash;</div>
+  </fieldset>
+
+  <!-- ===================== PARRY ===================== -->
+  <fieldset>
+    <legend>Parry</legend>
+    <div class="row">
+      <div><label>WS</label><input type="number" id="p-ws" value="40"></div>
+      <div><label>Other modifier</label><input type="number" id="p-mod" value="0"></div>
+    </div>
+    <label>Weapon qualities (comma separated — e.g. Balanced, Defensive)</label>
+    <input id="p-qualities" value="Balanced">
+    <button onclick="doParry()">Roll Parry</button>
+    <div class="result" id="p-result">&mdash;</div>
+  </fieldset>
+
+  <!-- ===================== FULL ATTACK ===================== -->
+  <fieldset style="grid-column: 1 / -1;">
+    <legend>Full Attack Resolution</legend>
+    <div class="grid">
+      <div>
+        <label class="gold">— Attacker characteristics —</label>
+        <div class="row4">
+          <div><label>WS</label><input type="number" id="a-ws" value="35"></div>
+          <div><label>BS</label><input type="number" id="a-bs" value="35"></div>
+          <div><label>S</label><input type="number" id="a-s" value="30"></div>
+          <div><label>T</label><input type="number" id="a-t" value="30"></div>
+        </div>
+        <label class="gold" style="margin-top:.8rem">— Attack —</label>
+        <div class="row">
+          <div><label>Action</label><select id="a-action"></select></div>
+          <div><label>Aim</label><select id="a-aim"><option>None</option><option>Half</option><option>Full</option></select></div>
+        </div>
+        <div class="row">
+          <div><label>Range band</label><select id="a-range"></select></div>
+          <div><label>Other modifier</label><input type="number" id="a-mod" value="0"></div>
+        </div>
+        <div id="a-calledshot-wrap" style="display:none"><label>Called shot location</label>
+          <select id="a-calledshot"></select></div>
+        <label class="gold" style="margin-top:.8rem">— Target (optional soak) —</label>
+        <div class="row3">
+          <div><label>Apply soak?</label><select id="a-soak"><option value="no">No</option><option value="yes">Yes</option></select></div>
+          <div><label>Armour (location)</label><input type="number" id="a-armour" value="4"></div>
+          <div><label>Toughness Bonus</label><input type="number" id="a-tb" value="3"></div>
+        </div>
+        <label class="gold" style="margin-top:.8rem">— Talents, traits &amp; status —</label>
+        <div class="checks" id="a-talents"><span class="dim">loading…</span></div>
+        <div class="checks">
+          <label><input type="checkbox" id="a-dualwield"> Dual-wielding (firing two weapons)</label>
+          <label><input type="checkbox" id="a-offhand"> Firing off-hand weapon</label>
+        </div>
+        <div class="row">
+          <div><label>Traits (DH2.0, comma separated)</label><input id="a-traits" placeholder="e.g. Brutal Charge (3)"></div>
+          <div><label>Status conditions (comma separated)</label><input id="a-statuses" placeholder="e.g. On Fire, Full Aim"></div>
+        </div>
+      </div>
+      <div>
+        <label class="gold">— Weapon —</label>
+        <label>Profile (from codified DH2 core)</label>
+        <select id="w-select"><option value="">— manual entry —</option></select>
+        <div class="row4">
+          <div><label>Damage</label><input id="w-damage" value="1d10+5"></div>
+          <div><label>Pen</label><input type="number" id="w-pen" value="4"></div>
+          <div><label>Type</label><select id="w-type"><option>Impact</option><option>Energy</option><option selected>Explosive</option><option>Rending</option></select></div>
+          <div><label>Melee?</label><select id="w-melee"><option value="no">Ranged</option><option value="yes">Melee</option></select></div>
+        </div>
+        <div class="row3">
+          <div><label>RoF semi (burst)</label><input type="number" id="w-burst" value="2"></div>
+          <div><label>RoF full</label><input type="number" id="w-full" value="0"></div>
+          <div><label>SB multiplier (melee)</label><input type="number" id="w-sbx" value="1" min="0" max="2"></div>
+        </div>
+        <label>Qualities (comma separated — e.g. Tearing, Proven (3), Reliable, Twin-Linked, Storm, Accurate, Razor Sharp, Melta, Vengeful (9), Primitive (7), Overheats)</label>
+        <input id="w-qualities" value="Tearing">
+        <button onclick="doAttack()">Resolve Attack</button>
+        <details style="margin-top:.8rem">
+          <summary class="gold">Ad-hoc rule (this attack only)</summary>
+          <label>Your saved rules from the <a href="rules.html">Rules</a> page are always applied. Add a one-off rule here for this attack only.</label>
+          <textarea id="a-customrules" rows="4" placeholder='talent "Hatred" {
+  on MODIFIERS
+  when has_talent("Hatred")
+  then add modifier "hatred" = 10
+}'></textarea>
+          <button type="button" class="minibtn" onclick="validateRules()">Validate</button>
+          <div class="result" id="a-rules-result" style="margin-top:.5rem">&mdash;</div>
+        </details>
+      </div>
+    </div>
+    <div class="result" id="a-result">&mdash;</div>
+  </fieldset>
+</div>
+
+<script src="rules-store.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const api = (path, body) => fetch(path, {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+}).then(r => r.json());
+
+let WEAPONS = [];
+
+function refreshActiveRules() {
+  const n = RulesStore.activeCount();
+  const off = RulesStore.disabledBuiltins().length;
+  const parts = [];
+  parts.push(n ? `<span class="gold">${n}</span> custom rule${n !== 1 ? 's' : ''} active` : 'no custom rules active');
+  if (off) parts.push(`<span class="bad">${off}</span> built-in disabled`);
+  $('activeRules').innerHTML = parts.join(' · ');
+}
+
+async function init() {
+  const [opts, wep, rules] = await Promise.all([
+    fetch('/api/options').then(r => r.json()),
+    fetch('/api/weapons').then(r => r.json()),
+    fetch('/api/rules').then(r => r.json()),
+  ]);
+  WEAPONS = wep.weapons;
+  $('wcount').textContent = WEAPONS.length + ' weapon profiles loaded';
+  refreshActiveRules();
+
+  const tBox = $('a-talents');
+  tBox.innerHTML = '';
+  for (const name of rules.talents) {
+    const lbl = document.createElement('label');
+    lbl.innerHTML = `<input type="checkbox" class="talent-cb" value="${name}"> ${name}`;
+    tBox.appendChild(lbl);
+  }
+  if (!rules.talents.length) tBox.innerHTML = '<span class="dim">none</span>';
+  if (rules.traits?.length) $('a-traits').placeholder = 'e.g. ' + rules.traits.join(', ');
+  if (rules.statuses?.length) $('a-statuses').placeholder = 'e.g. ' + rules.statuses.join(', ');
+  for (const a of opts.actions) {
+    $('a-action').add(new Option(`${a.name} (${a.modifier >= 0 ? '+' : ''}${a.modifier})`, a.name));
+  }
+  for (const [band, mod] of Object.entries(opts.rangeBands)) {
+    if (band === 'Melee') continue;
+    $('a-range').add(new Option(`${band} (${mod >= 0 ? '+' : ''}${mod})`, band, band === 'Normal Range', band === 'Normal Range'));
+  }
+  for (const loc of opts.hitLocations) $('a-calledshot').add(new Option(loc, loc));
+  const groups = {};
+  for (const w of WEAPONS) (groups[w.class] ??= []).push(w);
+  for (const [cls, list] of Object.entries(groups)) {
+    const og = document.createElement('optgroup'); og.label = cls;
+    for (const w of list) og.appendChild(new Option(`${w.name} (${w.damage} ${w.damageType[0]}; Pen ${w.pen})`, w.id));
+    $('w-select').appendChild(og);
+  }
+  $('w-select').onchange = () => {
+    const w = WEAPONS.find(x => x.id === $('w-select').value);
+    if (!w) return;
+    $('w-damage').value = w.damage; $('w-pen').value = w.pen; $('w-type').value = w.damageType;
+    $('w-melee').value = w.isMelee ? 'yes' : 'no';
+    $('w-burst').value = w.rof.burst; $('w-full').value = w.rof.full;
+    $('w-sbx').value = w.sbMultiplier || (w.isMelee ? 1 : 0);
+    $('w-qualities').value = (w.qualities || []).join(', ');
+  };
+  $('a-action').onchange = () => {
+    $('a-calledshot-wrap').style.display = $('a-action').value === 'Called Shot' ? '' : 'none';
+  };
+}
+init();
+window.addEventListener('focus', refreshActiveRules); // pick up edits made on the Rules page
+
+const sign = (n) => (n >= 0 ? '+' : '') + n;
+
+async function doTest() {
+  const r = await api('/api/test', {
+    target: +$('t-target').value,
+    modifiers: { difficulty: +$('t-difficulty').value, modifier: +$('t-mod').value },
+  });
+  $('t-result').innerHTML =
+    `Roll: <span class="gold">${r.roll}</span> vs ${r.modifiedTarget} ` +
+    `<span class="dim">(${r.target} ${sign(r.modifierTotal)})</span>\n` +
+    (r.success
+      ? `<span class="ok">SUCCESS</span> — ${r.dos} degree${r.dos !== 1 ? 's' : ''} of success${r.autoSuccess ? ' (natural 1!)' : ''}`
+      : `<span class="bad">FAILURE</span> — ${r.dof} degree${r.dof !== 1 ? 's' : ''} of failure${r.autoFailure ? ' (natural 100!)' : ''}`);
+}
+
+async function doDamage() {
+  const qualities = [];
+  if ($('d-tearing').checked) qualities.push('Tearing');
+  if ($('d-proven').checked) qualities.push('Proven (3)');
+  if ($('d-primitive').checked) qualities.push('Primitive (7)');
+  if ($('d-accurate').checked) qualities.push('Accurate');
+  const r = await api('/api/damage', {
+    formula: $('d-formula').value, qualities,
+    sbTimes: +$('d-sbtimes').value, strengthBonus: +$('d-sb').value,
+    dos: +$('d-dos').value, location: $('d-location').value, damageType: $('d-type').value,
+  });
+  if (r.error) { $('d-result').innerHTML = `<span class="bad">${r.error}</span>`; return; }
+  $('d-result').innerHTML = fmtDamage(r);
+}
+
+function fmtDamage(r) {
+  let s = `Dice [${r.formula}${r.tearing ? ', Tearing' : ''}]: rolled (${r.dice.rolled.join(', ')})`;
+  if (r.dice.discarded.length) s += ` <span class="dim">dropped (${r.dice.discarded.join(', ')})</span>`;
+  if (JSON.stringify(r.dice.kept) !== JSON.stringify(r.dice.adjusted)) {
+    s += `\n  adjusted to (${r.dice.adjusted.join(', ')})` +
+         `<span class="dim">${r.proven ? ` Proven(${r.proven})` : ''}${r.primitive ? ` Primitive(${r.primitive})` : ''}</span>`;
+  }
+  for (const [k, v] of Object.entries(r.modifiers)) s += `\n  ${sign(v)} ${k}`;
+  s += `\nTotal: <span class="gold">${r.total}</span>`;
+  for (const rf of r.righteousFury) {
+    s += `\n<span class="rf">RIGHTEOUS FURY (nat ${rf.naturalRoll})! Crit roll 1d5 = ${rf.rfRoll}</span>`;
+    if (rf.effect) s += `\n<span class="dim">${rf.effect}</span>`;
+  }
+  return s;
+}
+
+async function doAttack() {
+  const body = {
+    characteristics: { ws: +$('a-ws').value, bs: +$('a-bs').value, s: +$('a-s').value, t: +$('a-t').value },
+    weapon: {
+      name: $('w-select').selectedOptions[0]?.text.split(' (')[0] || 'Custom weapon',
+      isMelee: $('w-melee').value === 'yes',
+      damage: $('w-damage').value,
+      sbMultiplier: +$('w-sbx').value,
+      damageType: $('w-type').value,
+      pen: +$('w-pen').value,
+      rof: { single: true, burst: +$('w-burst').value, full: +$('w-full').value },
+      qualities: $('w-qualities').value.split(',').map(x => x.trim()).filter(Boolean),
+    },
+    action: $('a-action').value,
+    aim: $('a-aim').value,
+    rangeBand: $('a-range').value,
+    customModifier: +$('a-mod').value,
+    calledShotLocation: $('a-calledshot').value,
+    talents: [...document.querySelectorAll('.talent-cb:checked')].map(x => x.value),
+    traits: $('a-traits').value.split(',').map(x => x.trim()).filter(Boolean),
+    statuses: $('a-statuses').value.split(',').map(x => x.trim()).filter(Boolean),
+    combat: { dualWielding: $('a-dualwield').checked, firingOffhand: $('a-offhand').checked },
+  };
+  if ($('a-soak').value === 'yes') {
+    body.target = { armour: +$('a-armour').value, toughnessBonus: +$('a-tb').value };
+  }
+  // Apply saved rules (from the Rules page) plus any ad-hoc rule entered here,
+  // and suppress any built-in rules toggled off on the Rules page.
+  const custom = [RulesStore.activeDsl(), $('a-customrules').value.trim()].filter(Boolean).join('\n\n');
+  if (custom.trim()) body.customRules = custom;
+  const disabled = RulesStore.disabledBuiltins();
+  if (disabled.length) body.disabledRules = disabled;
+  const r = await api('/api/attack', body);
+  if (r.error) { $('a-result').innerHTML = `<span class="bad">${r.error}</span>`; return; }
+
+  const t = r.test;
+  let s = `<span class="gold">${r.weapon}</span> — ${r.action} @ ${r.rangeBand}\n` +
+    `${t.characteristic} test: roll <span class="gold">${t.roll}</span> vs ${t.modifiedTarget} ` +
+    `<span class="dim">(${t.target} ${Object.entries(t.modifiers).map(([k, v]) => `${sign(v)} ${k}`).join(' ')})</span>\n` +
+    (t.success
+      ? `<span class="ok">HIT</span> — ${t.dos} DoS`
+      : `<span class="bad">MISS</span> — ${t.dof} DoF`);
+  for (const e of r.effects) s += `\n<span class="rf">${e.name}:</span> <span class="dim">${e.effect}</span>`;
+
+  if (r.hits.length) {
+    s += `\n\n${r.hits.length} hit${r.hits.length > 1 ? 's' : ''}:`;
+    for (const h of r.hits) {
+      s += `\n\n<span class="gold">Hit ${h.hitNumber} — ${h.location}</span> (${h.damageType}, Pen ${h.totalPenetration}` +
+        (Object.keys(h.penetrationModifiers).length
+          ? ` <span class="dim">[${Object.entries(h.penetrationModifiers).map(([k, v]) => `${k} ${sign(v)}`).join(', ')}]</span>` : '') + `)\n` +
+        fmtDamage(h.damage);
+      if (h.soak) {
+        s += `\nSoak: armour ${h.soak.armour} − pen ${h.soak.penetration} → ${h.soak.usableArmour}, +TB ${h.soak.toughnessBonus} = ${h.soak.reduction} reduction` +
+             `\n<span class="${h.soak.woundsInflicted > 0 ? 'bad' : 'ok'}">Wounds inflicted: ${h.soak.woundsInflicted}</span>`;
+      }
+    }
+    if (r.totalWounds !== undefined) s += `\n\n<span class="gold">TOTAL WOUNDS: ${r.totalWounds}</span>`;
+  }
+  if (r.scatter) {
+    const mods = Object.entries(r.scatter.modifiers);
+    s += `\n\n<span class="rf">SCATTER</span> — lands <span class="gold">${r.scatter.distance}m</span> away, direction <span class="gold">${r.scatter.direction}</span>/10 on the Scatter Diagram clock` +
+      (mods.length ? ` <span class="dim">[base ${r.scatter.baseDistance}${mods.map(([k, v]) => `, ${k} ${v >= 0 ? '+' : ''}${v}`).join('')}]</span>` : '');
+  }
+  if (r.log && r.log.length) {
+    s += `\n\n<span class="trace">rule trace: ${r.log.map(l => `${l.effect}@${l.checkpoint}`).join(' · ')}</span>`;
+  }
+  $('a-result').innerHTML = s;
+}
+
+async function doParry() {
+  const body = {
+    characteristics: { ws: +$('p-ws').value },
+    weapon: { name: 'Parry weapon', qualities: $('p-qualities').value.split(',').map(x => x.trim()).filter(Boolean) },
+    customModifier: +$('p-mod').value,
+  };
+  const disabled = RulesStore.disabledBuiltins();
+  if (disabled.length) body.disabledRules = disabled;
+  const custom = RulesStore.activeDsl();
+  if (custom.trim()) body.customRules = custom;
+  const r = await api('/api/parry', body);
+  if (r.error) { $('p-result').innerHTML = `<span class="bad">${r.error}</span>`; return; }
+  const t = r.test;
+  $('p-result').innerHTML =
+    `Parry: WS test roll <span class="gold">${t.roll}</span> vs ${t.modifiedTarget} ` +
+    `<span class="dim">(${t.target} ${Object.entries(t.modifiers).map(([k, v]) => `${v >= 0 ? '+' : ''}${v} ${k}`).join(' ') || '+0'})</span>\n` +
+    (t.success
+      ? `<span class="ok">PARRY SUCCESS</span> — ${t.dos} DoS`
+      : `<span class="bad">PARRY FAILED</span> — ${t.dof} DoF`);
+}
+
+async function validateRules() {
+  const text = $('a-customrules').value;
+  const out = $('a-rules-result');
+  if (!text.trim()) { out.innerHTML = '<span class="dim">— nothing to validate —</span>'; return; }
+  const r = await api('/api/rules/validate', { rules: text });
+  if (r.ok) {
+    out.innerHTML = `<span class="ok">OK</span> — ${r.count} rule${r.count !== 1 ? 's' : ''}:\n` +
+      r.effects.map(e => `  <span class="gold">${e.name}</span> <span class="dim">${e.source} @ ${e.checkpoint} (p${e.priority})</span>`).join('\n');
+  } else {
+    out.innerHTML = `<span class="bad">PARSE ERROR</span> ${r.line ? `<span class="dim">(line ${r.line}, col ${r.col})</span>` : ''}\n${r.message || r.error}`;
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,3157 @@
+{
+ "_source": "codified-systems/dark_heresy_2e/data/weapons.json",
+ "count": 144,
+ "weapons": [
+  {
+   "id": "bolt_pistol",
+   "name": "Bolt Pistol",
+   "class": "Pistol",
+   "group": "Bolt",
+   "isMelee": false,
+   "damage": "1d10+5",
+   "sbMultiplier": 0,
+   "damageType": "Explosive",
+   "pen": 4,
+   "rof": {
+    "single": true,
+    "burst": 2,
+    "full": 0
+   },
+   "range_m": 30,
+   "qualities": [
+    "Tearing"
+   ],
+   "source": "src_dh2_core_p151"
+  },
+  {
+   "id": "boltgun",
+   "name": "Boltgun",
+   "class": "Basic",
+   "group": "Bolt",
+   "isMelee": false,
+   "damage": "1d10+5",
+   "sbMultiplier": 0,
+   "damageType": "Explosive",
+   "pen": 4,
+   "rof": {
+    "single": true,
+    "burst": 3,
+    "full": 0
+   },
+   "range_m": 100,
+   "qualities": [
+    "Tearing"
+   ],
+   "source": "src_dh2_core_p151"
+  },
+  {
+   "id": "heavy_bolter",
+   "name": "Heavy Bolter",
+   "class": "Heavy",
+   "group": "Bolt",
+   "isMelee": false,
+   "damage": "1d10+8",
+   "sbMultiplier": 0,
+   "damageType": "Explosive",
+   "pen": 5,
+   "rof": {
+    "single": false,
+    "burst": 0,
+    "full": 6
+   },
+   "range_m": 150,
+   "qualities": [
+    "Tearing"
+   ],
+   "source": "src_dh2_core_p151"
+  },
+  {
+   "id": "storm_bolter",
+   "name": "Storm Bolter",
+   "class": "Basic",
+   "group": "Bolt",
+   "isMelee": false,
+   "damage": "1d10+5",
+   "sbMultiplier": 0,
+   "damageType": "Explosive",
+   "pen": 4,
+   "rof": {
+    "single": true,
+    "burst": 2,
+    "full": 4
+   },
+   "range_m": 90,
+   "qualities": [
+    "Storm",
+    "Tearing"
+   ],
+   "source": "src_dh2_core_p151"
+  },
+  {
+   "id": "hand_flamer",
+   "name": "Hand Flamer",
+   "class": "Pistol",
+   "group": "Flame",
+   "isMelee": false,
+   "damage": "1d10+4",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 2,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 10,
+   "qualities": [
+    "Flame",
+    "Spray"
+   ],
+   "source": "src_dh2_core_p151"
+  },
+  {
+   "id": "flamer",
+   "name": "Flamer",
+   "class": "Basic",
+   "group": "Flame",
+   "isMelee": false,
+   "damage": "1d10+4",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 2,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 20,
+   "qualities": [
+    "Flame",
+    "Spray"
+   ],
+   "source": "src_dh2_core_p151"
+  },
+  {
+   "id": "heavy_flamer",
+   "name": "Heavy Flamer",
+   "class": "Heavy",
+   "group": "Flame",
+   "isMelee": false,
+   "damage": "1d10+5",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 4,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 30,
+   "qualities": [
+    "Flame",
+    "Spray"
+   ],
+   "source": "src_dh2_core_p151"
+  },
+  {
+   "id": "laspistol",
+   "name": "Laspistol",
+   "class": "Pistol",
+   "group": "Las",
+   "isMelee": false,
+   "damage": "1d10+2",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 2,
+    "full": 0
+   },
+   "range_m": 30,
+   "qualities": [
+    "Reliable"
+   ],
+   "source": "src_dh2_core_p151"
+  },
+  {
+   "id": "lasgun",
+   "name": "Lasgun",
+   "class": "Basic",
+   "group": "Las",
+   "isMelee": false,
+   "damage": "1d10+3",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 3,
+    "full": 0
+   },
+   "range_m": 100,
+   "qualities": [
+    "Reliable"
+   ],
+   "source": "src_dh2_core_p151"
+  },
+  {
+   "id": "laslock",
+   "name": "Laslock",
+   "class": "Basic",
+   "group": "Las",
+   "isMelee": false,
+   "damage": "1d10+4",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 70,
+   "qualities": [
+    "Unreliable"
+   ],
+   "source": "src_dh2_core_p151"
+  },
+  {
+   "id": "long_las",
+   "name": "Long Las",
+   "class": "Basic",
+   "group": "Las",
+   "isMelee": false,
+   "damage": "1d10+3",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 1,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 150,
+   "qualities": [
+    "Accurate",
+    "Felling (4)",
+    "Reliable"
+   ],
+   "source": "src_dh2_core_p151"
+  },
+  {
+   "id": "hot_shot_laspistol",
+   "name": "Hot-shot Laspistol",
+   "class": "Pistol",
+   "group": "Las",
+   "isMelee": false,
+   "damage": "1d10+4",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 7,
+   "rof": {
+    "single": true,
+    "burst": 2,
+    "full": 0
+   },
+   "range_m": 20,
+   "qualities": [],
+   "source": "src_dh2_core_p151"
+  },
+  {
+   "id": "hot_shot_lasgun",
+   "name": "Hot-shot Lasgun",
+   "class": "Basic",
+   "group": "Las",
+   "isMelee": false,
+   "damage": "1d10+4",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 7,
+   "rof": {
+    "single": true,
+    "burst": 3,
+    "full": 0
+   },
+   "range_m": 60,
+   "qualities": [],
+   "source": "src_dh2_core_p151"
+  },
+  {
+   "id": "bow",
+   "name": "Bow",
+   "class": "Basic",
+   "group": "Low-Tech",
+   "isMelee": false,
+   "damage": "1d10",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 30,
+   "qualities": [
+    "Primitive (6)",
+    "Reliable"
+   ],
+   "source": "src_dh2_core_p151"
+  },
+  {
+   "id": "crossbow",
+   "name": "Crossbow",
+   "class": "Basic",
+   "group": "Low-Tech",
+   "isMelee": false,
+   "damage": "1d10",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 30,
+   "qualities": [
+    "Primitive (7)"
+   ],
+   "source": "src_dh2_core_p151"
+  },
+  {
+   "id": "inferno_pistol",
+   "name": "Inferno Pistol",
+   "class": "Pistol",
+   "group": "Melta",
+   "isMelee": false,
+   "damage": "2d10+10",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 12,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 10,
+   "qualities": [
+    "Melta"
+   ],
+   "source": "src_dh2_core_p151"
+  },
+  {
+   "id": "meltagun",
+   "name": "Meltagun",
+   "class": "Basic",
+   "group": "Melta",
+   "isMelee": false,
+   "damage": "2d10+10",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 12,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 20,
+   "qualities": [
+    "Melta"
+   ],
+   "source": "src_dh2_core_p151"
+  },
+  {
+   "id": "plasma_pistol",
+   "name": "Plasma Pistol",
+   "class": "Pistol",
+   "group": "Plasma",
+   "isMelee": false,
+   "damage": "1d10+6",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 6,
+   "rof": {
+    "single": true,
+    "burst": 2,
+    "full": 0
+   },
+   "range_m": 30,
+   "qualities": [
+    "Maximal",
+    "Overheats"
+   ],
+   "source": "src_dh2_core_p152"
+  },
+  {
+   "id": "plasma_gun",
+   "name": "Plasma Gun",
+   "class": "Basic",
+   "group": "Plasma",
+   "isMelee": false,
+   "damage": "1d10+7",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 6,
+   "rof": {
+    "single": true,
+    "burst": 2,
+    "full": 0
+   },
+   "range_m": 90,
+   "qualities": [
+    "Maximal",
+    "Overheats"
+   ],
+   "source": "src_dh2_core_p152"
+  },
+  {
+   "id": "autopistol",
+   "name": "Autopistol",
+   "class": "Pistol",
+   "group": "SP",
+   "isMelee": false,
+   "damage": "1d10+2",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 6
+   },
+   "range_m": 30,
+   "qualities": [],
+   "source": "src_dh2_core_p152"
+  },
+  {
+   "id": "autogun",
+   "name": "Autogun",
+   "class": "Basic",
+   "group": "SP",
+   "isMelee": false,
+   "damage": "1d10+3",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 3,
+    "full": 10
+   },
+   "range_m": 100,
+   "qualities": [],
+   "source": "src_dh2_core_p152"
+  },
+  {
+   "id": "autocannon",
+   "name": "Autocannon",
+   "class": "Heavy",
+   "group": "SP",
+   "isMelee": false,
+   "damage": "3d10+8",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 6,
+   "rof": {
+    "single": true,
+    "burst": 3,
+    "full": 0
+   },
+   "range_m": 300,
+   "qualities": [
+    "Reliable"
+   ],
+   "source": "src_dh2_core_p152"
+  },
+  {
+   "id": "hand_cannon",
+   "name": "Hand Cannon",
+   "class": "Pistol",
+   "group": "SP",
+   "isMelee": false,
+   "damage": "1d10+4",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 2,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 35,
+   "qualities": [],
+   "source": "src_dh2_core_p152"
+  },
+  {
+   "id": "heavy_stubber",
+   "name": "Heavy Stubber",
+   "class": "Heavy",
+   "group": "SP",
+   "isMelee": false,
+   "damage": "1d10+4",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 3,
+   "rof": {
+    "single": false,
+    "burst": 0,
+    "full": 8
+   },
+   "range_m": 100,
+   "qualities": [],
+   "source": "src_dh2_core_p152"
+  },
+  {
+   "id": "shotgun",
+   "name": "Shotgun",
+   "class": "Basic",
+   "group": "SP",
+   "isMelee": false,
+   "damage": "1d10+4",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 30,
+   "qualities": [
+    "Scatter"
+   ],
+   "source": "src_dh2_core_p152"
+  },
+  {
+   "id": "combat_shotgun",
+   "name": "Shotgun (Combat)",
+   "class": "Basic",
+   "group": "SP",
+   "isMelee": false,
+   "damage": "1d10+4",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 3,
+    "full": 0
+   },
+   "range_m": 30,
+   "qualities": [
+    "Scatter"
+   ],
+   "source": "src_dh2_core_p152"
+  },
+  {
+   "id": "sniper_rifle",
+   "name": "Sniper Rifle",
+   "class": "Basic",
+   "group": "SP",
+   "isMelee": false,
+   "damage": "1d10+4",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 3,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 200,
+   "qualities": [
+    "Accurate",
+    "Reliable"
+   ],
+   "source": "src_dh2_core_p152"
+  },
+  {
+   "id": "stub_automatic",
+   "name": "Stub Automatic",
+   "class": "Pistol",
+   "group": "SP",
+   "isMelee": false,
+   "damage": "1d10+3",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 3,
+    "full": 0
+   },
+   "range_m": 30,
+   "qualities": [],
+   "source": "src_dh2_core_p152"
+  },
+  {
+   "id": "stub_revolver",
+   "name": "Stub Revolver",
+   "class": "Pistol",
+   "group": "SP",
+   "isMelee": false,
+   "damage": "1d10+3",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 30,
+   "qualities": [
+    "Reliable"
+   ],
+   "source": "src_dh2_core_p152"
+  },
+  {
+   "id": "grav_pistol",
+   "name": "Grav Pistol",
+   "class": "Pistol",
+   "group": "Exotic",
+   "isMelee": false,
+   "damage": "1d10+3",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 6,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 15,
+   "qualities": [
+    "Concussive (1)",
+    "Graviton"
+   ],
+   "source": "src_dh2_core_p152"
+  },
+  {
+   "id": "graviton_gun",
+   "name": "Graviton Gun",
+   "class": "Basic",
+   "group": "Exotic",
+   "isMelee": false,
+   "damage": "1d10+6",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 8,
+   "rof": {
+    "single": true,
+    "burst": 3,
+    "full": 0
+   },
+   "range_m": 30,
+   "qualities": [
+    "Concussive (2)",
+    "Graviton"
+   ],
+   "source": "src_dh2_core_p152"
+  },
+  {
+   "id": "needle_pistol",
+   "name": "Needle Pistol",
+   "class": "Pistol",
+   "group": "Exotic",
+   "isMelee": false,
+   "damage": "1d10",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 30,
+   "qualities": [
+    "Accurate",
+    "Felling (1)",
+    "Toxic (5)"
+   ],
+   "source": "src_dh2_core_p152"
+  },
+  {
+   "id": "needle_rifle",
+   "name": "Needle Rifle",
+   "class": "Basic",
+   "group": "Exotic",
+   "isMelee": false,
+   "damage": "1d10",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 180,
+   "qualities": [
+    "Accurate",
+    "Felling (1)",
+    "Toxic (5)"
+   ],
+   "source": "src_dh2_core_p152"
+  },
+  {
+   "id": "frag_grenade",
+   "name": "Frag Grenade",
+   "class": "Thrown",
+   "group": "Grenade",
+   "isMelee": false,
+   "damage": "2d10",
+   "sbMultiplier": 0,
+   "damageType": "Explosive",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": "SBx3",
+   "qualities": [
+    "Blast (3)"
+   ],
+   "source": "src_dh2_core_p157"
+  },
+  {
+   "id": "krak_grenade",
+   "name": "Krak Grenade",
+   "class": "Thrown",
+   "group": "Grenade",
+   "isMelee": false,
+   "damage": "2d10+4",
+   "sbMultiplier": 0,
+   "damageType": "Explosive",
+   "pen": 6,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": "SBx3",
+   "qualities": [
+    "Concussive (0)"
+   ],
+   "source": "src_dh2_core_p157"
+  },
+  {
+   "id": "frag_missile",
+   "name": "Frag Missile",
+   "class": "Missile",
+   "group": "Missile",
+   "isMelee": false,
+   "damage": "2d10+2",
+   "sbMultiplier": 0,
+   "damageType": "Explosive",
+   "pen": 2,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Blast (5)"
+   ],
+   "source": "src_dh2_core_p157"
+  },
+  {
+   "id": "krak_missile",
+   "name": "Krak Missile",
+   "class": "Missile",
+   "group": "Missile",
+   "isMelee": false,
+   "damage": "3d10+8",
+   "sbMultiplier": 0,
+   "damageType": "Explosive",
+   "pen": 8,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Concussive (3)",
+    "Proven (2)"
+   ],
+   "source": "src_dh2_core_p157"
+  },
+  {
+   "id": "fire_bomb",
+   "name": "Fire Bomb",
+   "class": "Thrown",
+   "group": "Explosive",
+   "isMelee": false,
+   "damage": "1d10+2",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": "SBx3",
+   "qualities": [
+    "Blast (2)",
+    "Flame"
+   ],
+   "source": "src_dh2_core_p157"
+  },
+  {
+   "id": "melta_bomb",
+   "name": "Melta Bomb",
+   "class": "Placed",
+   "group": "Explosive",
+   "isMelee": false,
+   "damage": "6d10",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 12,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Blast (2)",
+    "Flame",
+    "Melta"
+   ],
+   "source": "src_dh2_core_p157"
+  },
+  {
+   "id": "chainaxe",
+   "name": "Chainaxe",
+   "class": "Melee",
+   "group": "Chain",
+   "isMelee": true,
+   "damage": "1d10+4",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 2,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Tearing",
+    "Two-Handed"
+   ],
+   "source": "src_dh2_core_p159"
+  },
+  {
+   "id": "chainblade",
+   "name": "Chainblade",
+   "class": "Melee",
+   "group": "Chain",
+   "isMelee": true,
+   "damage": "1d10+1",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 1,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Tearing"
+   ],
+   "source": "src_dh2_core_p159"
+  },
+  {
+   "id": "chainsword",
+   "name": "Chainsword",
+   "class": "Melee",
+   "group": "Chain",
+   "isMelee": true,
+   "damage": "1d10+2",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 2,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Balanced",
+    "Tearing"
+   ],
+   "source": "src_dh2_core_p159"
+  },
+  {
+   "id": "eviscerator",
+   "name": "Eviscerator",
+   "class": "Melee",
+   "group": "Chain",
+   "isMelee": true,
+   "damage": "2d10",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 9,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Razor Sharp",
+    "Tearing",
+    "Two-Handed",
+    "Unwieldy"
+   ],
+   "source": "src_dh2_core_p159"
+  },
+  {
+   "id": "force_sword",
+   "name": "Force Sword",
+   "class": "Melee",
+   "group": "Force",
+   "isMelee": true,
+   "damage": "1d10+1",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 2,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Balanced",
+    "Force"
+   ],
+   "source": "src_dh2_core_p159"
+  },
+  {
+   "id": "force_staff",
+   "name": "Force Staff",
+   "class": "Melee",
+   "group": "Force",
+   "isMelee": true,
+   "damage": "1d10",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 2,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Force",
+    "Two-Handed"
+   ],
+   "source": "src_dh2_core_p159"
+  },
+  {
+   "id": "great_weapon",
+   "name": "Great Weapon",
+   "class": "Melee",
+   "group": "Low-Tech",
+   "isMelee": true,
+   "damage": "2d10",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Unbalanced",
+    "Two-Handed"
+   ],
+   "source": "src_dh2_core_p159"
+  },
+  {
+   "id": "hunting_lance",
+   "name": "Hunting Lance",
+   "class": "Melee",
+   "group": "Low-Tech",
+   "isMelee": true,
+   "damage": "2d10+3",
+   "sbMultiplier": 0,
+   "damageType": "Explosive",
+   "pen": 7,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Concussive (3)"
+   ],
+   "source": "src_dh2_core_p159"
+  },
+  {
+   "id": "improvised",
+   "name": "Improvised",
+   "class": "Melee",
+   "group": "Low-Tech",
+   "isMelee": true,
+   "damage": "1d10-2",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Primitive (7)",
+    "Unbalanced"
+   ],
+   "source": "src_dh2_core_p159"
+  },
+  {
+   "id": "knife",
+   "name": "Knife",
+   "class": "Melee/Thrown",
+   "group": "Low-Tech",
+   "isMelee": true,
+   "damage": "1d5",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 5,
+   "qualities": [],
+   "source": "src_dh2_core_p159"
+  },
+  {
+   "id": "shield",
+   "name": "Shield",
+   "class": "Melee",
+   "group": "Low-Tech",
+   "isMelee": true,
+   "damage": "1d5",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Defensive"
+   ],
+   "source": "src_dh2_core_p159"
+  },
+  {
+   "id": "spear",
+   "name": "Spear",
+   "class": "Melee",
+   "group": "Low-Tech",
+   "isMelee": true,
+   "damage": "1d10",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Primitive (8)",
+    "Two-Handed"
+   ],
+   "source": "src_dh2_core_p159"
+  },
+  {
+   "id": "staff",
+   "name": "Staff",
+   "class": "Melee",
+   "group": "Low-Tech",
+   "isMelee": true,
+   "damage": "1d10",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Balanced",
+    "Primitive (7)",
+    "Two-Handed"
+   ],
+   "source": "src_dh2_core_p159"
+  },
+  {
+   "id": "sword",
+   "name": "Sword",
+   "class": "Melee",
+   "group": "Low-Tech",
+   "isMelee": true,
+   "damage": "1d10",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Balanced"
+   ],
+   "source": "src_dh2_core_p159"
+  },
+  {
+   "id": "truncheon",
+   "name": "Truncheon",
+   "class": "Melee",
+   "group": "Low-Tech",
+   "isMelee": true,
+   "damage": "1d10",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Primitive (7)"
+   ],
+   "source": "src_dh2_core_p159"
+  },
+  {
+   "id": "warhammer",
+   "name": "Warhammer",
+   "class": "Melee",
+   "group": "Low-Tech",
+   "isMelee": true,
+   "damage": "1d10+3",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 1,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Concussive (1)",
+    "Primitive (8)",
+    "Two-Handed"
+   ],
+   "source": "src_dh2_core_p159"
+  },
+  {
+   "id": "whip",
+   "name": "Whip",
+   "class": "Melee",
+   "group": "Low-Tech",
+   "isMelee": true,
+   "damage": "1d10",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 3,
+   "qualities": [
+    "Flexible",
+    "Primitive (6)"
+   ],
+   "source": "src_dh2_core_p159"
+  },
+  {
+   "id": "omnissian_axe",
+   "name": "Omnissian Axe",
+   "class": "Melee",
+   "group": "Power",
+   "isMelee": true,
+   "damage": "2d10+4",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 6,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Power Field",
+    "Unbalanced",
+    "Two-Handed"
+   ],
+   "source": "src_dh2_core_p159"
+  },
+  {
+   "id": "power_fist",
+   "name": "Power Fist",
+   "class": "Melee",
+   "group": "Power",
+   "isMelee": true,
+   "damage": "2d10",
+   "sbMultiplier": 2,
+   "damageType": "Energy",
+   "pen": 9,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Power Field",
+    "Unwieldy",
+    "Special: SB x2 damage"
+   ],
+   "source": "src_dh2_core_p159"
+  },
+  {
+   "id": "power_sword",
+   "name": "Power Sword",
+   "class": "Melee",
+   "group": "Power",
+   "isMelee": true,
+   "damage": "1d10+5",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 5,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Balanced",
+    "Power Field"
+   ],
+   "source": "src_dh2_core_p159"
+  },
+  {
+   "id": "power_axe",
+   "name": "Power Axe",
+   "class": "Melee",
+   "group": "Power",
+   "isMelee": true,
+   "damage": "1d10+7",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 7,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Power Field",
+    "Unbalanced",
+    "Two-Handed"
+   ],
+   "source": "src_dh2_core_p159"
+  },
+  {
+   "id": "power_maul_high",
+   "name": "Power Maul (High)",
+   "class": "Melee",
+   "group": "Power",
+   "isMelee": true,
+   "damage": "1d10+5",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 4,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Power Field",
+    "Shocking"
+   ],
+   "source": "src_dh2_core_p159"
+  },
+  {
+   "id": "power_maul_low",
+   "name": "Power Maul (Low)",
+   "class": "Melee",
+   "group": "Power",
+   "isMelee": true,
+   "damage": "1d10+1",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 2,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Shocking"
+   ],
+   "source": "src_dh2_core_p159"
+  },
+  {
+   "id": "shock_maul",
+   "name": "Shock Maul",
+   "class": "Melee",
+   "group": "Shock",
+   "isMelee": true,
+   "damage": "1d10+3",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Shocking"
+   ],
+   "source": "src_dh2_core_p159"
+  },
+  {
+   "id": "shock_whip",
+   "name": "Shock Whip",
+   "class": "Melee",
+   "group": "Shock",
+   "isMelee": true,
+   "damage": "1d10+1",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 3,
+   "qualities": [
+    "Flexible",
+    "Shocking"
+   ],
+   "source": "src_dh2_core_p159"
+  },
+  {
+   "id": "godwyn_deaz_bolt_pistol",
+   "name": "Godwyn-De'az Bolt Pistol",
+   "class": "Pistol",
+   "group": "Bolt",
+   "isMelee": false,
+   "damage": "1d10+5",
+   "sbMultiplier": 0,
+   "damageType": "Explosive",
+   "pen": 4,
+   "rof": {
+    "single": true,
+    "burst": 2,
+    "full": 0
+   },
+   "range_m": 40,
+   "qualities": [
+    "Reliable",
+    "Tearing"
+   ],
+   "source": "src_dh2_within_p42"
+  },
+  {
+   "id": "godwyn_deaz_bolter",
+   "name": "Godwyn-De'az Bolter",
+   "class": "Basic",
+   "group": "Bolt",
+   "isMelee": false,
+   "damage": "1d10+5",
+   "sbMultiplier": 0,
+   "damageType": "Explosive",
+   "pen": 4,
+   "rof": {
+    "single": true,
+    "burst": 2,
+    "full": 0
+   },
+   "range_m": 90,
+   "qualities": [
+    "Reliable",
+    "Tearing"
+   ],
+   "source": "src_dh2_within_p42"
+  },
+  {
+   "id": "godwyn_deaz_heavy_bolter",
+   "name": "Godwyn-De'az Heavy Bolter",
+   "class": "Heavy",
+   "group": "Bolt",
+   "isMelee": false,
+   "damage": "1d10+8",
+   "sbMultiplier": 0,
+   "damageType": "Explosive",
+   "pen": 5,
+   "rof": {
+    "single": false,
+    "burst": 0,
+    "full": 6
+   },
+   "range_m": 140,
+   "qualities": [
+    "Reliable",
+    "Tearing"
+   ],
+   "source": "src_dh2_within_p42"
+  },
+  {
+   "id": "godwyn_deaz_storm_bolter",
+   "name": "Godwyn-De'az Storm Bolter",
+   "class": "Basic",
+   "group": "Bolt",
+   "isMelee": false,
+   "damage": "1d10+5",
+   "sbMultiplier": 0,
+   "damageType": "Explosive",
+   "pen": 4,
+   "rof": {
+    "single": true,
+    "burst": 2,
+    "full": 4
+   },
+   "range_m": 80,
+   "qualities": [
+    "Reliable",
+    "Storm",
+    "Tearing"
+   ],
+   "source": "src_dh2_within_p42"
+  },
+  {
+   "id": "cerberus_heavy_flamer",
+   "name": "Cerberus Heavy Flamer",
+   "class": "Heavy",
+   "group": "Flame",
+   "isMelee": false,
+   "damage": "1d10+5",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 3,
+   "rof": {
+    "single": true,
+    "burst": 2,
+    "full": 0
+   },
+   "range_m": 30,
+   "qualities": [
+    "Flame",
+    "Reliable",
+    "Spray"
+   ],
+   "source": "src_dh2_within_p42"
+  },
+  {
+   "id": "gorgon_chemical_flamer",
+   "name": "Gorgon Chemical Flamer",
+   "class": "Basic",
+   "group": "Flame",
+   "isMelee": false,
+   "damage": "1d10+4",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 2,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 20,
+   "qualities": [
+    "Corrosive",
+    "Felling (1)",
+    "Flame",
+    "Spray",
+    "Toxic (2)"
+   ],
+   "source": "src_dh2_within_p42"
+  },
+  {
+   "id": "hydra_flamer_array",
+   "name": "Hydra Flamer Array",
+   "class": "Basic",
+   "group": "Flame",
+   "isMelee": false,
+   "damage": "1d10+4",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 2,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 8,
+   "qualities": [
+    "Flame",
+    "Proven (3)",
+    "Spray"
+   ],
+   "source": "src_dh2_within_p42"
+  },
+  {
+   "id": "arquebus",
+   "name": "Arquebus",
+   "class": "Basic",
+   "group": "Low-Tech",
+   "isMelee": false,
+   "damage": "2d10",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 2,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 45,
+   "qualities": [
+    "Concussive (1)",
+    "Inaccurate",
+    "Unreliable"
+   ],
+   "source": "src_dh2_within_p42"
+  },
+  {
+   "id": "castigator_heavy_crossbow",
+   "name": "Castigator Heavy Crossbow",
+   "class": "Heavy",
+   "group": "Low-Tech",
+   "isMelee": false,
+   "damage": "1d10+6",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 1,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 70,
+   "qualities": [
+    "Concussive (2)",
+    "Reliable"
+   ],
+   "source": "src_dh2_within_p42"
+  },
+  {
+   "id": "deliverance_light_crossbow",
+   "name": "Deliverance Light Crossbow",
+   "class": "Pistol",
+   "group": "Low-Tech",
+   "isMelee": false,
+   "damage": "1d10",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 15,
+   "qualities": [
+    "Primitive (7)"
+   ],
+   "source": "src_dh2_within_p42"
+  },
+  {
+   "id": "drakes_claw",
+   "name": "Drake's Claw",
+   "class": "Heavy",
+   "group": "Low-Tech",
+   "isMelee": false,
+   "damage": "1d10+2",
+   "sbMultiplier": 0,
+   "damageType": "Explosive",
+   "pen": 2,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 200,
+   "qualities": [
+    "Blast (3)",
+    "Crippling (1)",
+    "Inaccurate",
+    "Primitive (7)",
+    "Tearing"
+   ],
+   "source": "src_dh2_within_p42"
+  },
+  {
+   "id": "flintlock_pistol",
+   "name": "Flintlock Pistol",
+   "class": "Pistol",
+   "group": "Low-Tech",
+   "isMelee": false,
+   "damage": "1d10+2",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 15,
+   "qualities": [
+    "Inaccurate",
+    "Primitive (8)",
+    "Unreliable"
+   ],
+   "source": "src_dh2_within_p42"
+  },
+  {
+   "id": "longflame",
+   "name": "Longflame",
+   "class": "Heavy",
+   "group": "Low-Tech",
+   "isMelee": false,
+   "damage": "1d10",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 200,
+   "qualities": [
+    "Blast (4)",
+    "Flame",
+    "Inaccurate",
+    "Primitive (8)"
+   ],
+   "source": "src_dh2_within_p42"
+  },
+  {
+   "id": "musket",
+   "name": "Musket",
+   "class": "Basic",
+   "group": "Low-Tech",
+   "isMelee": false,
+   "damage": "1d10+3",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 30,
+   "qualities": [
+    "Inaccurate",
+    "Primitive (8)",
+    "Unreliable"
+   ],
+   "source": "src_dh2_within_p42"
+  },
+  {
+   "id": "snapper_repeating_rifle",
+   "name": "Snapper Repeating Rifle",
+   "class": "Basic",
+   "group": "Low-Tech",
+   "isMelee": false,
+   "damage": "1d10+3",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 2,
+    "full": 0
+   },
+   "range_m": 50,
+   "qualities": [
+    "Inaccurate",
+    "Overheats",
+    "Primitive (8)",
+    "Unreliable"
+   ],
+   "source": "src_dh2_within_p42"
+  },
+  {
+   "id": "sentinel_plasma_rifle",
+   "name": "Sentinel Plasma Rifle",
+   "class": "Basic",
+   "group": "Plasma",
+   "isMelee": false,
+   "damage": "1d10+5",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 3,
+   "rof": {
+    "single": true,
+    "burst": 5,
+    "full": 10
+   },
+   "range_m": 120,
+   "qualities": [
+    "Reliable"
+   ],
+   "source": "src_dh2_within_p42"
+  },
+  {
+   "id": "purgatus_crossbow",
+   "name": "Purgatus Crossbow",
+   "class": "Basic",
+   "group": "Exotic",
+   "isMelee": false,
+   "damage": "1d10+5",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 50,
+   "qualities": [
+    "Reliable"
+   ],
+   "source": "src_dh2_within_p42"
+  },
+  {
+   "id": "condemnor",
+   "name": "Condemnor",
+   "class": "Basic",
+   "group": "Exotic",
+   "isMelee": false,
+   "damage": "1d10+4",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 2,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 100,
+   "qualities": [
+    "Accurate",
+    "Reliable"
+   ],
+   "source": "src_dh2_within_p42"
+  },
+  {
+   "id": "psyk_out_grenade",
+   "name": "Psyk-Out Grenade",
+   "class": "Thrown",
+   "group": "Grenade",
+   "isMelee": false,
+   "damage": "1d10",
+   "sbMultiplier": 0,
+   "damageType": "Explosive",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": "SBx3",
+   "qualities": [
+    "Blast (3)",
+    "Smoke (3)"
+   ],
+   "source": "src_dh2_within_p44"
+  },
+  {
+   "id": "rad_grenade",
+   "name": "Rad Grenade",
+   "class": "Thrown",
+   "group": "Grenade",
+   "isMelee": false,
+   "damage": "1d10",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": "SBx3",
+   "qualities": [
+    "Blast (2)"
+   ],
+   "source": "src_dh2_within_p44"
+  },
+  {
+   "id": "tears_of_the_emperor",
+   "name": "Tears of the Emperor",
+   "class": "Thrown",
+   "group": "Grenade",
+   "isMelee": false,
+   "damage": "1d10",
+   "sbMultiplier": 0,
+   "damageType": "Explosive",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": "SBx3",
+   "qualities": [
+    "Blast (2)",
+    "Sanctified"
+   ],
+   "source": "src_dh2_within_p44"
+  },
+  {
+   "id": "whitefire_grenade",
+   "name": "Whitefire Grenade",
+   "class": "Thrown",
+   "group": "Grenade",
+   "isMelee": false,
+   "damage": "1d10+4",
+   "sbMultiplier": 0,
+   "damageType": "Explosive",
+   "pen": 3,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": "SBx3",
+   "qualities": [
+    "Blast (3)",
+    "Corrosive",
+    "Flame",
+    "Smoke (5)",
+    "Toxic (2)"
+   ],
+   "source": "src_dh2_within_p44"
+  },
+  {
+   "id": "brazier_of_holy_fire",
+   "name": "Brazier of Holy Fire",
+   "class": "Melee",
+   "group": "Flame",
+   "isMelee": true,
+   "damage": "1d10+5",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 3,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Flame",
+    "Unbalanced"
+   ],
+   "source": "src_dh2_within_p46"
+  },
+  {
+   "id": "fire_gauntlets",
+   "name": "Fire Gauntlets",
+   "class": "Melee",
+   "group": "Flame",
+   "isMelee": true,
+   "damage": "1d10",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 2,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Flame",
+    "Unbalanced"
+   ],
+   "source": "src_dh2_within_p46"
+  },
+  {
+   "id": "axe_of_retribution",
+   "name": "Axe of Retribution",
+   "class": "Melee",
+   "group": "Low-Tech",
+   "isMelee": true,
+   "damage": "2d10",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 6,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Felling (2)",
+    "Sanctified",
+    "Two-Handed"
+   ],
+   "source": "src_dh2_within_p46"
+  },
+  {
+   "id": "ablative_projector",
+   "name": "Ablative Projector",
+   "class": "Basic",
+   "group": "Xenos-Lost",
+   "isMelee": false,
+   "damage": "1d10+8",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 5,
+   "rof": {
+    "single": true,
+    "burst": 2,
+    "full": 0
+   },
+   "range_m": 100,
+   "qualities": [
+    "Reliable",
+    "Vengeful (9)"
+   ],
+   "source": "src_dh2_without_p50"
+  },
+  {
+   "id": "cascade_lance_melee",
+   "name": "Cascade Lance (Melee)",
+   "class": "Melee",
+   "group": "Xenos-Lost",
+   "isMelee": true,
+   "damage": "1d10+6",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 8,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Concussive (1)",
+    "Power Field"
+   ],
+   "source": "src_dh2_without_p50"
+  },
+  {
+   "id": "cascade_lance_ranged",
+   "name": "Cascade Lance (Ranged)",
+   "class": "Basic",
+   "group": "Xenos-Lost",
+   "isMelee": false,
+   "damage": "1d10+12",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 10,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 15,
+   "qualities": [
+    "Proven (5)",
+    "Reliable"
+   ],
+   "source": "src_dh2_without_p50"
+  },
+  {
+   "id": "concussion_beamer",
+   "name": "Concussion Beamer",
+   "class": "Pistol",
+   "group": "Xenos-Lost",
+   "isMelee": false,
+   "damage": "2d10+5",
+   "sbMultiplier": 0,
+   "damageType": "Explosive",
+   "pen": 4,
+   "rof": {
+    "single": true,
+    "burst": 3,
+    "full": 0
+   },
+   "range_m": 30,
+   "qualities": [
+    "Concussive (1)",
+    "Reliable"
+   ],
+   "source": "src_dh2_without_p50"
+  },
+  {
+   "id": "molecular_blade",
+   "name": "Molecular Blade",
+   "class": "Melee",
+   "group": "Xenos-Lost",
+   "isMelee": true,
+   "damage": "1d10",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 5,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Corrosive",
+    "Razor Sharp",
+    "Tearing"
+   ],
+   "source": "src_dh2_without_p50"
+  },
+  {
+   "id": "resonance_arc",
+   "name": "Resonance Arc",
+   "class": "Basic",
+   "group": "Xenos-Lost",
+   "isMelee": false,
+   "damage": "2d10+3",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 3,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 75,
+   "qualities": [
+    "Shocking",
+    "Reliable"
+   ],
+   "source": "src_dh2_without_p50"
+  },
+  {
+   "id": "akvran_cutter",
+   "name": "Akvran Cutter",
+   "class": "Thrown",
+   "group": "Xenos-Lost",
+   "isMelee": false,
+   "damage": "2d10",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 6,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": "3xSB",
+   "qualities": [
+    "Blast (3)",
+    "Concussive (3)",
+    "Proven (4)"
+   ],
+   "source": "src_dh2_without_p51"
+  },
+  {
+   "id": "guldaniri_bile_projector",
+   "name": "Guldaniri Bile Projector",
+   "class": "Basic",
+   "group": "Xenos-Lost",
+   "isMelee": false,
+   "damage": "3d10",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 60,
+   "qualities": [
+    "Blast (2)",
+    "Corrosive",
+    "Toxic (2)"
+   ],
+   "source": "src_dh2_without_p51"
+  },
+  {
+   "id": "havatian_ringblade_melee",
+   "name": "Havatian Ringblade (Melee)",
+   "class": "Melee",
+   "group": "Xenos-Lost",
+   "isMelee": true,
+   "damage": "1d10+4",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 3,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Razor Sharp"
+   ],
+   "source": "src_dh2_without_p51"
+  },
+  {
+   "id": "psycannon",
+   "name": "Psycannon",
+   "class": "Heavy",
+   "group": "Bolt",
+   "isMelee": false,
+   "damage": "2d10+5",
+   "sbMultiplier": 0,
+   "damageType": "Explosive",
+   "pen": 5,
+   "rof": {
+    "single": false,
+    "burst": 2,
+    "full": 5
+   },
+   "range_m": 120,
+   "qualities": [
+    "Daemonbane",
+    "Reliable",
+    "Tearing"
+   ],
+   "source": "src_dh2_beyond_p41"
+  },
+  {
+   "id": "incinerator",
+   "name": "Incinerator",
+   "class": "Basic",
+   "group": "Flame",
+   "isMelee": false,
+   "damage": "1d10+6",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 6,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 30,
+   "qualities": [
+    "Daemonbane",
+    "Flame",
+    "Spray"
+   ],
+   "source": "src_dh2_beyond_p41"
+  },
+  {
+   "id": "hellrifle",
+   "name": "Hellrifle",
+   "class": "Basic",
+   "group": "Exotic",
+   "isMelee": false,
+   "damage": "1d10+4",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 4,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 300,
+   "qualities": [
+    "Felling (2)"
+   ],
+   "source": "src_dh2_beyond_p41"
+  },
+  {
+   "id": "silverseine_launcher",
+   "name": "Silverseine Launcher",
+   "class": "Heavy",
+   "group": "Exotic",
+   "isMelee": false,
+   "damage": "1d10",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 60,
+   "qualities": [
+    "Blast (4)",
+    "Reliable",
+    "Sanctified",
+    "Snare (2)"
+   ],
+   "source": "src_dh2_beyond_p41"
+  },
+  {
+   "id": "abyssal_charge",
+   "name": "Abyssal Charge",
+   "class": "Thrown",
+   "group": "Grenade",
+   "isMelee": false,
+   "damage": "1d10+4",
+   "sbMultiplier": 0,
+   "damageType": "Explosive",
+   "pen": 4,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": "SBx3",
+   "qualities": [
+    "Blast (3)",
+    "Crippling (2)",
+    "Tainted"
+   ],
+   "source": "src_dh2_beyond_p41"
+  },
+  {
+   "id": "argent_globe",
+   "name": "Argent Globe",
+   "class": "Thrown",
+   "group": "Grenade",
+   "isMelee": false,
+   "damage": "2d10",
+   "sbMultiplier": 0,
+   "damageType": "Explosive",
+   "pen": 2,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": "SBx3",
+   "qualities": [
+    "Blast (3)",
+    "Crippling (3)\u2020",
+    "Sanctified"
+   ],
+   "source": "src_dh2_beyond_p41"
+  },
+  {
+   "id": "ironfaith_incense_grenade",
+   "name": "\"Ironfaith\" Incense Grenade",
+   "class": "Thrown",
+   "group": "Grenade",
+   "isMelee": false,
+   "damage": "1d10",
+   "sbMultiplier": 0,
+   "damageType": "Explosive",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": "SBx3",
+   "qualities": [
+    "Daemonbane",
+    "Sanctified",
+    "Smoke (3)"
+   ],
+   "source": "src_dh2_beyond_p41"
+  },
+  {
+   "id": "animus_hammer",
+   "name": "Animus Hammer",
+   "class": "Melee",
+   "group": "Force",
+   "isMelee": true,
+   "damage": "2d10+10",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 4,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Daemonbane",
+    "Force",
+    "Power Field",
+    "Unwieldy"
+   ],
+   "source": "src_dh2_beyond_p42"
+  },
+  {
+   "id": "force_hammer",
+   "name": "Force Hammer",
+   "class": "Melee",
+   "group": "Force",
+   "isMelee": true,
+   "damage": "2d10",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Force",
+    "Unbalanced"
+   ],
+   "source": "src_dh2_beyond_p42"
+  },
+  {
+   "id": "nemesis_hammer",
+   "name": "Nemesis Hammer",
+   "class": "Melee",
+   "group": "Force",
+   "isMelee": true,
+   "damage": "2d10+1",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 8,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Daemonbane",
+    "Force",
+    "Power Field",
+    "Unwieldy"
+   ],
+   "source": "src_dh2_beyond_p42"
+  },
+  {
+   "id": "desoleum_power_blade",
+   "name": "Desoleum Power Blade",
+   "class": "Melee",
+   "group": "Power",
+   "isMelee": true,
+   "damage": "1d10+3",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 5,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Power Field"
+   ],
+   "source": "src_dh2_without_p43"
+  },
+  {
+   "id": "digi_weapon",
+   "name": "Digi-Weapon",
+   "class": "Pistol",
+   "group": "Exotic",
+   "isMelee": false,
+   "damage": "1d10+2",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 3,
+   "qualities": [
+    "Reliable"
+   ],
+   "source": "src_dh2_without_p45"
+  },
+  {
+   "id": "firesprite_needler",
+   "name": "Firesprite Needler",
+   "class": "Pistol",
+   "group": "Exotic",
+   "isMelee": false,
+   "damage": "1d10+2",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 2,
+   "rof": {
+    "single": false,
+    "burst": 4,
+    "full": 8
+   },
+   "range_m": 30,
+   "qualities": [
+    "Inaccurate",
+    "Toxic (2)"
+   ],
+   "source": "src_dh2_without_p45"
+  },
+  {
+   "id": "ghostblade",
+   "name": "Ghostblade",
+   "class": "Melee",
+   "group": "Power",
+   "isMelee": true,
+   "damage": "1d10+5",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 6,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Felling (4)",
+    "Razor Sharp",
+    "Overheats"
+   ],
+   "source": "src_dh2_without_p45"
+  },
+  {
+   "id": "graviton_grenade",
+   "name": "Graviton Grenade",
+   "class": "Thrown",
+   "group": "Exotic",
+   "isMelee": false,
+   "damage": "1d10+7",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 7,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Blast (3)",
+    "Concussive (3)",
+    "Graviton"
+   ],
+   "source": "src_dh2_without_p45"
+  },
+  {
+   "id": "graviton_hammer",
+   "name": "Graviton Hammer",
+   "class": "Melee",
+   "group": "Power",
+   "isMelee": true,
+   "damage": "2d10+5",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 7,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Concussive (3)",
+    "Graviton"
+   ],
+   "source": "src_dh2_without_p45"
+  },
+  {
+   "id": "integration_cannon",
+   "name": "Integration Cannon",
+   "class": "Heavy",
+   "group": "Exotic",
+   "isMelee": false,
+   "damage": "4d10+4",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 8,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 100,
+   "qualities": [
+    "Blast (5)",
+    "Concussive (0)",
+    "Inaccurate"
+   ],
+   "source": "src_dh2_without_p45"
+  },
+  {
+   "id": "silver_shield_dh24",
+   "name": "Silver Shield",
+   "class": "Melee",
+   "group": "Low-Tech",
+   "isMelee": true,
+   "damage": "1d5+1",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 1,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Defensive"
+   ],
+   "source": "src_dh2_without_p45"
+  },
+  {
+   "id": "agoniser",
+   "name": "Agoniser",
+   "class": "Melee",
+   "group": "Power",
+   "isMelee": true,
+   "damage": "1d10+3",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 6,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 3,
+   "qualities": [
+    "Flexible",
+    "Power Field",
+    "Tearing",
+    "Shocking"
+   ],
+   "source": "src_dh2_without_p47"
+  },
+  {
+   "id": "eldar_plasma_grenade",
+   "name": "Eldar Plasma Grenade",
+   "class": "Thrown",
+   "group": "Plasma",
+   "isMelee": false,
+   "damage": "1d10+8",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 8,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Blast (4)",
+    "Shocking"
+   ],
+   "source": "src_dh2_without_p47"
+  },
+  {
+   "id": "eldar_power_sword",
+   "name": "Eldar Power Sword",
+   "class": "Melee",
+   "group": "Power",
+   "isMelee": true,
+   "damage": "1d10+5",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 4,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Balanced",
+    "Power Field"
+   ],
+   "source": "src_dh2_without_p47"
+  },
+  {
+   "id": "harlequins_kiss",
+   "name": "Harlequin's Kiss",
+   "class": "Melee",
+   "group": "Exotic",
+   "isMelee": true,
+   "damage": "1d10+8",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 10,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Felling (4)",
+    "Tearing"
+   ],
+   "source": "src_dh2_without_p47"
+  },
+  {
+   "id": "shardcarbine",
+   "name": "Shardcarbine",
+   "class": "Basic",
+   "group": "Exotic",
+   "isMelee": false,
+   "damage": "1d10+2",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 3,
+   "rof": {
+    "single": true,
+    "burst": 3,
+    "full": 5
+   },
+   "range_m": 60,
+   "qualities": [
+    "Storm",
+    "Toxic (1)"
+   ],
+   "source": "src_dh2_without_p47"
+  },
+  {
+   "id": "shuriken_cannon",
+   "name": "Shuriken Cannon",
+   "class": "Heavy",
+   "group": "Exotic",
+   "isMelee": false,
+   "damage": "1d10+6",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 4,
+   "rof": {
+    "single": false,
+    "burst": 0,
+    "full": 10
+   },
+   "range_m": 60,
+   "qualities": [
+    "Razor Sharp",
+    "Reliable"
+   ],
+   "source": "src_dh2_without_p47"
+  },
+  {
+   "id": "shuriken_catapult",
+   "name": "Shuriken Catapult",
+   "class": "Basic",
+   "group": "Exotic",
+   "isMelee": false,
+   "damage": "1d10+4",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 3,
+   "rof": {
+    "single": true,
+    "burst": 3,
+    "full": 10
+   },
+   "range_m": 80,
+   "qualities": [
+    "Razor Sharp",
+    "Reliable"
+   ],
+   "source": "src_dh2_without_p47"
+  },
+  {
+   "id": "shuriken_pistol",
+   "name": "Shuriken Pistol",
+   "class": "Pistol",
+   "group": "Exotic",
+   "isMelee": false,
+   "damage": "1d10+4",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 3,
+   "rof": {
+    "single": true,
+    "burst": 3,
+    "full": 0
+   },
+   "range_m": 30,
+   "qualities": [
+    "Razor Sharp",
+    "Reliable"
+   ],
+   "source": "src_dh2_without_p47"
+  },
+  {
+   "id": "splinter_cannon",
+   "name": "Splinter Cannon",
+   "class": "Heavy",
+   "group": "Exotic",
+   "isMelee": false,
+   "damage": "1d10+5",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 4,
+   "rof": {
+    "single": false,
+    "burst": 0,
+    "full": 10
+   },
+   "range_m": 110,
+   "qualities": [
+    "Tearing",
+    "Toxic (4)"
+   ],
+   "source": "src_dh2_without_p47"
+  },
+  {
+   "id": "splinter_pistol",
+   "name": "Splinter Pistol",
+   "class": "Pistol",
+   "group": "Exotic",
+   "isMelee": false,
+   "damage": "1d10+2",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 3,
+   "rof": {
+    "single": true,
+    "burst": 3,
+    "full": 0
+   },
+   "range_m": 30,
+   "qualities": [
+    "Toxic (1)"
+   ],
+   "source": "src_dh2_without_p47"
+  },
+  {
+   "id": "splinter_rifle",
+   "name": "Splinter Rifle",
+   "class": "Basic",
+   "group": "Exotic",
+   "isMelee": false,
+   "damage": "1d10+2",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 3,
+   "rof": {
+    "single": true,
+    "burst": 3,
+    "full": 5
+   },
+   "range_m": 80,
+   "qualities": [
+    "Toxic (2)"
+   ],
+   "source": "src_dh2_without_p47"
+  },
+  {
+   "id": "big_choppa",
+   "name": "Big Choppa",
+   "class": "Melee",
+   "group": "Low-Tech",
+   "isMelee": true,
+   "damage": "2d10",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 2,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Tearing",
+    "Unbalanced"
+   ],
+   "source": "src_dh2_without_p48"
+  },
+  {
+   "id": "big_shoota",
+   "name": "Big Shoota",
+   "class": "Basic",
+   "group": "SP",
+   "isMelee": false,
+   "damage": "1d10+6",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 2,
+   "rof": {
+    "single": false,
+    "burst": 0,
+    "full": 10
+   },
+   "range_m": 120,
+   "qualities": [
+    "Inaccurate",
+    "Unreliable\u2020"
+   ],
+   "source": "src_dh2_without_p48"
+  },
+  {
+   "id": "burna_melee",
+   "name": "Burna (Melee)",
+   "class": "Melee",
+   "group": "Power",
+   "isMelee": true,
+   "damage": "1d10+5",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 5,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Power Field",
+    "Unwieldy"
+   ],
+   "source": "src_dh2_without_p48"
+  },
+  {
+   "id": "burna_ranged",
+   "name": "Burna (Ranged)",
+   "class": "Basic",
+   "group": "Flame",
+   "isMelee": false,
+   "damage": "1d10+4",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 2,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 20,
+   "qualities": [
+    "Flame",
+    "Spray",
+    "Unreliable\u2020"
+   ],
+   "source": "src_dh2_without_p48"
+  },
+  {
+   "id": "choppa",
+   "name": "Choppa",
+   "class": "Melee",
+   "group": "Low-Tech",
+   "isMelee": true,
+   "damage": "1d10+1",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 2,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Unbalanced"
+   ],
+   "source": "src_dh2_without_p48"
+  },
+  {
+   "id": "rokkit_launcha",
+   "name": "Rokkit Launcha",
+   "class": "Basic",
+   "group": "Launcher",
+   "isMelee": false,
+   "damage": "2d10+5",
+   "sbMultiplier": 0,
+   "damageType": "Explosive",
+   "pen": 6,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 150,
+   "qualities": [
+    "Blast (2)",
+    "Inaccurate",
+    "Unreliable\u2020"
+   ],
+   "source": "src_dh2_without_p48"
+  },
+  {
+   "id": "shoota",
+   "name": "Shoota",
+   "class": "Basic",
+   "group": "SP",
+   "isMelee": false,
+   "damage": "1d10+4",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 3,
+    "full": 0
+   },
+   "range_m": 60,
+   "qualities": [
+    "Inaccurate",
+    "Unreliable\u2020"
+   ],
+   "source": "src_dh2_without_p48"
+  },
+  {
+   "id": "slugga",
+   "name": "Slugga",
+   "class": "Pistol",
+   "group": "SP",
+   "isMelee": false,
+   "damage": "1d10+4",
+   "sbMultiplier": 0,
+   "damageType": "Impact",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 3,
+    "full": 0
+   },
+   "range_m": 20,
+   "qualities": [
+    "Inaccurate",
+    "Unreliable\u2020"
+   ],
+   "source": "src_dh2_without_p48"
+  },
+  {
+   "id": "stikkbomb",
+   "name": "Stikkbomb",
+   "class": "Thrown",
+   "group": "Launcher",
+   "isMelee": false,
+   "damage": "2d10+5",
+   "sbMultiplier": 0,
+   "damageType": "Explosive",
+   "pen": 2,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Blast (2)",
+    "Unreliable\u2020"
+   ],
+   "source": "src_dh2_without_p48"
+  },
+  {
+   "id": "pulse_carbine",
+   "name": "Pulse Carbine",
+   "class": "Basic",
+   "group": "Exotic",
+   "isMelee": false,
+   "damage": "2d10+2",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 4,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 3
+   },
+   "range_m": 60,
+   "qualities": [],
+   "source": "src_dh2_without_p50"
+  },
+  {
+   "id": "pulse_pistol",
+   "name": "Pulse Pistol",
+   "class": "Pistol",
+   "group": "Exotic",
+   "isMelee": false,
+   "damage": "2d10+2",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 4,
+   "rof": {
+    "single": true,
+    "burst": 2,
+    "full": 0
+   },
+   "range_m": 40,
+   "qualities": [],
+   "source": "src_dh2_without_p50"
+  },
+  {
+   "id": "pulse_rifle",
+   "name": "Pulse Rifle",
+   "class": "Basic",
+   "group": "Exotic",
+   "isMelee": false,
+   "damage": "2d10+3",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 4,
+   "rof": {
+    "single": true,
+    "burst": 2,
+    "full": 4
+   },
+   "range_m": 150,
+   "qualities": [],
+   "source": "src_dh2_without_p50"
+  },
+  {
+   "id": "havatian_ringblade_ranged",
+   "name": "Havatian Ringblade (Ranged)",
+   "class": "Thrown",
+   "group": "Exotic",
+   "isMelee": false,
+   "damage": "1d10+6",
+   "sbMultiplier": 0,
+   "damageType": "Explosive",
+   "pen": 6,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Blast (2)",
+    "Corrosive"
+   ],
+   "source": "src_dh2_without_p52"
+  },
+  {
+   "id": "kyaire_riveblade_grenade",
+   "name": "Kyaire Riveblade Grenade",
+   "class": "Thrown",
+   "group": "Exotic",
+   "isMelee": false,
+   "damage": "1d10+6",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 10,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Razor Sharp"
+   ],
+   "source": "src_dh2_without_p52"
+  },
+  {
+   "id": "neural_catalyser",
+   "name": "Neural Catalyser",
+   "class": "Pistol",
+   "group": "Exotic",
+   "isMelee": false,
+   "damage": "2d10",
+   "sbMultiplier": 0,
+   "damageType": "Explosive",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": 35,
+   "qualities": [
+    "Concussive (3)",
+    "Overheats"
+   ],
+   "source": "src_dh2_without_p53"
+  },
+  {
+   "id": "talonblade",
+   "name": "Talonblade",
+   "class": "Melee",
+   "group": "Low-Tech",
+   "isMelee": true,
+   "damage": "1d10+3",
+   "sbMultiplier": 0,
+   "damageType": "Rending",
+   "pen": 4,
+   "rof": {
+    "single": true,
+    "burst": 0,
+    "full": 0
+   },
+   "range_m": null,
+   "qualities": [
+    "Razor Sharp",
+    "Tearing"
+   ],
+   "source": "src_dh2_without_p53"
+  },
+  {
+   "id": "xenarch_death_arc",
+   "name": "Xenarch Death-Arc",
+   "class": "Basic",
+   "group": "Exotic",
+   "isMelee": false,
+   "damage": "1d10+3",
+   "sbMultiplier": 0,
+   "damageType": "Energy",
+   "pen": 0,
+   "rof": {
+    "single": true,
+    "burst": 3,
+    "full": 6
+   },
+   "range_m": 100,
+   "qualities": [
+    "Inaccurate",
+    "Shocking"
+   ],
+   "source": "src_dh2_without_p53"
+  }
+ ]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "dh2-roll-api",
+  "version": "1.0.0",
+  "description": "Minimalist Dark Heresy 2e roll/test API with HTML front-end",
+  "type": "module",
+  "main": "api/server.mjs",
+  "scripts": {
+    "start": "node api/server.mjs",
+    "test": "node --test \"api/test/**/*.test.mjs\""
+  },
+  "dependencies": {
+    "express": "^4.19.0"
+  }
+}
