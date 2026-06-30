@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="dh2-engine.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DH2 Roll Servitor — Roll</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav>
+  <a class="brand" href="index.html">DH2 Roll Servitor</a>
+  <div class="links">
+    <a href="index.html">Home</a>
+    <a href="roll.html" class="active">Roll</a>
+    <a href="rules.html">Rules</a>
+  </div>
+</nav>
+
+<h1>Roll</h1>
+<div class="sub">d100 tests &amp; weapon attack resolution &middot; <span class="gold" id="wcount"></span> &middot; <span id="activeRules" class="dim"></span></div>
+
+<div class="grid">
+
+  <!-- ===================== d100 TEST ===================== -->
+  <fieldset>
+    <legend>d100 Test</legend>
+    <div class="row3">
+      <div><label>Target (characteristic / skill)</label><input type="number" id="t-target" value="35"></div>
+      <div><label>Difficulty</label>
+        <select id="t-difficulty">
+          <option value="40">Simple (+40)</option><option value="30">Easy (+30)</option>
+          <option value="20">Routine (+20)</option><option value="10">Ordinary (+10)</option>
+          <option value="0" selected>Challenging (+0)</option><option value="-10">Difficult (-10)</option>
+          <option value="-20">Hard (-20)</option><option value="-30">Very Difficult (-30)</option>
+          <option value="-40">Arduous (-40)</option>
+        </select></div>
+      <div><label>Other modifier</label><input type="number" id="t-mod" value="0"></div>
+    </div>
+    <button onclick="doTest()">Roll Test</button>
+    <div class="result" id="t-result">&mdash;</div>
+  </fieldset>
+
+  <!-- ===================== DAMAGE ===================== -->
+  <fieldset>
+    <legend>Damage Roll</legend>
+    <div class="row3">
+      <div><label>Formula (XdY+Z)</label><input id="d-formula" value="1d10+5"></div>
+      <div><label>Damage type</label>
+        <select id="d-type"><option>Impact</option><option>Energy</option><option>Explosive</option><option>Rending</option></select></div>
+      <div><label>Location (for Fury)</label>
+        <select id="d-location"><option>Body</option><option>Head</option><option>Right Arm</option><option>Left Arm</option><option>Right Leg</option><option>Left Leg</option></select></div>
+    </div>
+    <div class="row3">
+      <div><label>+SB &times;</label><input type="number" id="d-sbtimes" value="0" min="0" max="2"></div>
+      <div><label>Strength Bonus</label><input type="number" id="d-sb" value="3"></div>
+      <div><label>DoS (for Accurate)</label><input type="number" id="d-dos" value="1"></div>
+    </div>
+    <div class="checks">
+      <label><input type="checkbox" id="d-tearing"> Tearing</label>
+      <label><input type="checkbox" id="d-proven"> Proven (3)</label>
+      <label><input type="checkbox" id="d-primitive"> Primitive (7)</label>
+      <label><input type="checkbox" id="d-accurate"> Accurate</label>
+    </div>
+    <button onclick="doDamage()">Roll Damage</button>
+    <div class="result" id="d-result">&mdash;</div>
+  </fieldset>
+
+  <!-- ===================== PARRY ===================== -->
+  <fieldset>
+    <legend>Parry</legend>
+    <div class="row">
+      <div><label>WS</label><input type="number" id="p-ws" value="40"></div>
+      <div><label>Other modifier</label><input type="number" id="p-mod" value="0"></div>
+    </div>
+    <label>Weapon qualities (comma separated — e.g. Balanced, Defensive)</label>
+    <input id="p-qualities" value="Balanced">
+    <button onclick="doParry()">Roll Parry</button>
+    <div class="result" id="p-result">&mdash;</div>
+  </fieldset>
+
+  <!-- ===================== FULL ATTACK ===================== -->
+  <fieldset style="grid-column: 1 / -1;">
+    <legend>Full Attack Resolution — Engagement</legend>
+    <p class="note">Attacker vs. defender. Resolution: ① to-hit → ② defender reaction (Evasion / Field) → ③ soak &amp; apply → ④ wounds → ⑤ on-hit target effects.</p>
+    <div class="grid">
+
+      <!-- ============ ATTACKER ============ -->
+      <div>
+        <label class="gold">— Attacker —</label>
+        <div class="row4">
+          <div><label>WS</label><input type="number" id="a-ws" value="35"></div>
+          <div><label>BS</label><input type="number" id="a-bs" value="40"></div>
+          <div><label>S</label><input type="number" id="a-s" value="35"></div>
+          <div><label>T</label><input type="number" id="a-t" value="30"></div>
+        </div>
+        <div class="row">
+          <div><label>Action</label><select id="a-action"></select></div>
+          <div><label>Aim</label><select id="a-aim"><option>None</option><option>Half</option><option>Full</option></select></div>
+        </div>
+        <div class="row">
+          <div><label>Range band</label><select id="a-range"></select></div>
+          <div><label>Other modifier</label><input type="number" id="a-mod" value="0"></div>
+        </div>
+        <div id="a-calledshot-wrap" style="display:none"><label>Called shot location</label>
+          <select id="a-calledshot"></select></div>
+        <label style="margin-top:.6rem">Talents (toggle)</label>
+        <div class="checks" id="a-talents"><span class="dim">loading…</span></div>
+        <div class="checks">
+          <label><input type="checkbox" id="a-dualwield"> Dual-wielding</label>
+          <label><input type="checkbox" id="a-offhand"> Off-hand</label>
+        </div>
+        <div class="row">
+          <div><label>Traits</label><input id="a-traits" placeholder="e.g. Brutal Charge (3)"></div>
+          <div><label>Conditions</label><input id="a-statuses" placeholder="e.g. Full Aim"></div>
+        </div>
+        <div class="row">
+          <div><label>Circumstances</label><input id="a-circumstances" placeholder="e.g. Darkness"></div>
+        </div>
+      </div>
+
+      <!-- ============ WEAPON ============ -->
+      <div>
+        <label class="gold">— Weapon —</label>
+        <select id="w-select"><option value="">— manual entry —</option></select>
+        <div class="row4">
+          <div><label>Damage</label><input id="w-damage" value="1d10+5"></div>
+          <div><label>Pen</label><input type="number" id="w-pen" value="4"></div>
+          <div><label>Type</label><select id="w-type"><option>Impact</option><option>Energy</option><option selected>Explosive</option><option>Rending</option></select></div>
+          <div><label>Melee?</label><select id="w-melee"><option value="no">Ranged</option><option value="yes">Melee</option></select></div>
+        </div>
+        <div class="row4">
+          <div><label>RoF burst</label><input type="number" id="w-burst" value="2"></div>
+          <div><label>RoF full</label><input type="number" id="w-full" value="0"></div>
+          <div><label>SB &times; (melee)</label><input type="number" id="w-sbx" value="1" min="0" max="2"></div>
+          <div><label>Craft</label><select id="w-craft"><option>Poor</option><option selected>Common</option><option>Good</option><option>Best</option></select></div>
+        </div>
+        <label>Qualities (comma separated — e.g. Tearing, Accurate, Concussive (2), Blast (3), Razor Sharp)</label>
+        <input id="w-qualities" value="Tearing" oninput="syncFiringModes()">
+        <div class="checks" id="w-firingmodes" style="display:none"></div>
+        <details style="margin-top:.6rem">
+          <summary class="gold">Ad-hoc rule (this engagement only)</summary>
+          <label>Saved rules from the <a href="rules.html">Rules</a> page are always applied.</label>
+          <textarea id="a-customrules" rows="3" placeholder='talent "Hatred" { on MODIFIERS when has_talent("Hatred") then add modifier "hatred" = 10 }'></textarea>
+          <button type="button" class="minibtn" onclick="validateRules()">Validate</button>
+          <div class="result" id="a-rules-result" style="margin-top:.5rem">&mdash;</div>
+        </details>
+      </div>
+
+      <!-- ============ DEFENDER ============ -->
+      <div>
+        <label class="gold">— Defender —</label>
+        <div class="row4">
+          <div><label>WS</label><input type="number" id="d-ws" value="30"></div>
+          <div><label>Ag</label><input type="number" id="d-ag" value="35"></div>
+          <div><label>T</label><input type="number" id="d-t" value="35"></div>
+          <div><label>S</label><input type="number" id="d-s" value="30"></div>
+        </div>
+        <div class="row3">
+          <div><label>Armour (loc)</label><input type="number" id="d-armour" value="4"></div>
+          <div><label>Toughness Bonus</label><input type="number" id="d-tb" value="3"></div>
+          <div><label>Unnatural Toughness</label><input type="number" id="d-unnatural-tough" value="0" min="0" title="Unnatural Toughness bonus (added to TB for soak; Felling reduces it)"></div>
+        </div>
+        <div class="row3">
+          <div><label>&nbsp;</label><label class="checks" style="margin:0"><input type="checkbox" id="a-autotest" style="width:auto" checked> auto-roll tests</label></div>
+        </div>
+        <label style="margin-top:.6rem">Reaction</label>
+        <div class="row">
+          <div><label>Evasion</label><select id="d-evasion"><option value="none">None</option><option value="dodge">Dodge (Ag)</option><option value="parry">Parry (WS)</option></select></div>
+          <div><label>Evasion modifier</label><input type="number" id="d-evmod" value="0"></div>
+        </div>
+        <div class="row">
+          <div><label>Force field rating</label><input type="number" id="d-field" value="0"></div>
+          <div><label>Field overload ≤</label><input type="number" id="d-overload" value="0"></div>
+        </div>
+        <label>Parry weapon qualities</label>
+        <input id="d-qualities" placeholder="e.g. Balanced, Defensive">
+        <label style="margin-top:.4rem">Talents (toggle)</label>
+        <div class="checks" id="d-talents"><span class="dim">loading…</span></div>
+        <div class="row">
+          <div><label>Traits</label><input id="d-traits" placeholder="e.g. Sturdy"></div>
+          <div><label>Conditions</label><input id="d-statuses" placeholder="e.g. Prone"></div>
+        </div>
+        <div class="row">
+          <div><label>Circumstances</label><input id="d-circumstances" placeholder="e.g. Darkness"></div>
+        </div>
+      </div>
+    </div>
+    <button onclick="doResolve()">Resolve Engagement</button>
+    <label style="margin-top:.6rem">Step pacing — by default the resolution pauses between phases so you can inspect or reroll (e.g. a Fate Point). Tick a box to skip that pause.</label>
+    <div class="checks" id="eng-pacing">
+      <label class="checks" style="margin:0"><input type="checkbox" id="skip-attack" style="width:auto"> skip pause after attack roll</label>
+      <label class="checks" style="margin:0"><input type="checkbox" id="skip-damage" style="width:auto"> skip pause after damage roll</label>
+      <label class="checks" style="margin:0"><input type="checkbox" id="skip-evasion" style="width:auto"> skip pause after defender evasion</label>
+    </div>
+    <label style="margin-top:.6rem">Report</label>
+    <div class="checks" id="eng-report">
+      <label class="checks" style="margin:0"><input type="checkbox" id="eng-verbose" style="width:auto" checked onchange="if(typeof ENG!=='undefined'&&ENG)engRender()"> verbose — show every die, modifier &amp; source (off = totals only)</label>
+      <label class="checks" style="margin:0"><input type="checkbox" id="eng-debug" style="width:auto" onchange="if(typeof ENG!=='undefined'&&ENG)engRender()"> debug — enable die-forcing fields &amp; reroll</label>
+    </div>
+    <div class="result" id="a-result">&mdash;</div>
+  </fieldset>
+</div>
+
+<script src="rules-store.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const api = (path, body) => fetch(path, {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+}).then(r => r.json());
+
+let WEAPONS = [];
+let FIRING_MODES = [];
+
+// show a toggle for each firing-mode quality the weapon currently has (e.g. Maximal)
+function syncFiringModes() {
+  const box = $('w-firingmodes');
+  if (!box) return;
+  const have = $('w-qualities').value.split(',').map(x => x.trim());
+  const modes = FIRING_MODES.filter(m => have.some(q => q.toLowerCase().startsWith(m.toLowerCase())));
+  if (!modes.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  const prev = new Set([...box.querySelectorAll('.firing-mode:checked')].map(c => c.value));
+  box.style.display = '';
+  box.innerHTML = `<label class="dim" style="width:100%">Configurations (per-shot toggles, e.g. firing on Maximal):</label>` +
+    modes.map(m => `<label class="checks" style="margin:0"><input type="checkbox" class="firing-mode" value="${m}" style="width:auto"${prev.has(m) ? ' checked' : ''}> ${m}</label>`).join('');
+}
+
+function refreshActiveRules() {
+  const n = RulesStore.activeCount();
+  const off = RulesStore.disabledBuiltins().length;
+  const parts = [];
+  parts.push(n ? `<span class="gold">${n}</span> custom rule${n !== 1 ? 's' : ''} active` : 'no custom rules active');
+  if (off) parts.push(`<span class="bad">${off}</span> built-in disabled`);
+  $('activeRules').innerHTML = parts.join(' · ');
+}
+
+async function init() {
+  const [opts, wep, rules] = await Promise.all([
+    fetch('/api/options').then(r => r.json()),
+    fetch('/api/weapons').then(r => r.json()),
+    fetch('/api/rules').then(r => r.json()),
+  ]);
+  WEAPONS = wep.weapons;
+  FIRING_MODES = opts.firingModes || [];
+  $('wcount').textContent = WEAPONS.length + ' weapon profiles loaded';
+  refreshActiveRules();
+  syncFiringModes();
+
+  const fillTalents = (boxId, cls) => {
+    const box = $(boxId);
+    box.innerHTML = rules.talents.length ? '' : '<span class="dim">none</span>';
+    for (const name of rules.talents) {
+      const lbl = document.createElement('label');
+      lbl.innerHTML = `<input type="checkbox" class="${cls}" value="${name}"> ${name}`;
+      box.appendChild(lbl);
+    }
+  };
+  fillTalents('a-talents', 'atk-talent');
+  fillTalents('d-talents', 'def-talent');
+  if (rules.traits?.length) { $('a-traits').placeholder = 'e.g. ' + rules.traits.join(', '); $('d-traits').placeholder = 'e.g. ' + rules.traits.join(', '); }
+  const condNames = rules.conditions ?? rules.statuses;
+  if (condNames?.length) { $('a-statuses').placeholder = 'e.g. ' + condNames.join(', '); $('d-statuses').placeholder = 'e.g. ' + condNames.join(', '); }
+  if (rules.circumstances?.length) { $('a-circumstances').placeholder = 'e.g. ' + rules.circumstances.join(', '); $('d-circumstances').placeholder = 'e.g. ' + rules.circumstances.join(', '); }
+  for (const a of opts.actions) {
+    $('a-action').add(new Option(`${a.name} (${a.modifier >= 0 ? '+' : ''}${a.modifier})`, a.name));
+  }
+  for (const [band, mod] of Object.entries(opts.rangeBands)) {
+    if (band === 'Melee') continue;
+    $('a-range').add(new Option(`${band} (${mod >= 0 ? '+' : ''}${mod})`, band, band === 'Normal Range', band === 'Normal Range'));
+  }
+  for (const loc of opts.hitLocations) $('a-calledshot').add(new Option(loc, loc));
+  const groups = {};
+  for (const w of WEAPONS) (groups[w.class] ??= []).push(w);
+  for (const [cls, list] of Object.entries(groups)) {
+    const og = document.createElement('optgroup'); og.label = cls;
+    for (const w of list) og.appendChild(new Option(`${w.name} (${w.damage} ${w.damageType[0]}; Pen ${w.pen})`, w.id));
+    $('w-select').appendChild(og);
+  }
+  $('w-select').onchange = () => {
+    const w = WEAPONS.find(x => x.id === $('w-select').value);
+    if (!w) return;
+    $('w-damage').value = w.damage; $('w-pen').value = w.pen; $('w-type').value = w.damageType;
+    $('w-melee').value = w.isMelee ? 'yes' : 'no';
+    $('w-burst').value = w.rof.burst; $('w-full').value = w.rof.full;
+    $('w-sbx').value = w.sbMultiplier || (w.isMelee ? 1 : 0);
+    $('w-qualities').value = (w.qualities || []).join(', ');
+    syncSbField();
+    syncFiringModes();
+  };
+  // Strength Bonus is melee-only: disable (and zero) the SB × field for ranged.
+  const syncSbField = () => {
+    const melee = $('w-melee').value === 'yes';
+    $('w-sbx').disabled = !melee;
+    if (!melee) $('w-sbx').value = 0;
+  };
+  $('w-melee').onchange = syncSbField;
+  syncSbField();
+  $('a-action').onchange = () => {
+    $('a-calledshot-wrap').style.display = $('a-action').value === 'Called Shot' ? '' : 'none';
+  };
+}
+init();
+window.addEventListener('focus', refreshActiveRules); // pick up edits made on the Rules page
+
+const sign = (n) => (n >= 0 ? '+' : '') + n;
+
+async function doTest() {
+  const r = await api('/api/test', {
+    target: +$('t-target').value,
+    modifiers: { difficulty: +$('t-difficulty').value, modifier: +$('t-mod').value },
+  });
+  $('t-result').innerHTML =
+    `Roll: <span class="gold">${r.roll}</span> vs ${r.modifiedTarget} ` +
+    `<span class="dim">(${r.target} ${sign(r.modifierTotal)})</span>\n` +
+    (r.success
+      ? `<span class="ok">SUCCESS</span> — ${r.dos} degree${r.dos !== 1 ? 's' : ''} of success${r.autoSuccess ? ' (natural 1!)' : ''}`
+      : `<span class="bad">FAILURE</span> — ${r.dof} degree${r.dof !== 1 ? 's' : ''} of failure${r.autoFailure ? ' (natural 100!)' : ''}`);
+}
+
+async function doDamage() {
+  const qualities = [];
+  if ($('d-tearing').checked) qualities.push('Tearing');
+  if ($('d-proven').checked) qualities.push('Proven (3)');
+  if ($('d-primitive').checked) qualities.push('Primitive (7)');
+  if ($('d-accurate').checked) qualities.push('Accurate');
+  const r = await api('/api/damage', {
+    formula: $('d-formula').value, qualities,
+    sbTimes: +$('d-sbtimes').value, strengthBonus: +$('d-sb').value,
+    dos: +$('d-dos').value, location: $('d-location').value, damageType: $('d-type').value,
+  });
+  if (r.error) { $('d-result').innerHTML = `<span class="bad">${r.error}</span>`; return; }
+  $('d-result').innerHTML = fmtDamage(r);
+}
+
+// Build an explicit, reconciling damage breakdown: every kept/adjusted die and
+// every labeled modifier shown as a signed term that sums to the total — so the
+// reader can always derive the total. (Discarded dice from Tearing, and any
+// Proven/Primitive die transforms, are noted but excluded from the sum.)
+function damageBreakdown(dmg) {
+  if (!dmg || dmg.error) return '';
+  const terms = [];
+  for (const die of (dmg.dice?.adjusted ?? [])) terms.push({ v: die, label: 'die' });
+  for (const [k, v] of Object.entries(dmg.modifiers || {})) terms.push({ v, label: k });
+  const expr = terms.length
+    ? terms.map((p, i) => {
+        const head = i === 0 ? `${p.v}` : (p.v < 0 ? `− ${Math.abs(p.v)}` : `+ ${p.v}`);
+        return `<span class="gold">${head}</span> <span class="dim">${p.label}</span>`;
+      }).join(' ')
+    : `<span class="gold">0</span>`;
+  const notes = [];
+  if ((dmg.dice?.discarded ?? []).length) notes.push(`rolled ${dmg.dice.rolled.join(', ')} → kept ${dmg.dice.kept.join(', ')}${dmg.tearing ? ', Tearing' : ''}`);
+  if (dmg.proven) notes.push(`Proven ${dmg.proven}`);
+  if (dmg.primitive) notes.push(`Primitive ${dmg.primitive}`);
+  const note = notes.length ? ` <span class="dim">[${notes.join('; ')}]</span>` : '';
+  return `${expr} = <span class="gold">${dmg.total}</span>${note}`;
+}
+
+function fmtDamage(r) {
+  let s = `Dice [${r.formula}${r.tearing ? ', Tearing' : ''}]: rolled (${r.dice.rolled.join(', ')})`;
+  if (r.dice.discarded.length) s += ` <span class="dim">dropped (${r.dice.discarded.join(', ')})</span>`;
+  if (JSON.stringify(r.dice.kept) !== JSON.stringify(r.dice.adjusted)) {
+    s += `\n  adjusted to (${r.dice.adjusted.join(', ')})` +
+         `<span class="dim">${r.proven ? ` Proven(${r.proven})` : ''}${r.primitive ? ` Primitive(${r.primitive})` : ''}</span>`;
+  }
+  s += `\nTotal: ${damageBreakdown(r)}`;
+  for (const rf of r.righteousFury) {
+    s += `\n<span class="rf">RIGHTEOUS FURY (nat ${rf.naturalRoll})! Crit roll 1d5 = ${rf.rfRoll}</span>`;
+    if (rf.effect) s += `\n<span class="dim">${rf.effect}</span>`;
+  }
+  return s;
+}
+
+// --- stepped engagement (pause / reroll between phases) ----------------------
+// The four phases (POST /api/engage) are driven one at a time; the client holds
+// the accumulated `state` and posts it back. Re-posting the current phase
+// rerolls just it (a Fate Point reroll). Pauses default on; the skip-* boxes
+// auto-advance past a given pause.
+const ENG_PHASES = ['attack', 'damage', 'evasion', 'onhit'];
+const ENG_SKIP = { attack: 'skip-attack', damage: 'skip-damage', evasion: 'skip-evasion' };
+const ENG_LABEL = { attack: 'attack roll', damage: 'damage roll', evasion: 'defender reaction', onhit: 'soak & on-hit' };
+let ENG = null;
+
+function buildEngagementInputs() {
+  const attacker = {
+    characteristics: { ws: +$('a-ws').value, bs: +$('a-bs').value, s: +$('a-s').value, t: +$('a-t').value },
+    weapon: {
+      name: $('w-select').selectedOptions[0]?.text.split(' (')[0] || 'Custom weapon',
+      isMelee: $('w-melee').value === 'yes',
+      damage: $('w-damage').value, sbMultiplier: $('w-melee').value === 'yes' ? +$('w-sbx').value : 0, damageType: $('w-type').value, pen: +$('w-pen').value,
+      rof: { single: true, burst: +$('w-burst').value, full: +$('w-full').value },
+      qualities: $('w-qualities').value.split(',').map(x => x.trim()).filter(Boolean),
+      craftsmanship: $('w-craft').value,
+    },
+    configs: [...document.querySelectorAll('.firing-mode:checked')].map(x => x.value),
+    action: $('a-action').value, aim: $('a-aim').value, rangeBand: $('a-range').value,
+    customModifier: +$('a-mod').value, calledShotLocation: $('a-calledshot').value,
+    talents: [...document.querySelectorAll('.atk-talent:checked')].map(x => x.value),
+    traits: $('a-traits').value.split(',').map(x => x.trim()).filter(Boolean),
+    conditions: $('a-statuses').value.split(',').map(x => x.trim()).filter(Boolean),
+    circumstances: $('a-circumstances').value.split(',').map(x => x.trim()).filter(Boolean),
+    combat: { dualWielding: $('a-dualwield').checked, firingOffhand: $('a-offhand').checked },
+  };
+  const defender = {
+    characteristics: { ws: +$('d-ws').value, ag: +$('d-ag').value, t: +$('d-t').value, s: +$('d-s').value },
+    armour: +$('d-armour').value, toughnessBonus: +$('d-tb').value, unnaturalToughness: +$('d-unnatural-tough').value,
+    weapon: { qualities: $('d-qualities').value.split(',').map(x => x.trim()).filter(Boolean) },
+    field: { rating: +$('d-field').value, overloadMax: +$('d-overload').value },
+    evasion: { mode: $('d-evasion').value, modifier: +$('d-evmod').value },
+    talents: [...document.querySelectorAll('.def-talent:checked')].map(x => x.value),
+    traits: $('d-traits').value.split(',').map(x => x.trim()).filter(Boolean),
+    conditions: $('d-statuses').value.split(',').map(x => x.trim()).filter(Boolean),
+    circumstances: $('d-circumstances').value.split(',').map(x => x.trim()).filter(Boolean),
+  };
+  const inputs = { attacker, defender, options: { autoResolveTests: $('a-autotest').checked } };
+  const custom = [RulesStore.activeDsl(), $('a-customrules').value.trim()].filter(Boolean).join('\n\n');
+  if (custom.trim()) inputs.customRules = custom;
+  const disabled = RulesStore.disabledBuiltins();
+  if (disabled.length) inputs.disabledRules = disabled;
+  return inputs;
+}
+
+async function doResolve() {
+  ENG = { ...buildEngagementInputs(), state: {}, done: new Set(), idx: -1, finished: false, busy: false, error: null,
+          traces: {}, forced: { attack: [], damage: [], evasion: [], onhit: [] } };
+  await engAdvance();
+}
+
+// debug: pin/clear a forced die FACE for a roll in a phase's sequence
+function engSetForced(phase, index, value) {
+  ENG.forced[phase] = ENG.forced[phase] || [];
+  if (value === '' || value == null) delete ENG.forced[phase][index];
+  else ENG.forced[phase][index] = Math.max(1, Math.floor(+value));
+}
+
+async function engAdvance() {        // run the next phase
+  if (!ENG || ENG.idx >= ENG_PHASES.length - 1) { if (ENG) ENG.finished = true; engRender(); return; }
+  ENG.idx++;
+  await engRunCurrent();
+}
+
+async function engReroll() { await engRunCurrent(); }   // re-roll the current phase
+
+// Run ONE phase (post to /api/engage, apply, set finished on a miss / last phase).
+// Returns 'ok' | 'miss' | 'done' | 'error' — the pause decision is the caller's.
+async function engRunPhase(phase) {
+  ENG.busy = true; ENG.error = null; ENG.finished = false; engRender();
+  const body = { phase, attacker: ENG.attacker, defender: ENG.defender, options: ENG.options, state: ENG.state };
+  if (ENG.forced[phase]?.some(v => v != null)) body.forcedRolls = ENG.forced[phase];
+  if (ENG.customRules) body.customRules = ENG.customRules;
+  if (ENG.disabledRules) body.disabledRules = ENG.disabledRules;
+  const r = await api('/api/engage', body);
+  ENG.busy = false;
+  if (r.error) { ENG.error = r.error; return 'error'; }
+  ENG.traces[phase] = r.rollTrace || [];
+  engApply(phase, r);
+  ENG.done.add(phase);
+  if (phase === 'attack' && (!r.success || !r.hits.length)) { ENG.finished = true; return 'miss'; }   // miss
+  if (phase === 'onhit') { ENG.finished = true; return 'done'; }                                       // last phase
+  return 'ok';
+}
+
+async function engRunCurrent() {
+  const phase = ENG_PHASES[ENG.idx];
+  const res = await engRunPhase(phase);
+  if (res !== 'ok') { engRender(); return; }
+  const skip = $(ENG_SKIP[phase])?.checked || (phase === 'evasion' && !ENG.state.reaction);   // no point pausing on a no-op reaction
+  if (skip) { await engAdvance(); } else { engRender(); }
+}
+
+// Full re-roll: re-run the whole attack (hit → damage → evasion → soak/on-hit)
+// straight through, so the final reroll also rerolls the to-hit. Pinned/forced
+// dice persist; a Fate Point reroll of the entire engagement.
+async function engRerollAll() {
+  ENG.state = {}; ENG.done = new Set(); ENG.finished = false; ENG.error = null;
+  for (ENG.idx = 0; ENG.idx < ENG_PHASES.length; ENG.idx++) {
+    if (await engRunPhase(ENG_PHASES[ENG.idx]) !== 'ok') break;
+  }
+  engRender();
+}
+
+function engApply(phase, r) {
+  if (phase === 'attack') ENG.state.attack = r;
+  else if (phase === 'damage') ENG.state.attack.hits = r.hits;
+  else if (phase === 'evasion') { ENG.state.reaction = r.reaction; ENG.state.evaded = Math.min(r.evaded, ENG.state.attack.hits.length); }
+  else if (phase === 'onhit') { ENG.state.attack.hits = r.hits; ENG.state.attack.totalWounds = r.totalWounds; ENG.state.fieldDown = r.fieldDown; }
+}
+
+function engRender() { $('a-result').innerHTML = renderEngagement(ENG); }
+
+function engControls(eng, debug) {
+  if (eng.busy) return `\n\n<span class="dim">rolling ${ENG_LABEL[ENG_PHASES[eng.idx]]}…</span>`;
+  if (eng.error) return `\n\n<span class="bad">${eng.error}</span>`;
+  const phase = ENG_PHASES[eng.idx];
+  // The reroll option only appears in debug mode.
+  if (eng.finished)   // done (miss or final phase) — full reroll re-rolls the to-hit too
+    return debug ? `\n\n<button class="minibtn" onclick="engRerollAll()">⟳ reroll whole attack</button>` : '';
+  const next = ENG_PHASES[eng.idx + 1];
+  const reroll = debug ? `<button class="minibtn" onclick="engReroll()">⟳ reroll ${ENG_LABEL[phase]}</button> ` : '';
+  return `\n\n<span class="dim">⏸ paused after ${ENG_LABEL[phase]} —</span> ` +
+    reroll + `<button class="minibtn" onclick="engAdvance()">continue to ${ENG_LABEL[next]} →</button>`;
+}
+
+// debug: editable "force value" field for every d-roll a phase made, in order.
+// Blank = random; type a face and reroll the phase to pin it.
+function rollTraceFields(eng, phase) {
+  const trace = eng.traces?.[phase];
+  if (!trace || !trace.length) return '';
+  let s = `\n  <span class="dim">🎲 force rolls — blank = random; edit then reroll ${ENG_LABEL[phase]}:</span>`;
+  trace.forEach((r, i) => {
+    const pinned = eng.forced[phase]?.[i] != null ? eng.forced[phase][i] : '';
+    s += `\n    <span class="dim">#${i + 1} ${r.label || 'roll'} (d${r.sides}):</span> ` +
+      `<input class="rollforce" type="number" min="1" max="${r.sides}" placeholder="${r.value}" value="${pinned}"` +
+      ` oninput="engSetForced('${phase}',${i},this.value)"> ` +
+      `<span class="dim">→ <span class="${r.forced ? 'gold' : 'dim'}">${r.value}</span>${r.forced ? ' (forced)' : ''}</span>`;
+  });
+  return s;
+}
+
+function renderEngagement(eng) {
+  if (!eng || !eng.state.attack) return eng?.busy ? '<span class="dim">rolling attack…</span>' : '&mdash;';
+  const debug = $('eng-debug')?.checked ?? false;     // show die-forcing fields + reroll
+  const v = $('eng-verbose')?.checked ?? true;        // full breakdowns + comments vs terse totals
+  const trace = (phase) => debug ? rollTraceFields(eng, phase) : '';
+  const a = eng.state.attack, t = a.test;
+  // ① to-hit
+  let s = `<span class="gold">① TO-HIT</span> — ${a.weapon} · ${a.action} @ ${a.rangeBand}\n` +
+    `  ${t.characteristic} roll <span class="gold">${t.roll}</span> vs <span class="gold">${t.modifiedTarget}</span>` +
+    (v ? ` <span class="dim">(${t.target} ${Object.entries(t.modifiers).map(([k, mv]) => `${sign(mv)} ${k}`).join(' ')})</span>` : '') + ` — ` +
+    (t.success ? `<span class="ok">HIT</span> ${t.dos} DoS → ${a.hits.length} hit${a.hits.length !== 1 ? 's' : ''}` : `<span class="bad">MISS</span> ${t.dof} DoF`);
+  // named effects (Jam, Overheats, Maximal, …) are events — shown even in terse (name only)
+  for (const e of a.effects) s += `\n  <span class="rf">${e.name}${v ? ':' : ''}</span>${v ? ` <span class="dim">${e.effect}</span>` : ''}`;
+  if (a.scatter) {
+    s += `\n  <span class="rf">SCATTER</span> ${a.scatter.distance}m away, direction <span class="gold">${a.scatter.direction}</span>/10` +
+      (v && a.scatter.directionText ? ` <span class="dim">— ${a.scatter.directionText}</span>` : '');
+    if (a.scatter.hit) {                          // Blast still detonates on a miss
+      const sd = a.scatter.hit.damage;
+      s += `\n  <span class="rf">💥 DETONATES</span> ${v ? `at the scatter point — ${a.scatter.hit.damageType} damage, ` : ''}Pen ${a.scatter.hit.totalPenetration}${v ? ' <span class="dim">(apply to any targets in the area)</span>' : ''}` +
+        `\n    <span class="dim">dmg</span> ${v ? damageBreakdown(sd) : `<span class="gold">${sd?.total ?? '—'}</span>`}`;
+      for (const rf of (sd?.righteousFury || [])) s += `\n    <span class="rf">⚡ RIGHTEOUS FURY! (natural ${rf.naturalRoll}, crit 1d5 = ${rf.rfRoll})</span>`;
+    }
+  }
+  s += trace('attack');
+  if (!t.success || !a.hits.length) return s + engControls(eng, debug);
+
+  // ② damage (per hit, before defence)
+  if (eng.done.has('damage')) {
+    s += `\n\n<span class="gold">② DAMAGE</span>`;
+    for (const h of a.hits) {
+      if (v) s += `\n  <span class="gold">Hit ${h.hitNumber} — ${h.location}</span> <span class="dim">(${h.damageType}, Pen ${h.totalPenetration})</span>` +
+        `\n    <span class="dim">dmg</span> ${damageBreakdown(h.damage)}`;
+      else s += `\n  <span class="gold">Hit ${h.hitNumber} — ${h.location}</span>: dmg <span class="gold">${h.damage?.total ?? '—'}</span>`;
+      for (const rf of (h.damage?.righteousFury || [])) {
+        s += `\n    <span class="rf">⚡ RIGHTEOUS FURY! (natural ${rf.naturalRoll}, crit 1d5 = ${rf.rfRoll})</span>`;
+        if (v && rf.effect) s += `\n      <span class="dim">${rf.effect}</span>`;
+      }
+    }
+    s += trace('damage');
+  }
+
+  // ③ defender reaction
+  if (eng.done.has('evasion')) {
+    s += `\n\n<span class="gold">③ DEFENDER REACTION</span>`;
+    if (eng.state.reaction?.prevented) {
+      s += `\n  Parry — <span class="bad">PREVENTED</span>${v ? ` <span class="dim">(${eng.state.reaction.note})</span>` : ''}`;
+    } else if (eng.state.reaction) {
+      const rt = eng.state.reaction.test;
+      s += `\n  ${eng.state.reaction.mode === 'parry' ? 'Parry' : 'Dodge'} (${rt.characteristic}) roll <span class="gold">${rt.roll}</span> vs <span class="gold">${rt.modifiedTarget}</span> — ` +
+        (rt.success ? `<span class="ok">EVADED ${eng.state.evaded} hit${eng.state.evaded !== 1 ? 's' : ''}</span>` : `<span class="bad">FAILED</span> (${rt.dof} DoF)`);
+      // Power Field weapon-destruction roll on a successful parry
+      for (const tr of (eng.state.reaction.tableRolls ?? [])) {
+        const destroyed = /DESTROYED/.test(tr.text);
+        s += `\n  ⚡ ${tr.table}: rolled <span class="gold">${tr.roll}</span> — <span class="${destroyed ? 'bad' : 'dim'}">${destroyed ? 'attacker weapon DESTROYED' : 'attacker weapon survives'}</span>${v ? ` <span class="dim">(${tr.text})</span>` : ''}`;
+      }
+    } else s += `\n  <span class="dim">${v ? 'no reaction declared' : 'none'}</span>`;
+    s += trace('evasion');
+  }
+
+  // ④ soak & apply ; ⑤ on-hit target effects
+  if (eng.done.has('onhit')) {
+    s += `\n\n<span class="gold">④ SOAK & APPLY</span>`;
+    for (const h of a.hits) {
+      s += `\n  <span class="gold">Hit ${h.hitNumber} — ${h.location}</span>: `;
+      if (h.evaded) { s += v ? `<span class="dim">evaded — ${h.damage?.total ?? 0} damage was still rolled (applies to the area for blast weapons)</span>` : `<span class="dim">evaded</span>`; continue; }
+      if (h.fieldAbsorbed) { s += `<span class="ok">field absorbed</span>${v ? ` (roll ${h.field.roll} ≤ ${h.field.rating}${h.field.overloaded ? ', <span class="bad">OVERLOAD</span>' : ''})` : ''}`; continue; }
+      if (h.field && v) s += `<span class="dim">field ${h.field.roll} &gt; ${h.field.rating}</span> · `;
+      if (h.soak) s += `dmg ${h.damage.total} − soak ${h.soak.reduction} → <span class="${h.soak.woundsInflicted > 0 ? 'bad' : 'ok'}">${h.soak.woundsInflicted} wounds</span>`;
+      if (h.targetEffects) {
+        for (const te of h.targetEffects.tests) {
+          let line = `\n    <span class="rf">⑤ ${te.characteristic} test</span>`;
+          if (v && te.threshold != null) line += ` <span class="dim">(${te.characteristic} ${te.characteristicValue} ${sign(te.modifier)} = <span class="gold">${te.threshold}</span>)</span>`;
+          else if (v) line += ` ${sign(te.modifier)}${te.note ? ` <span class="dim">(${te.note})</span>` : ''}`;
+          if (te.resolved) {
+            line += ` — roll <span class="gold">${te.resolved.roll}</span> vs <span class="gold">${te.resolved.modifiedTarget}</span>: ` +
+              (te.resolved.success ? '<span class="ok">RESISTED</span>' : `<span class="bad">FAILED (${te.resolved.dof} DoF)</span> → ${te.resolved.outcome}`);
+            if (v && te.resolved.tableRoll) line += `\n      <span class="rf">🎲 ${te.resolved.tableRoll.table}:</span> rolled <span class="gold">${te.resolved.tableRoll.roll}</span> — <span class="dim">${te.resolved.tableRoll.text}</span>`;
+          } else if (v && te.threshold != null) {
+            line += ` — <span class="dim">defender rolls ≤ ${te.threshold} or:</span> ${te.onFail}`;
+          } else if (v) { line += ` <span class="dim">→ on fail: ${te.onFail}</span>`; }
+          s += line;
+        }
+        for (const st of h.targetEffects.statuses) {
+          const durTxt = st.duration == null ? '' : (typeof st.duration === 'number' ? `${st.duration} round${st.duration !== 1 ? 's' : ''}` : `${st.duration}`);
+          const vars = [st.value != null ? `severity ${st.value}` : '', durTxt && `duration ${durTxt}`, st.location ? `@ ${st.location}` : ''].filter(Boolean).join(', ');
+          s += `\n    <span class="rf">⑤ condition:</span> <span class="gold">${st.status}${vars ? ` (${vars})` : ''}</span>` +
+            (v ? `<span class="dim"> — ${st.source}${st.reason ? `: ${st.reason}` : ' (applied automatically, no defender test)'}</span>` : '');
+        }
+        for (const ar of (h.targetEffects.armour || [])) {
+          s += `\n    <span class="rf">⑤ corrosive:</span> armour <span class="gold">${ar.apBefore}</span> → <span class="gold">${ar.apAfter}</span>` + (v ? ` <span class="dim">(−${ar.rolled} AP${ar.source ? `, ${ar.source}` : ''})</span>` : '');
+          if (ar.excessToWounds > 0) s += ` · <span class="bad">+${ar.excessToWounds} excess → wounds</span>${v ? ' <span class="dim">(ignores Toughness)</span>' : ''}`;
+        }
+        for (const tr of (h.targetEffects.tableRolls || [])) {
+          if (tr.error) { s += `\n    <span class="rf">⑤ ${tr.source || 'roll table'}:</span> <span class="bad">${tr.error}: ${tr.table}</span>`; continue; }
+          s += `\n    <span class="rf">⑤ 🎲 ${tr.table}:</span> rolled <span class="gold">${tr.roll}</span>` +
+            (tr.area != null ? ` <span class="dim">(field area: <span class="gold">${tr.area}</span> m radius)</span>` : '') +
+            (v ? ` — <span class="dim">${tr.text}</span>` : '');
+        }
+      }
+    }
+    s += trace('onhit');
+    s += `\n\n<span class="gold">TOTAL WOUNDS: ${a.totalWounds}</span>`;
+    if (eng.state.fieldDown) s += ` <span class="dim">(force field overloaded — down)</span>`;
+    if (v && eng.finished && a.log && a.log.length) s += `\n<span class="trace">trace: ${a.log.map(l => `${l.effect}@${l.checkpoint}`).join(' · ')}</span>`;
+  }
+  return s + engControls(eng, debug);
+}
+
+async function doParry() {
+  const body = {
+    characteristics: { ws: +$('p-ws').value },
+    weapon: { name: 'Parry weapon', qualities: $('p-qualities').value.split(',').map(x => x.trim()).filter(Boolean) },
+    customModifier: +$('p-mod').value,
+  };
+  const disabled = RulesStore.disabledBuiltins();
+  if (disabled.length) body.disabledRules = disabled;
+  const custom = RulesStore.activeDsl();
+  if (custom.trim()) body.customRules = custom;
+  const r = await api('/api/parry', body);
+  if (r.error) { $('p-result').innerHTML = `<span class="bad">${r.error}</span>`; return; }
+  const t = r.test;
+  $('p-result').innerHTML =
+    `Parry: WS test roll <span class="gold">${t.roll}</span> vs ${t.modifiedTarget} ` +
+    `<span class="dim">(${t.target} ${Object.entries(t.modifiers).map(([k, v]) => `${v >= 0 ? '+' : ''}${v} ${k}`).join(' ') || '+0'})</span>\n` +
+    (t.success
+      ? `<span class="ok">PARRY SUCCESS</span> — ${t.dos} DoS`
+      : `<span class="bad">PARRY FAILED</span> — ${t.dof} DoF`);
+}
+
+async function validateRules() {
+  const text = $('a-customrules').value;
+  const out = $('a-rules-result');
+  if (!text.trim()) { out.innerHTML = '<span class="dim">— nothing to validate —</span>'; return; }
+  const r = await api('/api/rules/validate', { rules: text });
+  if (r.ok) {
+    out.innerHTML = `<span class="ok">OK</span> — ${r.count} rule${r.count !== 1 ? 's' : ''}:\n` +
+      r.effects.map(e => `  <span class="gold">${e.name}</span> <span class="dim">${e.source} @ ${e.checkpoint} (p${e.priority})</span>`).join('\n');
+  } else {
+    out.innerHTML = `<span class="bad">PARSE ERROR</span> ${r.line ? `<span class="dim">(line ${r.line}, col ${r.col})</span>` : ''}\n${r.message || r.error}`;
+  }
+}
+</script>
+</body>
+</html>

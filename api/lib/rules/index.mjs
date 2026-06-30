@@ -13,17 +13,14 @@
  * Native effect lists and DSL-compiled effects share one shape, so they mix
  * freely; user-supplied DSL can later be compiled and merged the same way.
  */
-import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
 import { Registry } from '../pipeline.mjs';
 import { compile, compileTables, compileActions, referencedNames } from '../dsl/compiler.mjs';
 import { combatActionEffects, COMBAT_ACTIONS, RANGE_BANDS, AIM_MODES } from './combat-actions.mjs';
 import { qualityConflictEffects } from './quality-conflicts.mjs';
 import { registerActions, availableActions } from '../actions.mjs';
+import { ruleSources } from './sources.mjs';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const readRule = (name) => readFileSync(join(__dirname, '..', '..', 'data', 'rules', name), 'utf8');
+const readRule = (name) => ruleSources[name];
 
 const qualitiesSrc = readRule('weapon-qualities.dsl');
 const talentsSrc = readRule('talents.dsl');

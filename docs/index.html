@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="dh2-engine.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DH2 Roll Servitor</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav>
+  <a class="brand" href="index.html">DH2 Roll Servitor</a>
+  <div class="links">
+    <a href="index.html" class="active">Home</a>
+    <a href="roll.html">Roll</a>
+    <a href="rules.html">Rules</a>
+  </div>
+</nav>
+
+<h1>Dark Heresy 2e — Roll Servitor</h1>
+<div class="sub">d100 tests &amp; weapon attack resolution &middot; mechanics per the dark-heresy-3rd-edition Foundry system &amp; DH2 core rules</div>
+
+<div class="cards">
+  <a class="card" href="roll.html">
+    <div class="big">Roll</div>
+    <p>d100 tests, raw damage, and full attack resolution against the codified weapon corpus. Your configured rules are applied automatically.</p>
+  </a>
+  <a class="card" href="rules.html">
+    <div class="big">Rules</div>
+    <p>View the built-in talents &amp; weapon qualities, and add, edit, validate, enable or remove your own custom rules (DSL).</p>
+  </a>
+</div>
+
+<fieldset style="margin-top:1rem">
+  <legend>Status</legend>
+  <div id="status" class="note">Loading…</div>
+</fieldset>
+
+<script src="rules-store.js"></script>
+<script>
+async function init() {
+  const [weapons, rules] = await Promise.all([
+    fetch('/api/weapons').then(r => r.json()).catch(() => ({ count: '?' })),
+    fetch('/api/rules').then(r => r.json()).catch(() => ({ talents: [], qualities: [] })),
+  ]);
+  const user = RulesStore.load();
+  const active = RulesStore.activeCount();
+  const invalid = user.filter(r => !r.valid).length;
+  document.getElementById('status').innerHTML =
+    `<span class="gold">${weapons.count ?? '?'}</span> weapon profiles · ` +
+    `<span class="gold">${rules.talents.length}</span> built-in talents · ` +
+    `<span class="gold">${rules.qualities.length}</span> built-in qualities<br>` +
+    `<span class="gold">${user.length}</span> custom rule${user.length !== 1 ? 's' : ''} ` +
+    `(<span class="ok">${active} active</span>${invalid ? `, <span class="bad">${invalid} invalid</span>` : ''}) — ` +
+    `<a href="rules.html">manage rules</a>`;
+}
+init();
+</script>
+</body>
+</html>

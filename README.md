@@ -6,8 +6,10 @@ Minimalist API + HTML front-end for Dark Heresy 2e d100 tests and weapon damage 
 
 ```
 npm install
-npm start          # http://localhost:3210
-npm test           # 177 tests (engine + pipeline + DSL + docs + qualities/talents/traits/conditions/circumstances/configurations/actions/craftsmanship/jam/parry/scatter/roll-tables/target-effects/corrosive/engagement/stepped-engagement/force-rolls + crit table + weapon data + HTTP endpoints)
+npm start          # Express dev server → http://localhost:3210
+npm test           # 209 tests (engine + pipeline + DSL + docs + qualities/talents/traits/conditions/circumstances/configurations/actions/craftsmanship/jam/parry/scatter/roll-tables/target-effects/corrosive/engagement/stepped-engagement/force-rolls + crit table + weapon data + HTTP endpoints)
+npm run build:static   # bundle a server-free build → ./docs (for GitHub Pages)
+npm run serve:static   # preview ./docs as Pages would → http://localhost:8080 (no API)
 ```
 
 Open http://localhost:3210 for the UI. It has three pages: **Home** (navigation + status), **Roll** (d100 test, raw damage, Parry, and a **Full Attack Resolution — Engagement** checklist with attacker / weapon / defender zones, per-side talent toggles, Conditions/Circumstances/Configurations inputs, Evasion/Field reactions, on-hit target tests, and report controls — a **verbose** detail toggle, a **debug** toggle for per-roll die-forcing + reroll, and pause/skip pacing), and **Rules** (click any built-in rule to toggle it on/off; add, edit, validate, toggle, and remove your own DSL rules; an active/inactive summary; the full active DSL; and the DSL reference). Rule toggles and custom rules are stored per-browser (localStorage); rolls apply only the rules toggled active.
@@ -136,6 +138,51 @@ dh2_roll_api/
 
 The server (`api/server.mjs`) serves the static UI from the sibling `ui/` directory.
 
+## Static / GitHub Pages build
+
+The whole tool runs **server-free in the browser** — GitHub Pages serves only static
+files, and this backend is a pure-function library over static data (no DB, no secrets,
+no persistence; custom rules already live in `localStorage`). `npm run build:static`
+produces a deployable `./docs` folder.
+
+**How it works.** The route behaviour is defined once in `api/lib/api-router.mjs`
+(`dispatch(method, path, body) → { status, body }`), shared verbatim by two transports —
+so they cannot drift:
+
+- **Dev:** `api/server.mjs` (Express) wraps each route around `dispatch`.
+- **Static:** `api/lib/pages-api.mjs` patches `window.fetch` so every `/api/*` request is
+  answered in-process by `dispatch`. The front-end is unchanged — it still calls
+  `fetch('/api/resolve', …)`, but there is no server.
+
+The build (`scripts/build-static.mjs`):
+
+1. **Inlines the data.** The on-disk rule (`.dsl`) and weapon (`.json`) files are loaded
+   only through `api/lib/rules/sources.mjs` (the one place that touches `fs`). The build
+   generates an inlined twin and esbuild aliases `sources.mjs` → it, so the bundle carries
+   the data with no filesystem.
+2. **Bundles** `pages-api.mjs` (engine + DSL + data + fetch patch) into `docs/dh2-engine.js`
+   — a single classic IIFE (~230 KB).
+3. **Copies** the UI into `docs/`, injecting `<script src="dh2-engine.js">` as the first
+   element in `<head>` so the `fetch` patch is installed **before** the page's app script
+   runs (the app's scripts are classic and call the API at load).
+4. Emits `.nojekyll` so Pages serves files verbatim.
+
+**Preview locally** exactly as Pages would (a plain static server, no API backend):
+`npm run serve:static` → http://localhost:8080. A request to `/api/*` on that server 404s —
+proving the API exists only in the browser bundle.
+
+**Deploy** — two options:
+
+- **GitHub Actions** (recommended): the included `.github/workflows/pages.yml` runs the
+  tests, `npm run build:static`, and publishes `docs/` to Pages on every push to `main`.
+  Set *Settings → Pages → Source = GitHub Actions*. `docs/` need not be committed.
+- **Branch folder:** commit `docs/` and set *Settings → Pages → Source = Deploy from a
+  branch → main / docs*.
+
+Because Pages serves under `https://<user>.github.io/<repo>/`, all asset/link paths are
+**relative** (they already are). The Express server and the test suite are untouched —
+local dev and CI still use the real server; only the published artifact is static.
+
 ## Architecture
 
 The roll logic (under `api/`) is split into three layers joined by a **checkpoint
@@ -155,7 +202,7 @@ api/lib (engine + rules + dsl)                                       api/data (r
 ```
 
 Checkpoints (see `api/lib/pipeline.mjs`): `MODIFIERS`, `POST_ROLL`, `ON_MISS`, `HIT_COUNT_MULT`,
-`HIT_COUNT_BONUS`, `PENETRATION`, `DAMAGE_POOL`, `DIE_ADJUST`, `DAMAGE_MODS`, `ON_HIT`, `PARRY`, `EVASION`. An effect is
+`HIT_COUNT_BONUS`, `PENETRATION`, `DAMAGE_POOL`, `DIE_ADJUST`, `DAMAGE_MODS`, `ON_HIT`, `PARRY`, `POST_PARRY`, `EVASION`. An effect is
 `{ id, source, checkpoint, priority?, when?(ctx), apply(ctx) }` — `when` is the activation
 predicate ("is this rule in effect right now?"), `apply` mutates the shared `RollContext`.
 A DSL rule may have several `when … then …` **branches**, each compiling to its own effect
@@ -186,7 +233,10 @@ talent "Ambidextrous" tier 1 {
 ## Files
 
 ### `api/` — backend
-- `api/server.mjs` — Express server (no deps beyond express); exports `app` for tests, listens only when run directly; serves the `ui/` static front-end
+- `api/server.mjs` — Express server (no deps beyond express); thin HTTP transport over `dispatch`; exports `app` for tests, listens only when run directly; serves the `ui/` static front-end
+- `api/lib/api-router.mjs` — **transport-agnostic** `dispatch(method, path, body)` — the single source of truth for every `/api/*` endpoint, shared by the Express server and the static browser build
+- `api/lib/pages-api.mjs` — static-build entry: patches `window.fetch` to answer `/api/*` from `dispatch` in-process (bundled into the GitHub Pages site)
+- `api/lib/rules/sources.mjs` — the only filesystem touch: loads the `.dsl` rule files + `weapons.json`. The static build swaps in a generated inlined twin (esbuild alias) so the bundle carries the data with no `fs`.
 - `api/lib/engine.mjs` — orchestrator + pure d100/damage/soak math; injectable RNG and registry (fully unit-testable). Re-exports the public surface.
 - `api/lib/dice.mjs`, `api/lib/hit-locations.mjs` — pure primitives + DH2 location tables
 - `api/lib/pipeline.mjs` — checkpoint constants, `Registry`, and the `runCheckpoint` runner (no rule content)
@@ -200,6 +250,11 @@ talent "Ambidextrous" tier 1 {
 
 ### `ui/` — frontend
 - `ui/` — multi-page UI: `index.html` (home/nav), `roll.html` (roller), `rules.html` (rule manager), `style.css` (shared), `rules-store.js` (localStorage rule store + server validation, shared by the roll & rules pages)
+
+### `scripts/` — static build (GitHub Pages)
+- `scripts/build-static.mjs` — `npm run build:static`: inlines the data, esbuild-bundles the engine + fetch shim into `docs/dh2-engine.js`, assembles `docs/` (see "Static / GitHub Pages build")
+- `scripts/serve-static.mjs` — `npm run serve:static`: zero-dependency static server for previewing `docs/` with no API backend
+- `.github/workflows/pages.yml` — CI: test → build → deploy `docs/` to GitHub Pages on push to `main`
 
 ### `api/test/` — Node built-in test runner (`node --test`)
 - `engine.test.mjs` — deterministic rigged-dice tests for the roll engine (now exercising DSL-driven qualities)

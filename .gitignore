@@ -23,8 +23,13 @@ coverage/
 # Build / cache output
 dist/
 build/
+.build/
 .cache/
 *.tsbuildinfo
+
+# Static-site staging (generated inlined data twin). docs/ is the Pages OUTPUT —
+# commit it for branch-based Pages, or uncomment `docs/` to let Actions own it.
+# docs/
 
 # Runtime
 pids/
