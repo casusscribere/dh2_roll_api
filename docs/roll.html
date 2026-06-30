@@ -54,29 +54,12 @@
     <div class="row3">
       <div><label>+SB &times;</label><input type="number" id="d-sbtimes" value="0" min="0" max="2"></div>
       <div><label>Strength Bonus</label><input type="number" id="d-sb" value="3"></div>
-      <div><label>DoS (for Accurate)</label><input type="number" id="d-dos" value="1"></div>
+      <div><label>Degrees of Success</label><input type="number" id="d-dos" value="1"></div>
     </div>
-    <div class="checks">
-      <label><input type="checkbox" id="d-tearing"> Tearing</label>
-      <label><input type="checkbox" id="d-proven"> Proven (3)</label>
-      <label><input type="checkbox" id="d-primitive"> Primitive (7)</label>
-      <label><input type="checkbox" id="d-accurate"> Accurate</label>
-    </div>
+    <label>Qualities (comma separated — e.g. Tearing, Proven (3), Razor Sharp)</label>
+    <input id="dmg-qualities" value="Tearing">
     <button onclick="doDamage()">Roll Damage</button>
     <div class="result" id="d-result">&mdash;</div>
-  </fieldset>
-
-  <!-- ===================== PARRY ===================== -->
-  <fieldset>
-    <legend>Parry</legend>
-    <div class="row">
-      <div><label>WS</label><input type="number" id="p-ws" value="40"></div>
-      <div><label>Other modifier</label><input type="number" id="p-mod" value="0"></div>
-    </div>
-    <label>Weapon qualities (comma separated — e.g. Balanced, Defensive)</label>
-    <input id="p-qualities" value="Balanced">
-    <button onclick="doParry()">Roll Parry</button>
-    <div class="result" id="p-result">&mdash;</div>
   </fieldset>
 
   <!-- ===================== FULL ATTACK ===================== -->
@@ -318,16 +301,20 @@ async function doTest() {
 }
 
 async function doDamage() {
-  const qualities = [];
-  if ($('d-tearing').checked) qualities.push('Tearing');
-  if ($('d-proven').checked) qualities.push('Proven (3)');
-  if ($('d-primitive').checked) qualities.push('Primitive (7)');
-  if ($('d-accurate').checked) qualities.push('Accurate');
-  const r = await api('/api/damage', {
-    formula: $('d-formula').value, qualities,
+  // Same engine path as the full-attack damage phase: rollDamage over the active
+  // registry. Qualities come from the free-text field, and the user's toggled /
+  // custom rules apply, exactly as they do in the engagement box.
+  const body = {
+    formula: $('d-formula').value,
+    qualities: $('dmg-qualities').value.split(',').map(x => x.trim()).filter(Boolean),
     sbTimes: +$('d-sbtimes').value, strengthBonus: +$('d-sb').value,
     dos: +$('d-dos').value, location: $('d-location').value, damageType: $('d-type').value,
-  });
+  };
+  const disabled = RulesStore.disabledBuiltins();
+  if (disabled.length) body.disabledRules = disabled;
+  const custom = RulesStore.activeDsl();
+  if (custom.trim()) body.customRules = custom;
+  const r = await api('/api/damage', body);
   if (r.error) { $('d-result').innerHTML = `<span class="bad">${r.error}</span>`; return; }
   $('d-result').innerHTML = fmtDamage(r);
 }
@@ -622,27 +609,6 @@ function renderEngagement(eng) {
     if (v && eng.finished && a.log && a.log.length) s += `\n<span class="trace">trace: ${a.log.map(l => `${l.effect}@${l.checkpoint}`).join(' · ')}</span>`;
   }
   return s + engControls(eng, debug);
-}
-
-async function doParry() {
-  const body = {
-    characteristics: { ws: +$('p-ws').value },
-    weapon: { name: 'Parry weapon', qualities: $('p-qualities').value.split(',').map(x => x.trim()).filter(Boolean) },
-    customModifier: +$('p-mod').value,
-  };
-  const disabled = RulesStore.disabledBuiltins();
-  if (disabled.length) body.disabledRules = disabled;
-  const custom = RulesStore.activeDsl();
-  if (custom.trim()) body.customRules = custom;
-  const r = await api('/api/parry', body);
-  if (r.error) { $('p-result').innerHTML = `<span class="bad">${r.error}</span>`; return; }
-  const t = r.test;
-  $('p-result').innerHTML =
-    `Parry: WS test roll <span class="gold">${t.roll}</span> vs ${t.modifiedTarget} ` +
-    `<span class="dim">(${t.target} ${Object.entries(t.modifiers).map(([k, v]) => `${v >= 0 ? '+' : ''}${v} ${k}`).join(' ') || '+0'})</span>\n` +
-    (t.success
-      ? `<span class="ok">PARRY SUCCESS</span> — ${t.dos} DoS`
-      : `<span class="bad">PARRY FAILED</span> — ${t.dof} DoF`);
 }
 
 async function validateRules() {
