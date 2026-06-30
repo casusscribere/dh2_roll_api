@@ -25,8 +25,11 @@ export const CHECKPOINTS = Object.freeze({
     DAMAGE_POOL: 'DAMAGE_POOL',       // shape the dice pool (extra dice, keep-highest)
     DIE_ADJUST: 'DIE_ADJUST',         // per-die transforms + Righteous Fury threshold
     DAMAGE_MODS: 'DAMAGE_MODS',       // add flat / bonus-dice damage modifiers
+    ON_HIT: 'ON_HIT',                 // per hit, after soak: on-hit target effects (Concussive, Crippling)
     // --- defensive reaction ---
     PARRY: 'PARRY',                   // modifiers for a Parry (WS) test
+    POST_PARRY: 'POST_PARRY',         // after the Parry test, once success is known (Power Field weapon destruction)
+    EVASION: 'EVASION',               // modifiers for a Dodge (Ag) evasion test
 });
 
 const CHECKPOINT_SET = new Set(Object.values(CHECKPOINTS));
@@ -44,7 +47,18 @@ export class Registry {
     constructor() {
         this._buckets = new Map();
         this._seq = 0;
+        this._tables = new Map();   // name → compiled roll_table (for the roll_on action)
     }
+
+    /** Register a compiled roll_table (keyed case-insensitively by name). */
+    addTable(table) {
+        if (table && table.name) this._tables.set(String(table.name).toLowerCase(), table);
+        return this;
+    }
+    addTables(tables = []) { for (const t of tables) this.addTable(t); return this; }
+    /** Look up a roll_table by name (case-insensitive), or undefined. */
+    table(name) { return this._tables.get(String(name ?? '').toLowerCase()); }
+    tables() { return [...this._tables.values()]; }
 
     add(effect) {
         if (!effect || typeof effect.apply !== 'function' || !CHECKPOINT_SET.has(effect.checkpoint)) {
@@ -78,6 +92,9 @@ export class Registry {
  */
 export function runCheckpoint(registry, checkpoint, ctx) {
     for (const eff of registry.at(checkpoint)) {
+        // a `suppress "Name"` action earlier in this run can skip a later effect by
+        // name (e.g. Overheats suppressing the baseline Jam mechanic).
+        if (ctx?.suppressed?.has(eff.name)) continue;
         if (eff.when && !eff.when(ctx)) continue;
         eff.apply(ctx);
         if (ctx && Array.isArray(ctx.log)) {

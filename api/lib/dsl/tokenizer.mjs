@@ -20,9 +20,9 @@ const isDigit = (ch) => ch >= '0' && ch <= '9';
 const isIdentStart = (ch) => ch === '_' || (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
 const isIdentPart = (ch) => isIdentStart(ch) || isDigit(ch);
 
-const TWO_CHAR_OPS = new Set(['==', '!=', '>=', '<=', '+=']);
+const TWO_CHAR_OPS = new Set(['==', '!=', '>=', '<=', '+=', '=>']);
 const ONE_CHAR_OPS = new Set(['>', '<', '=', '+', '-', '*', '/']);
-const PUNCT = new Set(['{', '}', '(', ')', ',', ';']);
+const PUNCT = new Set(['{', '}', '(', ')', ',', ';', ':']);
 
 /**
  * Tokenize DSL source. Token shape:

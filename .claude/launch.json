@@ -1,6 +1,6 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "dh2-roll-api", "runtimeExecutable": "node", "runtimeArgs": ["server.mjs"], "port": 3210 }
+    { "name": "dh2-roll-api", "runtimeExecutable": "node", "runtimeArgs": ["api/server.mjs"], "port": 3210 }
   ]
 }

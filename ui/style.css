@@ -42,6 +42,7 @@ details { margin-top: .4rem; } summary { cursor: pointer; color: var(--dim); fon
 .checks input { width: auto; }
 textarea { width: 100%; background: #0e0c09; color: var(--text); border: 1px solid var(--border); border-radius: 3px; padding: .35rem .5rem; font-family: var(--mono); font-size: .82rem; resize: vertical; }
 .minibtn { width: auto; margin-top: .5rem; padding: .3rem .9rem; font-size: .85rem; }
+input.rollforce { width: 3.6em; margin: 0; padding: .05rem .25rem; font-size: .8rem; vertical-align: middle; }
 .trace { color: var(--dim); font-size: .78rem; }
 
 /* --- home cards --- */

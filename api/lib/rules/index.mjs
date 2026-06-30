@@ -17,8 +17,10 @@ import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { Registry } from '../pipeline.mjs';
-import { compile, referencedNames } from '../dsl/compiler.mjs';
+import { compile, compileTables, compileActions, referencedNames } from '../dsl/compiler.mjs';
 import { combatActionEffects, COMBAT_ACTIONS, RANGE_BANDS, AIM_MODES } from './combat-actions.mjs';
+import { qualityConflictEffects } from './quality-conflicts.mjs';
+import { registerActions, availableActions } from '../actions.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const readRule = (name) => readFileSync(join(__dirname, '..', '..', 'data', 'rules', name), 'utf8');
@@ -26,44 +28,84 @@ const readRule = (name) => readFileSync(join(__dirname, '..', '..', 'data', 'rul
 const qualitiesSrc = readRule('weapon-qualities.dsl');
 const talentsSrc = readRule('talents.dsl');
 const traitsSrc = readRule('traits.dsl');
-const statusesSrc = readRule('statuses.dsl');
+const conditionsSrc = readRule('conditions.dsl');
+const circumstancesSrc = readRule('circumstances.dsl');
+const configurationsSrc = readRule('configurations.dsl');
+const mechanicsSrc = readRule('mechanics.dsl');
+const rollTablesSrc = readRule('roll-tables.dsl');
+const actionsSrc = readRule('actions.dsl');
+
+// Compile the Action declarations once at load and register them into the actions
+// taxonomy (is_action/action_type/is_reaction read this). "Checked at startup."
+registerActions(compileActions(actionsSrc));
+/** Names of every known action (defaults + DSL-declared). */
+export const availableActionNames = availableActions();
 
 /** Each rule category, compiled from its DSL source at load time. */
 export const weaponQualityEffects = compile(qualitiesSrc);
-export const talentEffects = compile(talentsSrc);   // talents + situational conditions
+export const talentEffects = compile(talentsSrc);   // talents + traits that gate on combat state
 export const traitEffects = compile(traitsSrc);
-export const statusEffects = compile(statusesSrc);
+export const conditionEffects = compile(conditionsSrc);       // active Conditions (On Fire, Aiming, …)
+export const circumstanceEffects = compile(circumstancesSrc); // environmental Circumstances (off-hand, …)
+export const configurationEffects = compile(configurationsSrc); // per-character toggles (Maximal, …)
+export const mechanicEffects = compile(mechanicsSrc);   // Jam mechanic + craftsmanship
 
-/** Player-facing names the rule set understands (for the UI / /api/rules). */
-export const availableQualities = referencedNames(qualitiesSrc).qualities;
+/** Built-in roll tables (Scatter Diagram, Haywire, Hallucinogenic), for roll_on. */
+export const rollTables = compileTables(rollTablesSrc);
+export const availableTables = rollTables.map((t) => ({ name: t.name, die: `${t.die.count}d${t.die.sides}`, rows: t.rows.length }));
+
+/** Player-facing names the rule set understands (for the UI / /api/rules).
+ *  Qualities are aggregated across ALL rule sources, so a weapon quality gating a
+ *  rule elsewhere (e.g. Maximal — both a quality and a Configuration: the quality
+ *  gates the config's availability) is recognised. */
+export const availableQualities = referencedNames(
+    [qualitiesSrc, talentsSrc, traitsSrc, conditionsSrc, circumstancesSrc, configurationsSrc, mechanicsSrc].join('\n\n'),
+).qualities;
 export const availableTalents = referencedNames(talentsSrc).talents;
 export const availableTraits = referencedNames(traitsSrc).traits;
-export const availableStatuses = referencedNames(statusesSrc).statuses;
+export const availableConditions = referencedNames(conditionsSrc).conditions;
+export const availableCircumstances = referencedNames(circumstancesSrc).circumstances;
+export const availableConfigurations = referencedNames(configurationsSrc).configurations;
+/** @deprecated alias kept for callers expecting the old name */
+export const availableStatuses = availableConditions;
 
 /** Raw DSL source of the built-in rule set, by category (for /api/rules/source). */
 export const builtinSources = [
     { category: 'Weapon qualities', file: 'weapon-qualities.dsl', source: qualitiesSrc },
-    { category: 'Talents & conditions', file: 'talents.dsl', source: talentsSrc },
+    { category: 'Talents & traits', file: 'talents.dsl', source: talentsSrc },
     { category: 'Traits (DH2.0)', file: 'traits.dsl', source: traitsSrc },
-    { category: 'Statuses', file: 'statuses.dsl', source: statusesSrc },
+    { category: 'Conditions', file: 'conditions.dsl', source: conditionsSrc },
+    { category: 'Circumstances', file: 'circumstances.dsl', source: circumstancesSrc },
+    { category: 'Configurations', file: 'configurations.dsl', source: configurationsSrc },
+    { category: 'Mechanical', file: 'mechanics.dsl', source: mechanicsSrc },
+    { category: 'Actions', file: 'actions.dsl', source: actionsSrc },
+    { category: 'Roll tables', file: 'roll-tables.dsl', source: rollTablesSrc },
 ];
 
 /** Flat per-RULE list of the (toggleable) built-in rules — one entry per rule
  *  (multi-branch rules collapse to a single ruleId), keyed by ruleId so one
  *  toggle controls all of a rule's effects. Grouped by rule KIND, not by source
  *  file. Combat-action core mechanics are excluded as they are not toggleable. */
+// The nine player-facing categories (KIND → category). Foundry targets for each
+// are in FOUNDRY_MIGRATION.md.
 const KIND_GROUP = {
     quality: 'Weapon qualities',
     talent: 'Talents and traits',
     trait: 'Talents and traits',
+    circumstance: 'Circumstances',
     condition: 'Conditions',
-    status: 'Statuses',
-    generic: 'Generics',
+    action: 'Actions',
+    configuration: 'Configurations',
+    mechanic: 'Mechanical',
+    miscellaneous: 'Miscellaneous',
 };
-const GROUP_ORDER = ['Weapon qualities', 'Talents and traits', 'Conditions', 'Statuses', 'Generics'];
+const GROUP_ORDER = [
+    'Weapon qualities', 'Talents and traits', 'Circumstances', 'Conditions',
+    'Actions', 'Configurations', 'Mechanical', 'Miscellaneous',
+];
 
 export const builtinRules = (() => {
-    const all = [...weaponQualityEffects, ...talentEffects, ...traitEffects, ...statusEffects];
+    const all = [...weaponQualityEffects, ...talentEffects, ...traitEffects, ...conditionEffects, ...circumstanceEffects, ...configurationEffects, ...mechanicEffects];
     const seen = new Set();
     const out = [];
     for (const e of all) {
@@ -80,14 +122,28 @@ export const builtinRules = (() => {
 // them (e.g. /api/options) without reaching past the rules layer.
 export { COMBAT_ACTIONS, RANGE_BANDS, AIM_MODES };
 
+/** Weapon qualities that act as a firing-mode toggle (modify the profile when
+ *  fired, rather than adding an Action). The UI offers a toggle for each one the
+ *  weapon has; the active modes are passed back as `firingModes` and gate the
+ *  rules via firing_mode("…"). */
+/** Available per-character Configurations (toggles), derived from the DSL.
+ *  FIRING_MODES kept as a back-compat alias. */
+export const availableConfigs = availableConfigurations;
+export const FIRING_MODES = availableConfigurations;
+
 /** Build a fresh registry holding the built-in (Claude-codified) rule set. */
 export function buildDefaultRegistry() {
     return new Registry()
         .addAll(combatActionEffects)
+        .addAll(qualityConflictEffects)
         .addAll(weaponQualityEffects)
         .addAll(talentEffects)
         .addAll(traitEffects)
-        .addAll(statusEffects);
+        .addAll(conditionEffects)
+        .addAll(circumstanceEffects)
+        .addAll(configurationEffects)
+        .addAll(mechanicEffects)
+        .addTables(rollTables);
 }
 
 /**
@@ -101,11 +157,19 @@ export function buildRegistry(customRules, disabledIds = []) {
     const keep = (effects) => effects.filter((e) => !disabled.has(e.ruleId) && !disabled.has(e.id));
     const registry = new Registry()
         .addAll(combatActionEffects)
+        .addAll(qualityConflictEffects)
         .addAll(keep(weaponQualityEffects))
         .addAll(keep(talentEffects))
         .addAll(keep(traitEffects))
-        .addAll(keep(statusEffects));
-    if (customRules && String(customRules).trim()) registry.addAll(compile(customRules));
+        .addAll(keep(conditionEffects))
+        .addAll(keep(circumstanceEffects))
+        .addAll(keep(configurationEffects))
+        .addAll(keep(mechanicEffects))
+        .addTables(rollTables);
+    if (customRules && String(customRules).trim()) {
+        registry.addAll(compile(customRules));
+        registry.addTables(compileTables(customRules));   // user-defined roll tables
+    }
     return registry;
 }
 

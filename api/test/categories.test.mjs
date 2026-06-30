@@ -13,19 +13,24 @@ import { compile } from '../lib/dsl/compiler.mjs';
 import { buildRegistry, builtinRules } from '../lib/rules/index.mjs';
 import { riggedDice, d100, die } from './helpers.mjs';
 
-// --- parser accepts the new/renamed kinds ------------------------------------
-test('parser accepts talent | trait | condition | quality | status | generic (+ rule alias)', () => {
+// --- parser accepts the canonical kinds + normalises aliases -----------------
+test('parser accepts the nine kinds and normalises aliases (status→condition, generic/rule→miscellaneous)', () => {
     const prog = parse(`
-        talent    "a" { on MODIFIERS then fail }
-        trait     "b" { on MODIFIERS then fail }
-        condition "c" { on MODIFIERS then fail }
-        quality   "d" { on MODIFIERS then fail }
-        status    "e" { on MODIFIERS then fail }
-        generic   "f" { on MODIFIERS then fail }
-        rule      "g" { on MODIFIERS then fail }
+        quality       "a" { on MODIFIERS then fail }
+        talent        "b" { on MODIFIERS then fail }
+        trait         "c" { on MODIFIERS then fail }
+        circumstance  "d" { on MODIFIERS then fail }
+        condition     "e" { on MODIFIERS then fail }
+        mechanic      "f" { on MODIFIERS then fail }
+        miscellaneous "g" { on MODIFIERS then fail }
+        status        "h" { on MODIFIERS then fail }
+        generic       "i" { on MODIFIERS then fail }
+        rule          "j" { on MODIFIERS then fail }
     `);
-    assert.deepEqual(prog.rules.map(r => r.kind), ['talent', 'trait', 'condition', 'quality', 'status', 'generic', 'rule']);
-    assert.equal(compile('status "On Fire" { on MODIFIERS when has_status("On Fire") then add modifier "x" = -10 }')[0].source, 'status');
+    assert.deepEqual(prog.rules.map(r => r.kind),
+        ['quality', 'talent', 'trait', 'circumstance', 'condition', 'mechanic', 'miscellaneous', 'condition', 'miscellaneous', 'miscellaneous']);
+    assert.equal(compile('condition "On Fire" { on MODIFIERS when has_condition("On Fire") then add modifier "x" = -10 }')[0].source, 'condition');
+    assert.equal(compile('status "On Fire" { on MODIFIERS when has_status("On Fire") then add modifier "x" = -10 }')[0].source, 'condition');
 });
 
 // --- helper ------------------------------------------------------------------
@@ -71,6 +76,39 @@ test('status On Fire applies a penalty; absent status does nothing', () => {
     assert.equal(rangedAttack({ statuses: ['On Fire'] }).test.modifiers.on_fire, -10);
     assert.equal(rangedAttack({ statuses: [] }).test.modifiers.on_fire, undefined);
     assert.equal(rangedAttack({}).test.modifiers.aim, undefined);
+});
+
+// --- renamed taxonomy: conditions[] alias + circumstances --------------------
+test('conditions[] input drives a Condition rule (statuses[] is an accepted alias)', () => {
+    assert.equal(rangedAttack({ conditions: ['Full Aim'] }).test.modifiers.aim, 20);
+    assert.equal(rangedAttack({ conditions: ['On Fire'] }).test.modifiers.on_fire, -10);
+});
+
+test('apply_status records structured Condition variables (severity, duration, location)', () => {
+    const reg = buildRegistry('quality "Concuss" { on ON_HIT when has_quality("Concuss") then apply_status "Stunned" duration 3 location "Head", "knocked silly" }');
+    const r = resolveAttack({ characteristics: { ws: 60, s: 30, t: 30 }, weapon: { name: 'Club', isMelee: true, damage: '1d10', pen: 0, damageType: 'Impact', rof: { single: true, burst: 0, full: 0 }, qualities: ['Concuss'] }, action: 'Standard Attack', target: { armour: 0, toughnessBonus: 0 } },
+        riggedDice([d100(20), die(5, 10)]), reg);
+    const st = r.hits[0].targetEffects.statuses[0];
+    assert.equal(st.status, 'Stunned');
+    assert.equal(st.duration, 3);
+    assert.equal(st.location, 'Head');
+});
+
+test('condition_* accessors read a structured Condition object from conditions[]', () => {
+    const reg = buildRegistry('circumstance "Crippled Drag" { on MODIFIERS when condition_severity("Crippled", 0) > 0 then add modifier "crippled drag" = (-1 * condition_severity("Crippled", 0)) }');
+    const r = resolveAttack({ characteristics: { ws: 50, s: 30, t: 30 }, weapon: { name: 'Sword', isMelee: true, damage: '1d10', pen: 0, damageType: 'Rending', rof: { single: true, burst: 0, full: 0 }, qualities: [] }, action: 'Standard Attack', conditions: [{ name: 'Crippled', severity: 4 }] },
+        riggedDice([d100(20), die(5, 10)]), reg);
+    assert.equal(r.test.modifiers['crippled drag'], -4);   // -1 × severity 4
+});
+
+test('has_circumstance gates a Circumstance rule on the circumstances[] list', () => {
+    const reg = buildRegistry('circumstance "Smoke" { on MODIFIERS when has_circumstance("Smoke") then add modifier "smoke" = -20 }');
+    const lit = resolveAttack({ characteristics: { bs: 50, s: 30, t: 30 }, weapon: { name: 'Pistol', isMelee: false, damage: '1d10', pen: 0, damageType: 'Impact', rof: { single: true, burst: 0, full: 0 }, qualities: [] }, action: 'Standard Attack' },
+        riggedDice([d100(50), die(5, 10)]), reg);
+    assert.equal(lit.test.modifiers.smoke, undefined);             // no circumstance → inactive
+    const smoky = resolveAttack({ characteristics: { bs: 50, s: 30, t: 30 }, weapon: { name: 'Pistol', isMelee: false, damage: '1d10', pen: 0, damageType: 'Impact', rof: { single: true, burst: 0, full: 0 }, qualities: [] }, action: 'Standard Attack', circumstances: ['Smoke'] },
+        riggedDice([d100(50), die(5, 10)]), reg);
+    assert.equal(smoky.test.modifiers.smoke, -20);
 });
 
 // --- toggling built-in rules off ---------------------------------------------

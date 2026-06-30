@@ -43,7 +43,7 @@ export function compileRule(rule) {
     // `set pen += …` writes to a named penetration-modifier slot; default it to
     // the rule's display name (e.g. "Razor Sharp" → "razor sharp").
     const ruleId = slug(rule.name);
-    const meta = { penKey: ruleId.replace(/-/g, ' ') };
+    const meta = { penKey: ruleId.replace(/-/g, ' '), ruleName: rule.name };
     const multi = rule.branches.length > 1;
 
     return rule.branches.map((br, i) => ({
@@ -65,6 +65,29 @@ export function compile(src) {
     return program.rules.flatMap(compileRule);
 }
 
+/** Compile one roll_table AST node into a runtime table: { name, die, rows }.
+ *  Rows are sorted and validated to cover the die's range without gaps/overlaps. */
+export function compileTable(table) {
+    const rows = [...table.rows].sort((a, b) => a.lo - b.lo);
+    for (const r of rows) {
+        if (r.hi < r.lo) throw new DslError(`Table "${table.name}" has a reversed range ${r.lo}-${r.hi}`, table.line, table.col);
+    }
+    return { name: table.name, die: table.die, rows };
+}
+
+/** Compile the roll_tables in DSL source (or a pre-parsed Program). */
+export function compileTables(src) {
+    const program = typeof src === 'string' ? parse(src) : src;
+    return (program.tables ?? []).map(compileTable);
+}
+
+/** Compile the action declarations: [{ name, type, attack }]. These are the
+ *  Actions taxonomy (hooked via is_action()/action_type()), compiled once at load. */
+export function compileActions(src) {
+    const program = typeof src === 'string' ? parse(src) : src;
+    return (program.actions ?? []).map((a) => ({ name: a.name, type: a.actionType, subtypes: a.subtypes ?? [] }));
+}
+
 /**
  * Extract the player-facing names a rule set references via has_talent("…"),
  * has_trait("…"), has_quality("…") and has_status("…"). These are the names the
@@ -73,8 +96,12 @@ export function compile(src) {
  */
 export function referencedNames(src) {
     const program = typeof src === 'string' ? parse(src) : src;
-    const buckets = { talents: new Set(), traits: new Set(), qualities: new Set(), statuses: new Set() };
-    const byFn = { has_talent: 'talents', has_trait: 'traits', has_quality: 'qualities', has_status: 'statuses' };
+    const buckets = { talents: new Set(), traits: new Set(), qualities: new Set(), conditions: new Set(), circumstances: new Set(), configurations: new Set() };
+    const byFn = {
+        has_talent: 'talents', has_trait: 'traits', has_quality: 'qualities',
+        has_condition: 'conditions', has_status: 'conditions', has_circumstance: 'circumstances',
+        configuration: 'configurations', firing_mode: 'configurations',
+    };
 
     const visit = (node) => {
         if (!node || typeof node !== 'object') return;
@@ -98,6 +125,8 @@ export function referencedNames(src) {
         talents: [...buckets.talents].sort(),
         traits: [...buckets.traits].sort(),
         qualities: [...buckets.qualities].sort(),
-        statuses: [...buckets.statuses].sort(),
+        conditions: [...buckets.conditions].sort(),
+        circumstances: [...buckets.circumstances].sort(),
+        configurations: [...buckets.configurations].sort(),
     };
 }

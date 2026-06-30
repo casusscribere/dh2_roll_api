@@ -20,8 +20,16 @@
  */
 import { tokenize, DslError } from './tokenizer.mjs';
 
-// `rule` is kept as a backward-compatible alias for `generic`.
-const RULE_KINDS = new Set(['talent', 'trait', 'condition', 'quality', 'status', 'generic', 'rule']);
+// Canonical rule kinds + accepted aliases. Aliases normalise to a canonical kind
+// (see KIND_ALIAS): the old `status` → `condition`, `condition`'s old situational
+// sense is now `circumstance`, and `generic`/`rule` → `miscellaneous`.
+const RULE_KINDS = new Set([
+    'quality', 'talent', 'trait', 'circumstance', 'condition', 'configuration', 'mechanic', 'miscellaneous',
+    'status', 'generic', 'rule',   // back-compat aliases
+]);
+// `roll_table` and `action` are top-level DECLARATIONS, not checkpoint rules.
+const ACTION_TYPES = new Set(['Half', 'Full', 'Reaction', 'Free']);
+const KIND_ALIAS = { status: 'condition', generic: 'miscellaneous', rule: 'miscellaneous' };
 const COMPARE_OPS = new Set(['==', '!=', '>=', '<=', '>', '<']);
 
 class Parser {
@@ -47,21 +55,102 @@ class Parser {
 
     // --- program / rule ------------------------------------------------------
     parseProgram() {
-        const rules = [];
-        while (!this.atEof()) rules.push(this.parseRule());
-        return { type: 'Program', rules };
+        const rules = [], tables = [], actions = [];
+        while (!this.atEof()) {
+            if (this.isKw('roll_table')) tables.push(this.parseTable());
+            else if (this.isKw('action')) actions.push(this.parseActionDecl());
+            else rules.push(this.parseRule());
+        }
+        return { type: 'Program', rules, tables, actions };
+    }
+
+    // action "Name" { type Half|Full|Reaction|Free  [attack] [subtype <name>]* }
+    //   `attack` is sugar for `subtype attack` — the key subtype many rules read.
+    parseActionDecl() {
+        const kw = this.expectKw('action');
+        const name = this.expectString('a quoted action name');
+        this.expectPunct('{');
+        let actionType = null;
+        const subtypes = [];
+        const addSub = (s) => { if (!subtypes.includes(s)) subtypes.push(s); };
+        while (!this.isPunct('}')) {
+            if (this.atEof()) throw this.err("Unterminated action (expected '}')");
+            if (this.isKw('type')) {
+                this.next();
+                const t = this.peek();
+                if (t.type !== 'ident' || !ACTION_TYPES.has(t.value)) throw this.err('Expected an action type (Half | Full | Reaction | Free)');
+                this.next();
+                actionType = t.value;
+            } else if (this.isKw('attack')) {
+                this.next();
+                addSub('attack');
+            } else if (this.isKw('subtype')) {
+                this.next();
+                const t = this.peek();
+                if (t.type !== 'ident' && t.type !== 'string') throw this.err('Expected a subtype name after subtype');
+                this.next();
+                addSub(t.value);
+            } else {
+                throw this.err("Unexpected clause in action body (expected 'type', 'attack' or 'subtype')");
+            }
+        }
+        this.expectPunct('}');
+        if (!actionType) throw new DslError(`Action "${name}" is missing a 'type' clause`, kw.line, kw.col);
+        return { type: 'ActionDecl', name, actionType, subtypes, line: kw.line, col: kw.col };
+    }
+
+    // roll_table "Name" { die 1d10  <lo>[-<hi>]: "text" [=> "Status", …]  … }
+    parseTable() {
+        const kw = this.expectKw('roll_table');
+        const name = this.expectString('a quoted table name');
+        this.expectPunct('{');
+        this.expectKw('die');
+        const dieTok = this.peek();
+        if (dieTok.type !== 'dice') throw this.err('Expected a dice literal (e.g. 1d10) after die');
+        this.next();
+        const rows = [];
+        while (!this.isPunct('}')) {
+            if (this.atEof()) throw this.err("Unterminated roll_table (expected '}')");
+            rows.push(this.parseTableRow());
+        }
+        this.expectPunct('}');
+        return { type: 'Table', name, die: { count: dieTok.count, sides: dieTok.sides }, rows, line: kw.line, col: kw.col };
+    }
+
+    parseTableRow() {
+        const lo = this.peek();
+        if (lo.type !== 'number') throw this.err('Expected a roll value (e.g. 1 or 1-2) for a table row');
+        this.next();
+        let hi = lo.value;
+        if (this.isOp('-')) {
+            this.next();
+            const h = this.peek();
+            if (h.type !== 'number') throw this.err('Expected the end of a roll range after -');
+            this.next();
+            hi = h.value;
+        }
+        this.expectPunct(':');
+        const text = this.expectString('the row outcome text');
+        const statuses = [];
+        if (this.isOp('=>')) {                          // optional statuses applied to the target
+            this.next();
+            statuses.push(this.expectString('a status name'));
+            while (this.isPunct(',')) { this.next(); statuses.push(this.expectString('a status name')); }
+        }
+        if (this.isPunct(';')) this.next();             // optional row separator
+        return { lo: lo.value, hi, text, statuses };
     }
 
     parseRule() {
         const kindTok = this.peek();
         if (kindTok.type !== 'ident' || !RULE_KINDS.has(kindTok.value)) {
-            throw this.err('Expected a rule kind (talent | trait | condition | quality | status | generic)');
+            throw this.err('Expected a rule kind (quality | talent | trait | circumstance | condition | configuration | mechanic | miscellaneous)');
         }
         this.next();
         const name = this.expectString('a quoted rule name');
 
         const rule = {
-            type: 'Rule', kind: kindTok.value, name,
+            type: 'Rule', kind: KIND_ALIAS[kindTok.value] ?? kindTok.value, name,
             tier: null, on: null, priority: null, branches: [],
             line: kindTok.line, col: kindTok.col,
         };
@@ -267,6 +356,12 @@ class Parser {
                     this.next();
                     return { type: 'Action', action: 'set_rf_threshold', value: this.parseExpr() };
                 }
+                if (this.isKw('jam_threshold')) {
+                    this.next();
+                    if (!this.isOp('=')) throw this.err("Expected '=' after jam_threshold");
+                    this.next();
+                    return { type: 'Action', action: 'set_jam_threshold', value: this.parseExpr() };
+                }
                 if (this.isKw('scatter')) {
                     this.next();
                     let op;
@@ -276,7 +371,13 @@ class Parser {
                     this.next();
                     return { type: 'Action', action: 'set_scatter', op, value: this.parseExpr() };
                 }
-                throw this.err("Expected 'modifier', 'pen', 'rf_threshold' or 'scatter' after 'set'");
+                if (this.isKw('damage_type')) {
+                    this.next();
+                    if (!this.isOp('=')) throw this.err("Expected '=' after damage_type");
+                    this.next();
+                    return { type: 'Action', action: 'set_damage_type', value: this.parseExpr() };
+                }
+                throw this.err("Expected 'modifier', 'pen', 'rf_threshold', 'jam_threshold', 'scatter' or 'damage_type' after 'set'");
             }
             case 'cancel': {
                 this.next();
@@ -297,6 +398,75 @@ class Parser {
                 return { type: 'Action', action: 'emit', name, text };
             }
             case 'fail': { this.next(); return { type: 'Action', action: 'fail' }; }
+            case 'suppress': {                           // suppress "Jam" — skip another rule this checkpoint run
+                this.next();
+                return { type: 'Action', action: 'suppress', name: this.expectString('the name of a rule to suppress') };
+            }
+            case 'prevent_parry': { this.next(); return { type: 'Action', action: 'prevent_parry' }; }
+            case 'cannot_parry': { this.next(); return { type: 'Action', action: 'cannot_parry' }; }
+            case 'detonate': { this.next(); return { type: 'Action', action: 'detonate' }; }
+            case 'corrode': { this.next(); return { type: 'Action', action: 'corrode', value: this.parseExpr() }; }
+            case 'bump_quality': {                       // bump_quality "Blast" by <expr>
+                this.next();
+                const name = this.expectString('a quality name');
+                this.expectKw('by');
+                return { type: 'Action', action: 'bump_quality', name, value: this.parseExpr() };
+            }
+            case 'add_quality': {                        // add_quality "Recharge"
+                this.next();
+                return { type: 'Action', action: 'add_quality', name: this.expectString('a quality name') };
+            }
+            case 'reduce_unnatural_toughness': {         // reduce_unnatural_toughness <expr> (Felling)
+                this.next();
+                return { type: 'Action', action: 'reduce_unnatural_toughness', value: this.parseExpr() };
+            }
+            case 'require_test': {
+                this.next();
+                const characteristic = this.expectString('a characteristic name (e.g. "Toughness")');
+                const value = this.parseExpr();                       // the test modifier
+                const onFail = this.expectString('the on-fail consequence text');
+                // optional follow-up on a FAILED test: roll on a roll_table OR
+                // apply a condition (e.g. Flame → On Fire).
+                let onFailRollTable = null, onFailApply = null;
+                if (this.isOp('=>')) {
+                    this.next();
+                    if (this.isKw('roll_on')) { this.next(); onFailRollTable = this.expectString('a roll_table name after roll_on'); }
+                    else if (this.isKw('apply_status')) {
+                        this.next();
+                        const name = this.expectString('a condition name after apply_status');
+                        let value = null, duration = null, location = null;   // same optional vars as apply_status
+                        while (this.isKw('value') || this.isKw('duration') || this.isKw('location')) {
+                            if (this.isKw('value')) { this.next(); value = this.parseExpr(); }
+                            else if (this.isKw('duration')) { this.next(); duration = this.parseExpr(); }
+                            else { this.next(); location = this.parseExpr(); }
+                        }
+                        onFailApply = { name, value, duration, location };
+                    } else throw this.err("Expected 'roll_on' or 'apply_status' after =>");
+                }
+                return { type: 'Action', action: 'require_test', characteristic, value, onFail, onFailRollTable, onFailApply };
+            }
+            case 'roll_on': {
+                this.next();
+                const table = this.expectString('a roll_table name');
+                let value = null, area = null;                        // roll_on "X" [+ <modifier>] [area <expr>]
+                if (this.isOp('+')) { this.next(); value = this.parseExpr(); }
+                if (this.isKw('area')) { this.next(); area = this.parseExpr(); }
+                return { type: 'Action', action: 'roll_on', table, value, area };
+            }
+            case 'apply_status': {
+                this.next();
+                const name = this.expectString('a status name');
+                // optional structured variables in any order, then optional reason:
+                //   value <expr> | duration <expr> | location <expr>
+                let value = null, duration = null, location = null, reason = null;
+                while (this.isKw('value') || this.isKw('duration') || this.isKw('location')) {
+                    if (this.isKw('value')) { this.next(); value = this.parseExpr(); }
+                    else if (this.isKw('duration')) { this.next(); duration = this.parseExpr(); }
+                    else { this.next(); location = this.parseExpr(); }
+                }
+                if (this.isPunct(',')) { this.next(); reason = this.expectString('a reason'); }
+                return { type: 'Action', action: 'apply_status', name, value, duration, location, reason };
+            }
             default:
                 throw this.err(`Unknown action '${kw}'`);
         }

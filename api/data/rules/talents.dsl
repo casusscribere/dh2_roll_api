@@ -8,15 +8,7 @@
 # Priorities: penalty injectors at 10, cancellers/reducers at 100 (so they run
 # after the penalties they modify are in place).
 
-# --- base situational penalty (no talent required) ---------------------------
-# Using a weapon in the off hand incurs -20. Modelled as a `condition` (a
-# situational rule that is not a purchasable talent).
-condition "Off-Hand" {
-  on MODIFIERS
-  priority 10
-  when firing_offhand and not dual_wielding
-  then add modifier "off_hand" = -20
-}
+# (The base off-hand -20 circumstance moved to circumstances.dsl.)
 
 # --- Two-Weapon Wielder ------------------------------------------------------
 # Lets a character attack with two weapons; each attack suffers -20.

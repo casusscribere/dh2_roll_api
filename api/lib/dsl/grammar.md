@@ -1,10 +1,13 @@
 # DH2 Trait DSL — grammar
 
-A small, line-oriented language for authoring DH2 rule interpretations (traits,
-talents, weapon qualities, custom modifiers) as **checkpoint effects**. Each rule
-compiles to the same `{ id, source, checkpoint, priority, when, apply }` shape the
-engine already runs from a `Registry` (see `lib/pipeline.mjs`), so DSL-authored
-rules and native-JS rules are interchangeable and the engine never changes.
+A small, line-oriented language for authoring DH2 rule interpretations (qualities,
+talents, traits, conditions, configurations, actions, roll tables, …) as
+**checkpoint effects**. Most constructs are *rules* that compile to the same
+`{ id, ruleId, source, checkpoint, priority, when, apply }` shape the engine runs
+from a `Registry` (see `lib/pipeline.mjs`), so DSL-authored rules and native-JS
+rules are interchangeable and the engine never changes. Two constructs —
+`roll_table` and `action` — are top-level **declarations** compiled into their own
+registries at load (not checkpoint rules).
 
 Pipeline: **text → `tokenize` → tokens → `parse` → AST → `compile` → Effect**.
 This document and the tokenizer/parser cover the first half (text → AST). The
@@ -25,23 +28,40 @@ compiler/interpreter (AST → executable Effect) is a separate module.
 ## EBNF
 
 ```ebnf
-program     = { rule } ;
-rule        = kind STRING [ "tier" INT ] "{" { clause } "}" ;
-kind        = "talent" | "trait" | "condition" | "quality" | "status" | "generic" ;
-            (* talent: XP-bought; trait: innate DH2.0 trait; condition: situational
-               (non-purchasable) rule; quality: weapon quality; status: active
-               status condition; generic: no particular source ("rule" is an
-               accepted alias). The kind is a label — gate with the matching
-               has_*() function. *)
+program     = { rule | roll_table | action_decl } ;
 
-(* A rule body contains exactly one `on`, an optional `priority`, and one or
-   more `when …? then …` branches (in any order, but a `when` must be
-   immediately followed by its `then`). Each branch compiles to its own effect,
-   evaluated independently. A branch with no `when` is unconditional. *)
-clause      = "on" IDENT                         (* checkpoint; required, once *)
-            | "priority" INT                      (* ordering; optional *)
+(* --- rule: compiles to one Effect per branch --- *)
+rule        = kind STRING [ "tier" INT ] "{" { clause } "}" ;
+kind        = "quality" | "talent" | "trait" | "circumstance" | "condition"
+            | "configuration" | "mechanic" | "miscellaneous"
+            | "status" | "generic" | "rule" ;   (* aliases, normalised below *)
+            (* The kind is the player-facing CATEGORY label; gate behaviour with
+               the matching has_*()/configuration() function. Aliases normalise:
+               status -> condition, generic/rule -> miscellaneous. The old
+               situational `condition` sense is now `circumstance`; the active
+               sense (On Fire, Aiming, Stunned) is `condition`. *)
+
+(* A rule body has exactly one `on`, an optional `priority`, and one or more
+   `when …? then …` branches (any order, but a `when` must be immediately
+   followed by its `then`). Each branch compiles to its own effect. A branch with
+   no `when` is unconditional. *)
+clause      = "on" IDENT                          (* checkpoint; required, once *)
+            | "priority" INT                       (* ordering; optional *)
             | branch ;
 branch      = [ "when" predicate ] "then" action { ";" action } ;
+
+(* --- roll_table: a die + range→outcome rows, invoked by the roll_on action --- *)
+roll_table  = "roll_table" STRING "{" "die" DICE { table_row } "}" ;
+table_row   = INT [ "-" INT ] ":" STRING [ "=>" STRING { "," STRING } ] [ ";" ] ;
+            (* lo[-hi]: "outcome" [=> "Status", …]  — the optional statuses are
+               applied to the target when that row is rolled. *)
+
+(* --- action declaration: the Actions taxonomy, compiled once at load --- *)
+action_decl = "action" STRING "{" { "type" action_type | "attack" | "subtype" IDENT } "}" ;
+action_type = "Half" | "Full" | "Reaction" | "Free" ;
+            (* `type` required. `attack` is sugar for `subtype attack` — the key
+               subtype, read via is_attack / action_subtype("…") (e.g. Defensive's
+               -10 to attacks). Hooked via is_action("…"), action_type, is_reaction(). *)
 
 (* --- activation predicate: boolean over whitelisted facts --- *)
 predicate   = orExpr ;
@@ -57,16 +77,30 @@ call        = IDENT "(" [ expr { "," expr } ] ")" ;
 action      = "add" "modifier" STRING "=" expr
             | "set" "modifier" STRING "=" expr
             | "cancel" "modifier" STRING
-            | "add_die" expr                      (* extra pool dice (weapon die size) *)
-            | "keep_highest"                       (* keep the original die count, highest *)
+            | "add_die" expr                       (* extra pool dice (weapon die size) *)
+            | "keep_highest"                        (* keep the original die count, highest *)
             | "add_hits" expr
             | "multiply_hits" expr
             | "set" "pen" ( "+=" | "=" ) expr
             | "set" "rf_threshold" "=" expr
-            | "floor_die" expr                     (* raise any die below N to N (Proven) *)
-            | "cap_die" expr                       (* cap any die above N at N (Primitive) *)
-            | "emit" STRING [ "," STRING ]         (* push a named effect [+ description] *)
-            | "fail" ;                             (* cancel success (e.g. Jam) *)
+            | "set" "jam_threshold" "=" expr
+            | "set" "scatter" ( "+=" | "=" ) expr   (* base / DSL-alterable scatter distance *)
+            | "set" "damage_type" "=" expr          (* override hit damage type (Sanctified → "Holy") *)
+            | "floor_die" expr                      (* raise any die below N to N (Proven) *)
+            | "cap_die" expr                        (* cap any die above N at N (Primitive) *)
+            | "emit" STRING [ "," STRING ]          (* push a named effect [+ description] *)
+            | "fail"                                (* cancel success (e.g. Jam) *)
+            | "suppress" STRING                     (* skip another rule by name this run (Overheats → Jam) *)
+            | "prevent_parry"                       (* mark the attack un-Parryable (Flexible) *)
+            | "cannot_parry"                        (* mark THIS weapon unable to Parry (Unwieldy) *)
+            | "detonate"                            (* resolve damage at the scatter point (Blast) *)
+            | "corrode" expr                        (* Corrosive: reduce struck-location AP *)
+            | "bump_quality" STRING "by" expr       (* raise an existing quality's rating *)
+            | "add_quality" STRING                  (* grant a quality this shot (Maximal → Recharge) *)
+            | "reduce_unnatural_toughness" expr     (* Felling: cut the target's Unnatural Toughness *)
+            | "roll_on" STRING [ "+" expr ] [ "area" expr ]   (* roll on a roll_table (+ modifier; optional radius surfaced with the result — Haywire) *)
+            | "require_test" STRING expr STRING [ "=>" ( "roll_on" STRING | "apply_status" STRING { "value" expr | "duration" expr | "location" expr } ) ]
+            | "apply_status" STRING { "value" expr | "duration" expr | "location" expr } [ "," STRING ] ;
 
 (* --- arithmetic expression (action values) --- *)
 expr        = addExpr ;
@@ -82,27 +116,41 @@ factor      = "(" expr ")" | value ;
 - `DICE` — `INT "d" INT`, e.g. `1d10` (rolled at apply time via the injected RNG)
 - `STRING` — `"..."` or `'...'`, with `\` escapes
 - `BOOL` — `true` | `false`
-- operators `== != >= <= > < += = + - * /`; punctuation `{ } ( ) , ;`
+- operators `== != >= <= += => > < = + - * /`; punctuation `{ } ( ) , ; :`
 - comments: `// ...` or `# ...` to end of line
 
 ## Checkpoints (`on`)
-`MODIFIERS`, `POST_ROLL`, `HIT_COUNT_MULT`, `HIT_COUNT_BONUS`, `PENETRATION`,
-`DAMAGE_POOL`, `DIE_ADJUST`, `DAMAGE_MODS` (validated by the compiler).
+`MODIFIERS`, `POST_ROLL`, `ON_MISS`, `HIT_COUNT_MULT`, `HIT_COUNT_BONUS`,
+`PENETRATION`, `DAMAGE_POOL`, `DIE_ADJUST`, `DAMAGE_MODS`, `ON_HIT`, `PARRY`,
+`POST_PARRY`, `EVASION` (validated by the compiler against `lib/pipeline.mjs`).
 
-## Fact vocabulary (`when`)
-Read-only facts the compiler will expose to the interpreter (illustrative):
-`dual_wielding`, `firing_offhand`, `is_melee`, `is_ranged`, `action`, `aim`,
-`range`, `roll`, `dos`, `dof`, `success`, `location`, `hit_index`, `damage_type`,
-`sb`, `tb`; functions `has_quality("X")`, `has_talent("X")`, `has_trait("X")`,
-`has_status("X")`, `quality_level("X", default)`, `trait_level("X", default)`,
-`tens(n)`, `is_natural(n)`. (Authoritative list: `lib/dsl/docs.mjs`, served at `/api/dsl-docs`.)
+## Vocabulary (`when` / expressions)
+Facts and functions are exposed to the interpreter over a whitelist. **The
+authoritative, always-current list lives in `lib/dsl/docs.mjs`, served at
+`/api/dsl-docs` and rendered on the Rules page.** Highlights:
+
+- weapon/actor: `is_melee`, `is_ranged`, `pen`, `sb`, `tb`, `bs_bonus`, `ws_bonus`
+- test/outcome: `roll`, `dos`, `dof`, `success`
+- action context: `action`, `action_type`, `is_attack`, `aim`, `half_aim`,
+  `full_aim`, `range`, `location`, `damage_type`, `hit_index`
+- mechanic: `jam_threshold`, `craftsmanship`
+- per-hit/target: `damage_dealt`, `wounds`, `target_sb`, `target_tb`, `target_armour`,
+  `target_unnatural_toughness`
+- combat state: `dual_wielding`, `firing_offhand`, `firing_both`
+- parry: `opposing_present`, `opposing_has_quality("…")` (the parried attacking
+  weapon — Power Field)
+- functions: `has_quality`, `has_talent`, `has_trait`, `target_has_trait`,
+  `has_condition`
+  (`has_status` alias), `has_circumstance`, `circumstance_severity`,
+  `configuration` (`firing_mode` alias),
+  `is_action`, `is_reaction`, `action_subtype`, `quality_level`, `trait_level`,
+  `condition_severity`, `condition_duration`, `condition_location`, `tens`,
+  `is_natural`
 
 ## Examples
 
 ```
-// Tier-1 talent with two branches, each independently activated: cancel the
-// off-hand penalty when firing off-hand; reduce the dual-wield penalty to -10
-// when wielding two weapons with Two-Weapon Wielder.
+// Tier-1 talent, two independently-activated branches.
 talent "Ambidextrous" tier 1 {
   on MODIFIERS
   priority 100                       // run after penalty injectors
@@ -119,20 +167,37 @@ quality "Accurate" {
   when has_quality("Accurate") and dos >= 5 then add modifier "accurate x 2" = 1d10
 }
 
-quality "Tearing" {
-  on DAMAGE_POOL
-  when has_quality("Tearing")
-  then add_die 1; keep_highest
+// An active Condition (was `status`): aiming adds the to-hit bonus.
+condition "Full Aim" {
+  on MODIFIERS  when has_condition("Full Aim")  then add modifier "aim" = 20
 }
 
-quality "Jam" {
-  on POST_ROLL
-  when is_ranged and ((not has_quality("Reliable") and roll > 96) or roll == 100)
-  then emit "Jam", "The weapon jams!"; fail
+// A per-character Configuration toggle that rewrites the profile this shot.
+configuration "Maximal" {
+  on DAMAGE_MODS  when has_quality("Maximal") and configuration("Maximal")
+  then add modifier "maximal" = 1d10; bump_quality "Blast" by 2
 }
 
-generic "Action modifier" {
-  on MODIFIERS
-  then add modifier "attack" = action_modifier
+// On-hit Condition with structured variables (severity + hit location).
+quality "Crippling" {
+  on ON_HIT  when has_quality("Crippling") and wounds > 0
+  then apply_status "Crippled" value quality_level("Crippling", 1) location location, "inflicted a wound"
 }
+
+// On-hit test that, on failure, rolls on a table.
+quality "Hallucinogenic" {
+  on ON_HIT  when has_quality("Hallucinogenic")
+  then require_test "Toughness" (-10 * quality_level("Hallucinogenic", 1)) "delusion" => roll_on "Hallucinogenic Effects"
+}
+
+// A roll table (invoked by roll_on); rows may apply statuses.
+roll_table "Hallucinogenic Effects" {
+  die 1d10
+  1: "Bugs! He claws at imaginary insects." => "Prone", "Stunned"
+  8: "Berserk rage — he attacks the nearest foe." => "Frenzied"
+}
+
+// An action declaration — the Actions taxonomy, compiled once at load.
+action "Standard Attack" { type Half attack }
+action "Parry"           { type Reaction }
 ```

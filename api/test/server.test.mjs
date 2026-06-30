@@ -155,7 +155,8 @@ test('GET /api/rules/source returns the built-in DSL source by category', async 
     assert.ok(qualities, 'weapon-qualities.dsl present');
     assert.match(qualities.source, /quality "Tearing"/);
     assert.ok(body.builtins.some((b) => b.file === 'traits.dsl'));
-    assert.ok(body.builtins.some((b) => b.file === 'statuses.dsl'));
+    assert.ok(body.builtins.some((b) => b.file === 'conditions.dsl'));
+    assert.ok(body.builtins.some((b) => b.file === 'circumstances.dsl'));
     // per-rule list for the toggle UI
     assert.ok(Array.isArray(body.rules));
     assert.ok(body.rules.some((r) => r.id === 'tearing' && r.category === 'Weapon qualities'));
@@ -253,6 +254,27 @@ test('serves the home, roll and rules pages plus shared assets', async () => {
         assert.equal(res.status, 200, `${path} should be 200`);
         assert.match(await res.text(), new RegExp(marker));
     }
+});
+
+// --- POST /api/resolve -------------------------------------------------------
+test('POST /api/resolve resolves an engagement (attack → reaction → soak)', async () => {
+    const res = await postJson('/api/resolve', {
+        attacker: {
+            characteristics: { ws: 40, bs: 50, s: 35, t: 30 },
+            weapon: { name: 'Sword', isMelee: true, damage: '1d10', pen: 0, damageType: 'Rending', rof: { single: true, burst: 0, full: 0 }, qualities: ['Concussive (2)'] },
+            action: 'Standard Attack',
+        },
+        defender: {
+            characteristics: { ws: 30, ag: 40, t: 35, s: 30 }, armour: 4, toughnessBonus: 3,
+            evasion: { mode: 'dodge' }, field: { rating: 30, overloadMax: 5 },
+        },
+        options: { autoResolveTests: true },
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.ok('attack' in body && 'defender' in body);
+    assert.ok('test' in body.attack);
+    if (body.attack.test.success) assert.ok(body.reaction); // a reaction was attempted
 });
 
 // --- unknown route -----------------------------------------------------------
