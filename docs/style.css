@@ -43,6 +43,16 @@ details { margin-top: .4rem; } summary { cursor: pointer; color: var(--dim); fon
 textarea { width: 100%; background: #0e0c09; color: var(--text); border: 1px solid var(--border); border-radius: 3px; padding: .35rem .5rem; font-family: var(--mono); font-size: .82rem; resize: vertical; }
 .minibtn { width: auto; margin-top: .5rem; padding: .3rem .9rem; font-size: .85rem; }
 input.rollforce { width: 3.6em; margin: 0; padding: .05rem .25rem; font-size: .8rem; vertical-align: middle; }
+
+/* --- dynamic per-side rule toggles (Talents/Traits/Circumstances/Conditions) --- */
+.rulepanel { margin-top: .3rem; border: 1px solid var(--border); border-radius: 3px; padding: .4rem .5rem; background: #0e0c09; }
+.rulegroup { margin: .2rem 0 .45rem; }
+.rulegroup .ghead { color: var(--gold); font-size: .72rem; font-variant: small-caps; letter-spacing: 1px; margin-bottom: .2rem; }
+.rrows { display: flex; flex-wrap: wrap; gap: .25rem .8rem; }
+.rrow { display: inline-flex; align-items: center; gap: .25rem; }
+.rrow label { display: inline-flex; align-items: center; gap: .25rem; margin: 0; font-size: .78rem; color: var(--text); }
+.rrow input[type="checkbox"] { width: auto; }
+.rrow input.rval { width: 3.2em; margin: 0; padding: .05rem .25rem; font-size: .78rem; }
 .trace { color: var(--dim); font-size: .78rem; }
 
 /* --- home cards --- */

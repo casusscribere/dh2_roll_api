@@ -39,7 +39,7 @@ export {
  *  - natural 1 always succeeds, natural 100 always fails
  *  - DoS = 1 + tens(target) - tens(roll); DoF likewise inverted
  */
-export function rollTest({ target = 0, modifiers = {}, label = 'test' }, rng = Math.random, forcedRoll = null) {
+export function rollTest({ target = 0, modifiers = {}, label = 'test', unnatural = 0 }, rng = Math.random, forcedRoll = null) {
     let modifierTotal = Object.values(modifiers).reduce((a, b) => a + (Number(b) || 0), 0);
     if (modifierTotal > 60) modifierTotal = 60;
     if (modifierTotal < -60) modifierTotal = -60;
@@ -48,6 +48,13 @@ export function rollTest({ target = 0, modifiers = {}, label = 'test' }, rng = M
     const roll = forcedRoll ?? d(100, rng, label);
     const success = roll === 1 || (roll <= modifiedTarget && roll !== 100);
 
+    // Unnatural Characteristic (DH2 core p.139): a SUCCESSFUL test using a
+    // characteristic with an Unnatural value gains bonus degrees of success equal
+    // to HALF that value, rounded up (p.18 rounding rule). The target number is
+    // not changed — only the DoS on a success. Failures are unaffected.
+    const unnaturalValue = Number(unnatural) || 0;
+    const bonusDos = success && unnaturalValue > 0 ? Math.ceil(unnaturalValue / 2) : 0;
+
     return {
         roll,
         target: Number(target),
@@ -55,8 +62,10 @@ export function rollTest({ target = 0, modifiers = {}, label = 'test' }, rng = M
         modifierTotal,
         modifiedTarget,
         success,
-        dos: success ? 1 + getDegree(modifiedTarget, roll) : 0,
+        dos: success ? 1 + getDegree(modifiedTarget, roll) + bonusDos : 0,
         dof: success ? 0 : 1 + getDegree(roll, modifiedTarget),
+        unnatural: unnaturalValue,
+        bonusDos,
         autoFailure: roll === 100,
         autoSuccess: roll === 1,
     };
@@ -202,6 +211,11 @@ function runToHit(input, rng, registry) {
     const baseTarget = isMelee ? (characteristics.ws ?? 0) : (characteristics.bs ?? 0);
     const rangeBand = isMelee ? 'Melee' : (input.rangeBand ?? 'Normal Range');
     const aimValue = AIM_MODES[input.aim ?? 'None'] ?? 0;
+    // Unnatural Characteristic values for this attacker (p.139): WS/BS grant bonus
+    // DoS on the to-hit test; Strength folds into the melee damage Strength Bonus.
+    const unnatural = input.unnatural ?? {};
+    const unnaturalToHit = isMelee ? (Number(unnatural.ws) || 0) : (Number(unnatural.bs) || 0);
+    const unnaturalStrength = Number(unnatural.s) || 0;
 
     const ctx = new RollContext({
         input, characteristics, weapon, target,
@@ -217,7 +231,7 @@ function runToHit(input, rng, registry) {
     });
 
     runCheckpoint(registry, CHECKPOINTS.MODIFIERS, ctx);
-    const test = rollTest({ target: baseTarget, modifiers: ctx.modifiers, label: 'to-hit' }, rng);
+    const test = rollTest({ target: baseTarget, modifiers: ctx.modifiers, label: 'to-hit', unnatural: unnaturalToHit }, rng);
     test.characteristic = isMelee ? 'WS' : 'BS';
     ctx.test = test;
     ctx.success = test.success;
@@ -254,7 +268,7 @@ function runToHit(input, rng, registry) {
             // targets in the area. `detonate` is set by the DSL rule; it is not
             // reached on a jam (the Blast rule gates itself on roll ≤ jam_threshold).
             if (ctx.detonate) {
-                const sb = Math.floor((characteristics.s ?? 0) / 10);
+                const sb = Math.floor((characteristics.s ?? 0) / 10) + unnaturalStrength;
                 const sbTimes = strengthBonusMultiple(weapon, isMelee);
                 ctx.pen = Number(weapon.pen) || 0; ctx.penModifiers = {}; ctx.firstLocation = 'Body';
                 runCheckpoint(registry, CHECKPOINTS.PENETRATION, ctx);
@@ -282,7 +296,7 @@ function runToHit(input, rng, registry) {
     const additionalHits = ctx.additionalHits;
 
     // locations + penetration
-    const sb = Math.floor((characteristics.s ?? 0) / 10);
+    const sb = Math.floor((characteristics.s ?? 0) / 10) + unnaturalStrength;
     const sbTimes = strengthBonusMultiple(weapon, isMelee);
     const firstLocation = (action === 'Called Shot' && input.calledShotLocation)
         ? input.calledShotLocation : getHitLocationForRoll(test.roll);
@@ -503,7 +517,7 @@ export function resolveParry(input, rng = Math.random, registry = defaultRegistr
         };
     }
 
-    const test = rollTest({ target: characteristics.ws ?? 0, modifiers: ctx.modifiers, label: 'parry (WS)' }, rng);
+    const test = rollTest({ target: characteristics.ws ?? 0, modifiers: ctx.modifiers, label: 'parry (WS)', unnatural: Number(input.unnatural?.ws) || 0 }, rng);
     test.characteristic = 'WS';
     ctx.test = test;
     ctx.success = test.success;
@@ -546,7 +560,7 @@ function resolveDodge(defender, rng, registry) {
     });
     if (defender.evasion?.modifier) ctx.modifiers.modifier = Number(defender.evasion.modifier) || 0;
     runCheckpoint(registry, CHECKPOINTS.EVASION, ctx);
-    const test = rollTest({ target: c.agility ?? c.ag ?? 0, modifiers: ctx.modifiers, label: 'dodge (Ag)' }, rng);
+    const test = rollTest({ target: c.agility ?? c.ag ?? 0, modifiers: ctx.modifiers, label: 'dodge (Ag)', unnatural: Number(defender.unnatural?.ag) || 0 }, rng);
     test.characteristic = 'Ag';
     return { mode: 'dodge', test, log: ctx.log };
 }
@@ -609,7 +623,7 @@ export function engageEvasion(defender, attackDos, registry = defaultRegistry, r
         return { reaction: { mode: 'parry', prevented: true, note: 'Parry prevented — the attacking weapon is Flexible (cannot be Parried)' }, evaded: 0 };
     }
     const reaction = mode === 'parry'
-        ? { mode: 'parry', ...resolveParry({ characteristics: { ws: defender.characteristics?.ws ?? 0 }, weapon: defender.weapon ?? {}, against: attackerWeapon, customModifier: defender.evasion?.modifier, talents: defender.talents, traits: defender.traits, statuses: defender.conditions ?? defender.statuses, circumstances: defender.circumstances }, rng, registry) }
+        ? { mode: 'parry', ...resolveParry({ characteristics: { ws: defender.characteristics?.ws ?? 0 }, weapon: defender.weapon ?? {}, against: attackerWeapon, customModifier: defender.evasion?.modifier, unnatural: defender.unnatural, talents: defender.talents, traits: defender.traits, statuses: defender.conditions ?? defender.statuses, circumstances: defender.circumstances }, rng, registry) }
         : resolveDodge(defender, rng, registry);
     // A refused parry (Unwieldy weapon) negates nothing.
     if (reaction.prevented) return { reaction, evaded: 0 };

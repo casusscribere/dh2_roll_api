@@ -1,4 +1,7 @@
-# DH2 talents/traits that gate on combat state — authored in the trait DSL.
+# DH2 TALENTS (XP-bought abilities) that gate on combat state — authored in the DSL.
+# This file holds talents ONLY (kind `talent`, gated on has_talent(...)); innate
+# DH2.0 traits live separately in traits.dsl (kind `trait`, has_trait(...)). The two
+# are distinct categories in the rule taxonomy and the UI.
 #
 # Talent rules are always present in the registry but only fire when the
 # character actually HAS the talent (has_talent(...)) AND the situation is

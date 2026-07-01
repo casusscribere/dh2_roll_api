@@ -37,6 +37,9 @@
         </select></div>
       <div><label>Other modifier</label><input type="number" id="t-mod" value="0"></div>
     </div>
+    <div class="row3">
+      <div><label title="Unnatural Characteristic (X): a successful test gains ⌈X/2⌉ bonus degrees of success (DH2 p.139). 0 = none.">Unnatural (X)</label><input type="number" id="t-unnatural" value="0" min="0"></div>
+    </div>
     <button onclick="doTest()">Roll Test</button>
     <div class="result" id="t-result">&mdash;</div>
   </fieldset>
@@ -77,6 +80,12 @@
           <div><label>S</label><input type="number" id="a-s" value="35"></div>
           <div><label>T</label><input type="number" id="a-t" value="30"></div>
         </div>
+        <div class="row4" title="Unnatural Characteristic (X) per DH2 p.139: WS/BS add ⌈X/2⌉ DoS to the hit; S adds X to the melee Strength Bonus. 0 = none.">
+          <div><label>Unnat. WS</label><input type="number" id="a-un-ws" value="0" min="0"></div>
+          <div><label>Unnat. BS</label><input type="number" id="a-un-bs" value="0" min="0"></div>
+          <div><label>Unnat. S</label><input type="number" id="a-un-s" value="0" min="0"></div>
+          <div></div>
+        </div>
         <div class="row">
           <div><label>Action</label><select id="a-action"></select></div>
           <div><label>Aim</label><select id="a-aim"><option>None</option><option>Half</option><option>Full</option></select></div>
@@ -87,18 +96,11 @@
         </div>
         <div id="a-calledshot-wrap" style="display:none"><label>Called shot location</label>
           <select id="a-calledshot"></select></div>
-        <label style="margin-top:.6rem">Talents (toggle)</label>
-        <div class="checks" id="a-talents"><span class="dim">loading…</span></div>
+        <label style="margin-top:.6rem">Active rules <span class="dim">— toggle on/off; set a value where it applies. Talents &amp; Traits default ON.</span></label>
+        <div id="a-rules" class="rulepanel"><span class="dim">loading…</span></div>
         <div class="checks">
           <label><input type="checkbox" id="a-dualwield"> Dual-wielding</label>
           <label><input type="checkbox" id="a-offhand"> Off-hand</label>
-        </div>
-        <div class="row">
-          <div><label>Traits</label><input id="a-traits" placeholder="e.g. Brutal Charge (3)"></div>
-          <div><label>Conditions</label><input id="a-statuses" placeholder="e.g. Full Aim"></div>
-        </div>
-        <div class="row">
-          <div><label>Circumstances</label><input id="a-circumstances" placeholder="e.g. Darkness"></div>
         </div>
       </div>
 
@@ -139,6 +141,12 @@
           <div><label>T</label><input type="number" id="d-t" value="35"></div>
           <div><label>S</label><input type="number" id="d-s" value="30"></div>
         </div>
+        <div class="row4" title="Unnatural Characteristic (X) per DH2 p.139: WS adds ⌈X/2⌉ DoS to a Parry, Ag adds ⌈X/2⌉ DoS to a Dodge (so it evades more hits). Unnatural Toughness is set below. 0 = none.">
+          <div><label>Unnat. WS</label><input type="number" id="d-un-ws" value="0" min="0"></div>
+          <div><label>Unnat. Ag</label><input type="number" id="d-un-ag" value="0" min="0"></div>
+          <div></div>
+          <div></div>
+        </div>
         <div class="row3">
           <div><label>Armour (loc)</label><input type="number" id="d-armour" value="4"></div>
           <div><label>Toughness Bonus</label><input type="number" id="d-tb" value="3"></div>
@@ -158,15 +166,8 @@
         </div>
         <label>Parry weapon qualities</label>
         <input id="d-qualities" placeholder="e.g. Balanced, Defensive">
-        <label style="margin-top:.4rem">Talents (toggle)</label>
-        <div class="checks" id="d-talents"><span class="dim">loading…</span></div>
-        <div class="row">
-          <div><label>Traits</label><input id="d-traits" placeholder="e.g. Sturdy"></div>
-          <div><label>Conditions</label><input id="d-statuses" placeholder="e.g. Prone"></div>
-        </div>
-        <div class="row">
-          <div><label>Circumstances</label><input id="d-circumstances" placeholder="e.g. Darkness"></div>
-        </div>
+        <label style="margin-top:.4rem">Active rules <span class="dim">— toggle on/off; set a value where it applies. Talents &amp; Traits default ON.</span></label>
+        <div id="d-rules" class="rulepanel"><span class="dim">loading…</span></div>
       </div>
     </div>
     <button onclick="doResolve()">Resolve Engagement</button>
@@ -194,6 +195,47 @@ const api = (path, body) => fetch(path, {
 
 let WEAPONS = [];
 let FIRING_MODES = [];
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// --- dynamic per-side rule toggles (Talents / Traits / Circumstances / Conditions) ---
+// Enumerates the rule set's active rules as toggle rows with an optional value.
+// Talents & Traits default ON; Circumstances & Conditions default OFF. A row's
+// toggle decides whether it is sent to the API (so whether it can fire and be
+// reported in the output); the value box appends a level for talents/traits
+// ("Name (X)") or a severity for circumstances/conditions ({ name, severity: X }).
+const RULE_GROUPS = [
+  { cat: 'talents', label: 'Talents', on: true },
+  { cat: 'traits', label: 'Traits', on: true },
+  { cat: 'circumstances', label: 'Circumstances', on: false },
+  { cat: 'conditions', label: 'Conditions', on: false },
+];
+function buildRulePanel(containerId, side, rules) {
+  const items = (cat) => cat === 'conditions' ? (rules.conditions ?? rules.statuses ?? []) : (rules[cat] ?? []);
+  let h = '';
+  for (const g of RULE_GROUPS) {
+    const list = items(g.cat);
+    h += `<div class="rulegroup"><div class="ghead">${g.label}</div>`;
+    if (!list.length) { h += '<span class="dim">none</span></div>'; continue; }
+    h += '<div class="rrows">';
+    for (const name of list) {
+      h += `<span class="rrow"><label><input type="checkbox" class="rtoggle" data-side="${side}" data-cat="${g.cat}" value="${esc(name)}"${g.on ? ' checked' : ''}> ${esc(name)}</label>`
+        + `<input type="number" class="rval" placeholder="X" title="optional value / severity (e.g. Brutal Charge → 3, a structured circumstance/condition severity)"></span>`;
+    }
+    h += '</div></div>';
+  }
+  $(containerId).innerHTML = h;
+}
+function collectRules(side, cat) {
+  const out = [];
+  document.querySelectorAll(`.rtoggle[data-side="${side}"][data-cat="${cat}"]:checked`).forEach((cb) => {
+    const valEl = cb.closest('.rrow')?.querySelector('.rval');
+    const raw = valEl && valEl.value.trim() !== '' ? +valEl.value : null;
+    if (cat === 'circumstances' || cat === 'conditions') out.push(raw != null ? { name: cb.value, severity: raw } : cb.value);
+    else out.push(raw != null ? `${cb.value} (${raw})` : cb.value);
+  });
+  return out;
+}
 
 // show a toggle for each firing-mode quality the weapon currently has (e.g. Maximal)
 function syncFiringModes() {
@@ -229,21 +271,8 @@ async function init() {
   refreshActiveRules();
   syncFiringModes();
 
-  const fillTalents = (boxId, cls) => {
-    const box = $(boxId);
-    box.innerHTML = rules.talents.length ? '' : '<span class="dim">none</span>';
-    for (const name of rules.talents) {
-      const lbl = document.createElement('label');
-      lbl.innerHTML = `<input type="checkbox" class="${cls}" value="${name}"> ${name}`;
-      box.appendChild(lbl);
-    }
-  };
-  fillTalents('a-talents', 'atk-talent');
-  fillTalents('d-talents', 'def-talent');
-  if (rules.traits?.length) { $('a-traits').placeholder = 'e.g. ' + rules.traits.join(', '); $('d-traits').placeholder = 'e.g. ' + rules.traits.join(', '); }
-  const condNames = rules.conditions ?? rules.statuses;
-  if (condNames?.length) { $('a-statuses').placeholder = 'e.g. ' + condNames.join(', '); $('d-statuses').placeholder = 'e.g. ' + condNames.join(', '); }
-  if (rules.circumstances?.length) { $('a-circumstances').placeholder = 'e.g. ' + rules.circumstances.join(', '); $('d-circumstances').placeholder = 'e.g. ' + rules.circumstances.join(', '); }
+  buildRulePanel('a-rules', 'a', rules);
+  buildRulePanel('d-rules', 'd', rules);
   for (const a of opts.actions) {
     $('a-action').add(new Option(`${a.name} (${a.modifier >= 0 ? '+' : ''}${a.modifier})`, a.name));
   }
@@ -291,12 +320,14 @@ async function doTest() {
   const r = await api('/api/test', {
     target: +$('t-target').value,
     modifiers: { difficulty: +$('t-difficulty').value, modifier: +$('t-mod').value },
+    unnatural: +$('t-unnatural').value,
   });
+  const unnat = r.bonusDos ? ` <span class="dim">(incl. +${r.bonusDos} from Unnatural ${r.unnatural})</span>` : '';
   $('t-result').innerHTML =
     `Roll: <span class="gold">${r.roll}</span> vs ${r.modifiedTarget} ` +
     `<span class="dim">(${r.target} ${sign(r.modifierTotal)})</span>\n` +
     (r.success
-      ? `<span class="ok">SUCCESS</span> — ${r.dos} degree${r.dos !== 1 ? 's' : ''} of success${r.autoSuccess ? ' (natural 1!)' : ''}`
+      ? `<span class="ok">SUCCESS</span> — ${r.dos} degree${r.dos !== 1 ? 's' : ''} of success${r.autoSuccess ? ' (natural 1!)' : ''}${unnat}`
       : `<span class="bad">FAILURE</span> — ${r.dof} degree${r.dof !== 1 ? 's' : ''} of failure${r.autoFailure ? ' (natural 100!)' : ''}`);
 }
 
@@ -370,6 +401,7 @@ let ENG = null;
 function buildEngagementInputs() {
   const attacker = {
     characteristics: { ws: +$('a-ws').value, bs: +$('a-bs').value, s: +$('a-s').value, t: +$('a-t').value },
+    unnatural: { ws: +$('a-un-ws').value, bs: +$('a-un-bs').value, s: +$('a-un-s').value },
     weapon: {
       name: $('w-select').selectedOptions[0]?.text.split(' (')[0] || 'Custom weapon',
       isMelee: $('w-melee').value === 'yes',
@@ -381,22 +413,23 @@ function buildEngagementInputs() {
     configs: [...document.querySelectorAll('.firing-mode:checked')].map(x => x.value),
     action: $('a-action').value, aim: $('a-aim').value, rangeBand: $('a-range').value,
     customModifier: +$('a-mod').value, calledShotLocation: $('a-calledshot').value,
-    talents: [...document.querySelectorAll('.atk-talent:checked')].map(x => x.value),
-    traits: $('a-traits').value.split(',').map(x => x.trim()).filter(Boolean),
-    conditions: $('a-statuses').value.split(',').map(x => x.trim()).filter(Boolean),
-    circumstances: $('a-circumstances').value.split(',').map(x => x.trim()).filter(Boolean),
+    talents: collectRules('a', 'talents'),
+    traits: collectRules('a', 'traits'),
+    conditions: collectRules('a', 'conditions'),
+    circumstances: collectRules('a', 'circumstances'),
     combat: { dualWielding: $('a-dualwield').checked, firingOffhand: $('a-offhand').checked },
   };
   const defender = {
     characteristics: { ws: +$('d-ws').value, ag: +$('d-ag').value, t: +$('d-t').value, s: +$('d-s').value },
+    unnatural: { ws: +$('d-un-ws').value, ag: +$('d-un-ag').value },
     armour: +$('d-armour').value, toughnessBonus: +$('d-tb').value, unnaturalToughness: +$('d-unnatural-tough').value,
     weapon: { qualities: $('d-qualities').value.split(',').map(x => x.trim()).filter(Boolean) },
     field: { rating: +$('d-field').value, overloadMax: +$('d-overload').value },
     evasion: { mode: $('d-evasion').value, modifier: +$('d-evmod').value },
-    talents: [...document.querySelectorAll('.def-talent:checked')].map(x => x.value),
-    traits: $('d-traits').value.split(',').map(x => x.trim()).filter(Boolean),
-    conditions: $('d-statuses').value.split(',').map(x => x.trim()).filter(Boolean),
-    circumstances: $('d-circumstances').value.split(',').map(x => x.trim()).filter(Boolean),
+    talents: collectRules('d', 'talents'),
+    traits: collectRules('d', 'traits'),
+    conditions: collectRules('d', 'conditions'),
+    circumstances: collectRules('d', 'circumstances'),
   };
   const inputs = { attacker, defender, options: { autoResolveTests: $('a-autotest').checked } };
   const custom = [RulesStore.activeDsl(), $('a-customrules').value.trim()].filter(Boolean).join('\n\n');
@@ -513,7 +546,7 @@ function renderEngagement(eng) {
   let s = `<span class="gold">① TO-HIT</span> — ${a.weapon} · ${a.action} @ ${a.rangeBand}\n` +
     `  ${t.characteristic} roll <span class="gold">${t.roll}</span> vs <span class="gold">${t.modifiedTarget}</span>` +
     (v ? ` <span class="dim">(${t.target} ${Object.entries(t.modifiers).map(([k, mv]) => `${sign(mv)} ${k}`).join(' ')})</span>` : '') + ` — ` +
-    (t.success ? `<span class="ok">HIT</span> ${t.dos} DoS → ${a.hits.length} hit${a.hits.length !== 1 ? 's' : ''}` : `<span class="bad">MISS</span> ${t.dof} DoF`);
+    (t.success ? `<span class="ok">HIT</span> ${t.dos} DoS${v && t.bonusDos ? ` <span class="dim">(+${t.bonusDos} Unnatural)</span>` : ''} → ${a.hits.length} hit${a.hits.length !== 1 ? 's' : ''}` : `<span class="bad">MISS</span> ${t.dof} DoF`);
   // named effects (Jam, Overheats, Maximal, …) are events — shown even in terse (name only)
   for (const e of a.effects) s += `\n  <span class="rf">${e.name}${v ? ':' : ''}</span>${v ? ` <span class="dim">${e.effect}</span>` : ''}`;
   if (a.scatter) {
@@ -552,7 +585,7 @@ function renderEngagement(eng) {
     } else if (eng.state.reaction) {
       const rt = eng.state.reaction.test;
       s += `\n  ${eng.state.reaction.mode === 'parry' ? 'Parry' : 'Dodge'} (${rt.characteristic}) roll <span class="gold">${rt.roll}</span> vs <span class="gold">${rt.modifiedTarget}</span> — ` +
-        (rt.success ? `<span class="ok">EVADED ${eng.state.evaded} hit${eng.state.evaded !== 1 ? 's' : ''}</span>` : `<span class="bad">FAILED</span> (${rt.dof} DoF)`);
+        (rt.success ? `<span class="ok">EVADED ${eng.state.evaded} hit${eng.state.evaded !== 1 ? 's' : ''}</span>${v && rt.bonusDos ? ` <span class="dim">(+${rt.bonusDos} DoS Unnatural)</span>` : ''}` : `<span class="bad">FAILED</span> (${rt.dof} DoF)`);
       // Power Field weapon-destruction roll on a successful parry
       for (const tr of (eng.state.reaction.tableRolls ?? [])) {
         const destroyed = /DESTROYED/.test(tr.text);

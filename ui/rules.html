@@ -284,14 +284,17 @@ function renderActiveDsl() {
     `(${builtinCount} built-in file${builtinCount !== 1 ? 's' : ''}` +
     `${userRules.length ? `, ${userRules.length} custom rule${userRules.length !== 1 ? 's' : ''}` : ''})`;
 
-  let h = '<p class="note">The full DSL of the built-in rule set (compiled at startup) plus your active custom rules. Built-in rules toggled off on this page are skipped at roll time — see the active/inactive list above.</p>';
+  let h = '<p class="note">The full DSL of the built-in rule set (compiled at startup) plus your active custom rules. Built-in rules toggled off on this page are skipped at roll time — see the active/inactive list above. Each subcategory below can be shown or hidden independently.</p>';
 
+  // One independently collapsible subcategory per built-in source file
+  // (Weapon qualities, Talents, Traits, Circumstances, …) — open by default.
   for (const b of BUILTIN_SOURCES) {
-    h += `<div class="docsection"><h3>${esc(b.category)} <span class="dim">— ${esc(b.file)}</span></h3>`;
-    h += `<pre class="tmpl">${esc(b.source.trim())}</pre></div>`;
+    const lines = b.source.trim().split('\n').length;
+    h += `<details class="docsection" open><summary class="toggle">${esc(b.category)} <span class="dim">— ${esc(b.file)} (${lines} lines)</span></summary>`;
+    h += `<pre class="tmpl">${esc(b.source.trim())}</pre></details>`;
   }
 
-  h += '<div class="docsection"><h3>Your active rules</h3>';
+  h += '<details class="docsection" open><summary class="toggle">Your active rules <span class="dim">— custom</span></summary>';
   if (userRules.length) {
     for (const r of userRules) {
       const names = r.effects.map(e => e.name).join(', ');
@@ -300,7 +303,7 @@ function renderActiveDsl() {
   } else {
     h += '<p class="note">No custom rules active — add some above.</p>';
   }
-  h += '</div>';
+  h += '</details>';
 
   box.innerHTML = h;
 }

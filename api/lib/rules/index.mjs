@@ -40,8 +40,8 @@ export const availableActionNames = availableActions();
 
 /** Each rule category, compiled from its DSL source at load time. */
 export const weaponQualityEffects = compile(qualitiesSrc);
-export const talentEffects = compile(talentsSrc);   // talents + traits that gate on combat state
-export const traitEffects = compile(traitsSrc);
+export const talentEffects = compile(talentsSrc);   // Talents only (XP-bought; has_talent)
+export const traitEffects = compile(traitsSrc);      // Traits only (innate DH2.0; has_trait)
 export const conditionEffects = compile(conditionsSrc);       // active Conditions (On Fire, Aiming, …)
 export const circumstanceEffects = compile(circumstancesSrc); // environmental Circumstances (off-hand, …)
 export const configurationEffects = compile(configurationsSrc); // per-character toggles (Maximal, …)
@@ -69,8 +69,8 @@ export const availableStatuses = availableConditions;
 /** Raw DSL source of the built-in rule set, by category (for /api/rules/source). */
 export const builtinSources = [
     { category: 'Weapon qualities', file: 'weapon-qualities.dsl', source: qualitiesSrc },
-    { category: 'Talents & traits', file: 'talents.dsl', source: talentsSrc },
-    { category: 'Traits (DH2.0)', file: 'traits.dsl', source: traitsSrc },
+    { category: 'Talents', file: 'talents.dsl', source: talentsSrc },
+    { category: 'Traits', file: 'traits.dsl', source: traitsSrc },
     { category: 'Conditions', file: 'conditions.dsl', source: conditionsSrc },
     { category: 'Circumstances', file: 'circumstances.dsl', source: circumstancesSrc },
     { category: 'Configurations', file: 'configurations.dsl', source: configurationsSrc },
@@ -87,8 +87,8 @@ export const builtinSources = [
 // are in FOUNDRY_MIGRATION.md.
 const KIND_GROUP = {
     quality: 'Weapon qualities',
-    talent: 'Talents and traits',
-    trait: 'Talents and traits',
+    talent: 'Talents',
+    trait: 'Traits',
     circumstance: 'Circumstances',
     condition: 'Conditions',
     action: 'Actions',
@@ -97,7 +97,7 @@ const KIND_GROUP = {
     miscellaneous: 'Miscellaneous',
 };
 const GROUP_ORDER = [
-    'Weapon qualities', 'Talents and traits', 'Circumstances', 'Conditions',
+    'Weapon qualities', 'Talents', 'Traits', 'Circumstances', 'Conditions',
     'Actions', 'Configurations', 'Mechanical', 'Miscellaneous',
 ];
 
