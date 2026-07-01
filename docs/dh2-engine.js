@@ -1499,6 +1499,30 @@
       configurations: [...buckets.configurations].sort()
     };
   }
+  function valuedNames(src) {
+    const program = typeof src === "string" ? parse(src) : src;
+    const LEVEL_FNS = /* @__PURE__ */ new Set(["quality_level", "trait_level", "circumstance_severity", "condition_severity"]);
+    const valued = /* @__PURE__ */ new Set();
+    const visit = (node) => {
+      if (!node || typeof node !== "object") return;
+      if (node.type === "Call") {
+        if (LEVEL_FNS.has(node.name)) {
+          const lit = node.args[0]?.type === "String" ? node.args[0].value : null;
+          if (lit) valued.add(lit);
+        }
+        node.args.forEach(visit);
+      } else {
+        for (const k of ["left", "right", "operand"]) if (node[k]) visit(node[k]);
+      }
+    };
+    for (const rule of program.rules) {
+      for (const br of rule.branches) {
+        if (br.when) visit(br.when);
+        for (const a of br.actions) if (a.value) visit(a.value);
+      }
+    }
+    return [...valued].sort();
+  }
 
   // api/lib/rules/combat-actions.mjs
   var COMBAT_ACTIONS = {
@@ -1808,6 +1832,9 @@ roll_table "Power Field Destruction" {
   var availableConditions = referencedNames(conditionsSrc).conditions;
   var availableCircumstances = referencedNames(circumstancesSrc).circumstances;
   var availableConfigurations = referencedNames(configurationsSrc).configurations;
+  var availableValued = valuedNames(
+    [qualitiesSrc, talentsSrc, traitsSrc, conditionsSrc, circumstancesSrc, configurationsSrc, mechanicsSrc].join("\n\n")
+  );
   var builtinSources = [
     { category: "Weapon qualities", file: "weapon-qualities.dsl", source: qualitiesSrc },
     { category: "Talents", file: "talents.dsl", source: talentsSrc },
@@ -2657,7 +2684,9 @@ roll_table "Power Field Destruction" {
       actions: availableActionNames,
       statuses: availableConditions,
       // back-compat alias
-      qualities: availableQualities
+      qualities: availableQualities,
+      valued: availableValued
+      // names that take a numeric severity/level variable
     }),
     "/api/dsl-docs": () => DSL_DOCS,
     "/api/rules/source": () => ({ builtins: builtinSources, rules: builtinRules })

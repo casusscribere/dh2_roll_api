@@ -212,6 +212,10 @@ const RULE_GROUPS = [
 ];
 function buildRulePanel(containerId, side, rules) {
   const items = (cat) => cat === 'conditions' ? (rules.conditions ?? rules.statuses ?? []) : (rules[cat] ?? []);
+  // Only rules that read a severity/level variable get a numeric input (e.g.
+  // Brutal Charge (X), Haywire Field severity); boolean ones (On Fire, Darkness)
+  // get a toggle only.
+  const valued = new Set(rules.valued ?? []);
   let h = '';
   for (const g of RULE_GROUPS) {
     const list = items(g.cat);
@@ -219,8 +223,10 @@ function buildRulePanel(containerId, side, rules) {
     if (!list.length) { h += '<span class="dim">none</span></div>'; continue; }
     h += '<div class="rrows">';
     for (const name of list) {
-      h += `<span class="rrow"><label><input type="checkbox" class="rtoggle" data-side="${side}" data-cat="${g.cat}" value="${esc(name)}"${g.on ? ' checked' : ''}> ${esc(name)}</label>`
-        + `<input type="number" class="rval" placeholder="X" title="optional value / severity (e.g. Brutal Charge → 3, a structured circumstance/condition severity)"></span>`;
+      const val = valued.has(name)
+        ? `<input type="number" class="rval" placeholder="X" title="severity / level value (X)">`
+        : '';
+      h += `<span class="rrow"><label><input type="checkbox" class="rtoggle" data-side="${side}" data-cat="${g.cat}" value="${esc(name)}"${g.on ? ' checked' : ''}> ${esc(name)}</label>${val}</span>`;
     }
     h += '</div></div>';
   }

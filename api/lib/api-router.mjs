@@ -18,7 +18,7 @@ import {
 import { rollScript } from './dice.mjs';
 import {
     availableTalents, availableTraits, availableConditions, availableCircumstances,
-    availableConfigurations, availableQualities, availableActionNames, FIRING_MODES,
+    availableConfigurations, availableQualities, availableActionNames, availableValued, FIRING_MODES,
     buildRegistry, builtinSources, builtinRules,
 } from './rules/index.mjs';
 import { weaponsJson } from './rules/sources.mjs';
@@ -45,6 +45,7 @@ const GET = {
         actions: availableActionNames,
         statuses: availableConditions,   // back-compat alias
         qualities: availableQualities,
+        valued: availableValued,         // names that take a numeric severity/level variable
     }),
     '/api/dsl-docs': () => DSL_DOCS,
     '/api/rules/source': () => ({ builtins: builtinSources, rules: builtinRules }),

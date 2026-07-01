@@ -14,7 +14,7 @@
  * freely; user-supplied DSL can later be compiled and merged the same way.
  */
 import { Registry } from '../pipeline.mjs';
-import { compile, compileTables, compileActions, referencedNames } from '../dsl/compiler.mjs';
+import { compile, compileTables, compileActions, referencedNames, valuedNames } from '../dsl/compiler.mjs';
 import { combatActionEffects, COMBAT_ACTIONS, RANGE_BANDS, AIM_MODES } from './combat-actions.mjs';
 import { qualityConflictEffects } from './quality-conflicts.mjs';
 import { registerActions, availableActions } from '../actions.mjs';
@@ -63,6 +63,11 @@ export const availableTraits = referencedNames(traitsSrc).traits;
 export const availableConditions = referencedNames(conditionsSrc).conditions;
 export const availableCircumstances = referencedNames(circumstancesSrc).circumstances;
 export const availableConfigurations = referencedNames(configurationsSrc).configurations;
+/** Names of rules that take a numeric severity/level variable (Brutal Charge,
+ *  Haywire Field, …) — the UI shows a value input only for these. */
+export const availableValued = valuedNames(
+    [qualitiesSrc, talentsSrc, traitsSrc, conditionsSrc, circumstancesSrc, configurationsSrc, mechanicsSrc].join('\n\n'),
+);
 /** @deprecated alias kept for callers expecting the old name */
 export const availableStatuses = availableConditions;
 

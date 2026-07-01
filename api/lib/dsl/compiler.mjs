@@ -130,3 +130,37 @@ export function referencedNames(src) {
         configurations: [...buckets.configurations].sort(),
     };
 }
+
+/**
+ * Extract the names of rules that take a numeric severity / level variable — i.e.
+ * whose DSL reads a level/severity accessor keyed by name (`trait_level("X")`,
+ * `quality_level("X")`, `circumstance_severity("X")`, `condition_severity("X")`).
+ * The UI uses this to show a value input ONLY for those rules (e.g. Brutal Charge,
+ * Haywire Field), not boolean ones (On Fire, Darkness, Ambidextrous).
+ */
+export function valuedNames(src) {
+    const program = typeof src === 'string' ? parse(src) : src;
+    const LEVEL_FNS = new Set(['quality_level', 'trait_level', 'circumstance_severity', 'condition_severity']);
+    const valued = new Set();
+
+    const visit = (node) => {
+        if (!node || typeof node !== 'object') return;
+        if (node.type === 'Call') {
+            if (LEVEL_FNS.has(node.name)) {
+                const lit = node.args[0]?.type === 'String' ? node.args[0].value : null;
+                if (lit) valued.add(lit);
+            }
+            node.args.forEach(visit);
+        } else {
+            for (const k of ['left', 'right', 'operand']) if (node[k]) visit(node[k]);
+        }
+    };
+
+    for (const rule of program.rules) {
+        for (const br of rule.branches) {
+            if (br.when) visit(br.when);
+            for (const a of br.actions) if (a.value) visit(a.value);
+        }
+    }
+    return [...valued].sort();
+}
