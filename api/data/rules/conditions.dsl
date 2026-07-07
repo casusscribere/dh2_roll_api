@@ -64,3 +64,17 @@ condition "Toxified" {
   when has_condition("Toxified")
   then require_test "Toughness" (-10 * condition_severity("Toxified", 0)) "1d10 additional damage from the toxin" => damage 1d10
 }
+
+# Blood Loss (DH2 core p.244): "At the start of his turn, an affected character
+# suffers 1 level of Fatigue. Once per round as a Free Action, he (or another
+# character who can reach him) can attempt a Difficult (-10) Medicae test to
+# remove this condition. … multiple Blood Loss conditions do not stack."
+# Fatigue is not yet a tracked stat — the tick surfaces the level as an event.
+# Die Hard (talents.dsl) suppresses this rule and rolls a Willpower test instead.
+condition "Blood Loss" {
+  meta { page 244 }
+  on upkeep.TURN_START
+  priority 50
+  when has_condition("Blood Loss")
+  then emit "Blood Loss", "suffers 1 level of Fatigue; a Difficult (-10) Medicae test (Free Action, once per round) removes the condition"
+}

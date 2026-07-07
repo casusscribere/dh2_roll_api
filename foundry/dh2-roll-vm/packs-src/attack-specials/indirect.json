@@ -1,0 +1,20 @@
+{
+  "_id": "MZsP1q2juwnuEbCp",
+  "_key": "!items!MZsP1q2juwnuEbCp",
+  "name": "Indirect",
+  "type": "attackSpecial",
+  "img": "icons/svg/sword.svg",
+  "system": {
+    "description": "Dark Heresy 2e Core Rulebook p.147. Generated from the dh2_roll_api DSL rule dh2.core.weapon-qualities/indirect (checkpoint MODIFIERS; takes a level (X)).",
+    "hasLevel": true,
+    "level": 0
+  },
+  "effects": [],
+  "flags": {
+    "dh2-roll-vm": {
+      "generated": true,
+      "qualifiedId": "dh2.core.weapon-qualities/indirect",
+      "page": 147
+    }
+  }
+}

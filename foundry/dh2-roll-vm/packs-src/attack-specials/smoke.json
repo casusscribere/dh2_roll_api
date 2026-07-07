@@ -1,0 +1,20 @@
+{
+  "_id": "GR4P63GHDA3kQdGL",
+  "_key": "!items!GR4P63GHDA3kQdGL",
+  "name": "Smoke",
+  "type": "attackSpecial",
+  "img": "icons/svg/sword.svg",
+  "system": {
+    "description": "Dark Heresy 2e Core Rulebook p.149. Generated from the dh2_roll_api DSL rule dh2.core.weapon-qualities/smoke (checkpoint ON_HIT).",
+    "hasLevel": false,
+    "level": 0
+  },
+  "effects": [],
+  "flags": {
+    "dh2-roll-vm": {
+      "generated": true,
+      "qualifiedId": "dh2.core.weapon-qualities/smoke",
+      "page": 149
+    }
+  }
+}

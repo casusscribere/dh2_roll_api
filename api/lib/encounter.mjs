@@ -45,7 +45,7 @@ export function emptyEncounter() {
 export function encounterActor(encounter, key, name = key) {
     if (!encounter.actors[key]) {
         encounter.actors[key] = {
-            name, stats: { characteristics: {}, unnatural: {} },
+            name, stats: { characteristics: {}, unnatural: {}, talents: [], traits: [] },
             conditions: [], armourDamage: {}, cooldowns: {}, wounds: { taken: 0 },
         };
     }
@@ -80,7 +80,7 @@ export function tickEncounter(encounter, phase, registry = defaultRegistry, rng 
         const ctx = new RollContext({
             action: 'Upkeep', isMelee: false, rangeBand: '', aimValue: 0, rng,
             qualities: [], craftsmanship: 'Common',
-            talents: [], traits: [],
+            talents: actor.stats?.talents ?? [], traits: actor.stats?.traits ?? [],
             statuses: actor.conditions, circumstances: [],
             combat: { dualWielding: false, firingOffhand: false, firingBoth: false },
             modifiers: {}, effects: [],

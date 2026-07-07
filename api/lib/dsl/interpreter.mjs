@@ -199,6 +199,8 @@ export function applyAction(action, ctx, meta = {}) {
                 } : null,
                 // LAZY: dice roll only if the test actually fails (Toxified's 1d10)
                 onFailDamage: action.onFailDamage ? () => evalNode(action.onFailDamage, ctx) : null,
+                // a PASSED test negates the hit entirely (Spray, p.149)
+                avoidsHit: !!action.avoidsHit,
             });
             break;
         case 'declare_damage':
@@ -210,6 +212,20 @@ export function applyAction(action, ctx, meta = {}) {
                 amount: evalNode(action.value, ctx),
                 reason: action.reason ?? null,
             });
+            break;
+        case 'declare_smoke':
+            // a smokescreen at the impact/scatter point (Smoke (X), p.149):
+            // radius in metres + duration in rounds, resolved now.
+            (ctx.smokeScreens ??= []).push({
+                source: meta.ruleName ?? meta.penKey,
+                radius: evalNode(action.radius, ctx),
+                duration: action.duration != null ? evalNode(action.duration, ctx) : null,
+            });
+            break;
+        case 'declare_scatter_hit':
+            // this HIT scatters (Indirect (X), p.147): the engine rolls the
+            // Scatter Diagram direction and clamps the distance at 0.
+            ctx.hitScatterDistance = Math.max(0, evalNode(action.value, ctx));
             break;
         case 'roll_on':
             // declare a roll on a named roll_table; the engine resolves it after

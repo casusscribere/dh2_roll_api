@@ -149,6 +149,9 @@ function withEncounter(body) {
             const a = encounterActor(enc, key, side.name);
             a.stats.characteristics = { ...a.stats.characteristics, ...side.characteristics };
             if (side.unnatural) a.stats.unnatural = { ...a.stats.unnatural, ...side.unnatural };
+            // talents/traits gate upkeep policy rules (Iron Jaw, Die Hard, Regeneration)
+            if (side.talents?.length) a.stats.talents = side.talents;
+            if (side.traits?.length) a.stats.traits = side.traits;
         }
     }
     return input;

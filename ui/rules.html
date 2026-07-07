@@ -24,6 +24,16 @@
   <fieldset>
     <legend>Built-in rules</legend>
     <p class="note">Codified DH2 rules compiled into the engine. <strong class="gold">Click a rule to toggle</strong> whether it is applied when you roll — active rules are highlighted, inactive (dashed) ones are skipped.</p>
+    <div class="row" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:end;margin-bottom:.4rem">
+      <div style="flex:2;min-width:12rem"><label>Search <span class="dim">name · page · checkpoint · package</span></label>
+        <input id="rule-search" type="text" placeholder="e.g. tearing, p.145, ON_HIT, upkeep"></div>
+      <div><label>Category</label><select id="rule-cat"><option value="">All</option></select></div>
+      <div><label>State</label><select id="rule-state">
+        <option value="">All</option><option value="active">Active</option>
+        <option value="inactive">Inactive</option><option value="replaced">Replaced</option>
+      </select></div>
+    </div>
+    <div class="note dim" id="rule-matchcount"></div>
     <div id="builtin-rules"><p class="note">Loading…</p></div>
   </fieldset>
 
@@ -105,13 +115,42 @@ function replacedBuiltins() {
   return map;
 }
 
+// --- search / filter over the built-in browser (Phase 5, Lane B) -------------
+// Every whitespace-separated query token must match SOMEWHERE in the rule's
+// searchable text (name, category, kind, checkpoint, package, source, p.<page>).
+function ruleMatches(r, tokens, state, replaced) {
+  if (state) {
+    const st = replaced.has(r.qualifiedId) || replaced.has(r.id) ? 'replaced'
+      : RulesStore.isBuiltinActive(r.id) ? 'active' : 'inactive';
+    if (st !== state) return false;
+  }
+  if (!tokens.length) return true;
+  const hay = [r.name, r.category, r.kind, r.checkpoint, r.package, r.sourceBook,
+    r.page ? `p.${r.page} page:${r.page}` : '', r.id, r.qualifiedId]
+    .filter(Boolean).join(' ').toLowerCase();
+  return tokens.every((t) => hay.includes(t));
+}
+
+function refreshCategoryOptions() {
+  const sel = $('rule-cat');
+  if (sel.options.length > 1) return;   // fill once
+  for (const cat of [...new Set(BUILTIN.map((r) => r.category))]) sel.add(new Option(cat, cat));
+}
+
 // Built-in rules as clickable toggle boxes, grouped by category.
 function renderBuiltin() {
   const box = $('builtin-rules');
   if (!BUILTIN.length) { box.innerHTML = '<p class="note">none</p>'; return; }
+  refreshCategoryOptions();
   const replaced = replacedBuiltins();
+  const tokens = $('rule-search').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const catFilter = $('rule-cat').value, stateFilter = $('rule-state').value;
+  const shown = BUILTIN.filter((r) => (!catFilter || r.category === catFilter) && ruleMatches(r, tokens, stateFilter, replaced));
+  $('rule-matchcount').textContent = (tokens.length || catFilter || stateFilter)
+    ? `${shown.length} of ${BUILTIN.length} rules match` : '';
+  if (!shown.length) { box.innerHTML = '<p class="note">no rules match the filter</p>'; return; }
   const groups = {};
-  for (const r of BUILTIN) (groups[r.category] ??= []).push(r);
+  for (const r of shown) (groups[r.category] ??= []).push(r);
   let h = '';
   for (const [cat, list] of Object.entries(groups)) {
     h += `<label class="gold" style="margin-top:.6rem">${esc(cat)}</label><div class="chips">`;
@@ -360,6 +399,10 @@ function renderActiveDsl() {
 
   box.innerHTML = h;
 }
+
+$('rule-search').oninput = renderBuiltin;
+$('rule-cat').onchange = renderBuiltin;
+$('rule-state').onchange = renderBuiltin;
 
 loadSource();              // built-in toggles, active DSL, active/inactive summary
 renderUserRules();

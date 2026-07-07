@@ -126,16 +126,25 @@ action      = "add" "modifier" STRING "=" expr
             | "bump_quality" STRING "by" expr       (* raise an existing quality's rating *)
             | "add_quality" STRING                  (* grant a quality this shot (Maximal → Recharge) *)
             | "roll_on" STRING [ "+" expr ] [ "area" expr ]   (* = declare table_roll *)
-            | "require_test" STRING expr STRING [ "=>" ( "roll_on" STRING | "apply_status" STRING { "value" expr | "duration" expr | "location" expr } ) ]
+            | "require_test" STRING expr STRING [ "avoids_hit" ]
+                  [ "=>" ( "roll_on" STRING | "apply_status" STRING { "value" expr | "duration" expr | "location" expr } ) ]
             | "apply_status" STRING { "value" expr | "duration" expr | "location" expr } [ "," STRING ] ;
 
 declaration = "test" <require_test body> | "status" <apply_status body>
             | "table_roll" <roll_on body> | "armour_damage" expr
             | "damage" expr [ "," STRING ]          (* direct damage vs the actor (upkeep ticks —
                                                        On Fire's 1d10/round); reason optional *)
+            | "smoke" expr [ "duration" expr ]      (* smokescreen: radius (metres) + optional
+                                                       lifetime in rounds (Smoke — 1d10 + 10) *)
+            | "scatter_hit" expr                    (* THIS HIT lands off-target by <expr> metres,
+                                                       clamped at 0, with a Scatter Diagram
+                                                       direction (Indirect: 1d10 - bs_bonus) *)
             | "event" STRING [ "," STRING ] ;
 (* require_test's on-fail follow-up also accepts `=> damage <expr>` — the dice
-   roll happens ONLY on a failed test (Toxified's end-of-turn 1d10). *)
+   roll happens ONLY on a failed test (Toxified's end-of-turn 1d10).
+   `avoids_hit` (ON_HIT): a PASSED test negates the hit entirely — its wounds
+   are voided and the hit is marked avoided (Spray's Agility test; any future
+   dodge-like effect). *)
 
 (* --- arithmetic expression (action values) --- *)
 expr        = addExpr ;

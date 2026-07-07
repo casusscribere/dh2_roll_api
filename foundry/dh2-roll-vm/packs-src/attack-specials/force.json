@@ -1,0 +1,20 @@
+{
+  "_id": "jpvOuiMo4270qpKW",
+  "_key": "!items!jpvOuiMo4270qpKW",
+  "name": "Force",
+  "type": "attackSpecial",
+  "img": "icons/svg/sword.svg",
+  "system": {
+    "description": "Dark Heresy 2e Core Rulebook p.145. Generated from the dh2_roll_api DSL rule dh2.core.weapon-qualities/force (checkpoint DAMAGE_POOL).",
+    "hasLevel": false,
+    "level": 0
+  },
+  "effects": [],
+  "flags": {
+    "dh2-roll-vm": {
+      "generated": true,
+      "qualifiedId": "dh2.core.weapon-qualities/force",
+      "page": 145
+    }
+  }
+}

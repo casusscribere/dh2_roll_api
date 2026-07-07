@@ -395,21 +395,27 @@ export → ActiveEffect mirror → playtest → … → distributable module). T
 "port gate" above is superseded by that per-phase Foundry lane; the gate's
 criteria survive as the Phase 8 entry conditions.
 
-**Status (2026-07-07):** Roadmap Phases 0–3 are complete, **and the v1 grammar
+**Status (2026-07-07):** Roadmap Phases 0–5 are complete, **and the v1 grammar
 has been retired (dsl 3)** — the redundant legacy surfaces (prefixed alias
 facts/functions, kind aliases, thin sugar verbs) were removed after migrating
 all content with `tools/migrate-dsl.mjs`; the kept-by-design surfaces (default
 `attack` namespace, rich verbs, runtime `suppress`, boundary canonicalization)
-are now the single canonical authoring style ahead of the Phase 5 sweep. Delivered against the
+are the single canonical authoring style. Delivered against the
 findings: F1 slots/flags/declarations (verbs are sugar) · F2 scoped facts ·
 F5 canonical `{name, level}` · F6 packages/meta/qualifiedIds **and** the layered
 `replaces` override · F8 single-source vocabulary (docs derive) · F10
-`ceil`/`floor`/`half` + round-up `/` · F3 **started** — `attack` is the default
-pipeline namespace and `test.*` is live (`/api/test`); `power`/`upkeep`/
-`ship_attack` remain (Phases 4/6/7) · F4 (system policies) and F7
-(EncounterState) are the next structural items (Phases 4/7) · F9
-(content-tests) begins with the Phase 5 sweep. Foundry: walking skeleton
-validated on v14.360; canonical-character Actor import working; pack export v1
+`ceil`/`floor`/`half` + round-up `/` · F3 **ongoing** — `attack` is the default
+pipeline namespace; `test.*` (`/api/test`, now with a `foe` block for
+target-scoped rules like Fear) and `upkeep.*` (EncounterState ticks) are live;
+`power`/`ship_attack` remain (Phases 6/7) · F7 (EncounterState) shipped in
+Phase 4 (upkeep policy rules can also gate on the actor's stored
+talents/traits — Iron Jaw, Die Hard, Regeneration) · F9 (content-tests)
+delivered with the Phase 5 sweep: all core weapon qualities including
+Force/Indirect/Smoke/Spray (`declare smoke`/`declare scatter_hit`/the generic
+`avoids_hit` test flavor) plus the attack-relevant talent/trait tranche, each
+rule RAW-cited and content-tested (286-test suite) · F4 (system policies) is
+the remaining structural item (Phase 7). Foundry: walking skeleton validated
+on v14.360; canonical-character Actor import working; pack export v1
 (RollTables + attackSpecials, LevelDB) shipping via `deploy:foundry`.
 
 ## 8. Summary of recommendations

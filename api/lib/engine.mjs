@@ -16,7 +16,7 @@ import { getHitLocationForRoll, ADDITIONAL_HIT_LOCATIONS, HIT_LOCATIONS } from '
 import { getCriticalDamage } from './critical-damage.mjs';
 import { CHECKPOINTS, runCheckpoint } from './pipeline.mjs';
 import { RollContext } from './context.mjs';
-import { canonList } from './rules/_util.mjs';
+import { canonList, hasQuality } from './rules/_util.mjs';
 import {
     defaultRegistry,
     COMBAT_ACTIONS, RANGE_BANDS, AIM_MODES,
@@ -83,7 +83,7 @@ export function rollTest({ target = 0, modifiers = {}, label = 'test', unnatural
  * Fear/Pinning and acquisition tests.
  *
  * input = { target, testName?, modifiers?{...}, unnatural?, talents?, traits?,
- *           conditions?, circumstances?, label? }
+ *           conditions?, circumstances?, label?, foe? }
  */
 export function resolveTest(input, rng = Math.random, registry = defaultRegistry) {
     const ctx = new RollContext({
@@ -95,6 +95,11 @@ export function resolveTest(input, rng = Math.random, registry = defaultRegistry
         statuses: input.conditions ?? input.statuses ?? [], circumstances: input.circumstances ?? [],
         combat: { dualWielding: false, firingOffhand: false, firingBoth: false },
         modifiers: { ...(input.modifiers ?? {}) },
+        // `foe` = the creature the test is ABOUT (the Fear source, the grappler),
+        // exposed through the target.* scope so target-scoped rules (the Fear
+        // trait) can read its traits. input.target stays the TEST TARGET NUMBER.
+        target: (input.foe && typeof input.foe === 'object')
+            ? { ...input.foe, traits: canonList(input.foe.traits) } : null,
         effects: [],
     });
     runCheckpoint(registry, CHECKPOINTS.TEST_MODIFIERS, ctx);
@@ -128,6 +133,8 @@ export function rollDamage(opts, rng = Math.random, registry = defaultRegistry) 
         talents = [], traits = [], statuses = [], firingModes = [], configs = [], isMelee = false, aimValue = 0, craftsmanship = 'Common',
         targetArmour = 0,   // the target's AP at the struck location, for Graviton (+damage = armour)
         target = null,      // the (normalised) target block, so target.* scoped facts work at the damage checkpoints
+        psyRating = 0,      // Force weapons (p.145): +psy rating damage/pen in a psyker's hands
+        characteristics = {},   // so ws_bonus/bs_bonus work at the damage checkpoints (Mighty Shot, Crushing Blow)
     } = opts;
 
     const parsed = parseDamageFormula(formula);
@@ -135,7 +142,7 @@ export function rollDamage(opts, rng = Math.random, registry = defaultRegistry) 
 
     const ctx = new RollContext({
         parsed, formula, qualities: canonList(qualities), sbTimes, strengthBonus, dos, action, location, damageType, rangeBand, rng,
-        talents: canonList(talents), traits: canonList(traits), statuses, firingModes, configs, isMelee, aimValue, craftsmanship, targetArmour, target,
+        talents: canonList(talents), traits: canonList(traits), statuses, firingModes, configs, isMelee, aimValue, craftsmanship, targetArmour, target, psyRating, characteristics,
         // accumulators the effects mutate:
         extraDice: 0, keepHighest: null, tearing: false,
         rfThreshold: 10, dieTransforms: [], proven: null, primitive: null,
@@ -188,7 +195,7 @@ export function rollDamage(opts, rng = Math.random, registry = defaultRegistry) 
     const diceTotal = adjusted.reduce((a, b) => a + b, 0);
     const total = diceTotal + Object.values(ctx.modifiers).reduce((a, b) => a + b, 0);
 
-    return {
+    const result = {
         formula, tearing: ctx.tearing,
         dice: { rolled, kept, adjusted, discarded },
         modifiers: ctx.modifiers, righteousFury,
@@ -198,6 +205,11 @@ export function rollDamage(opts, rng = Math.random, registry = defaultRegistry) 
         damageType: ctx.damageType ?? damageType,
         total,
     };
+    // Spray (p.149): the weapon jams if the firer rolls a NATURAL 9 on any
+    // damage die (before modifiers/transforms). The hit still resolves; the
+    // weapon is jammed afterwards (surfaced as an effect by the caller).
+    if (hasQuality(ctx.qualities, 'Spray') && rolled.includes(9)) result.sprayJam = true;
+    return result;
 }
 
 // ------------------------------------------------------------ soak ----------
@@ -261,20 +273,37 @@ function runToHit(input, rng, registry) {
         action, actionInfo, isMelee, qualities, rangeBand, aimValue, rng,
         talents: canonList(input.talents), traits: canonList(input.traits), statuses: input.conditions ?? input.statuses ?? [], circumstances: input.circumstances ?? [], firingModes: input.firingModes ?? [], configs: input.configs ?? input.firingModes ?? [],
         craftsmanship: weapon.craftsmanship ?? 'Common',
+        psyRating: Number(input.psyRating) || 0,   // Force weapons (p.145)
         combat: {
             dualWielding: !!(input.combat?.dualWielding ?? input.dualWielding),
             firingOffhand: !!(input.combat?.firingOffhand ?? input.firingOffhand),
             firingBoth: !!(input.combat?.firingBoth ?? input.firingBoth),
         },
-        modifiers: {},
+        modifiers: {}, effects: [],   // effects exists from MODIFIERS on (emit is legal there)
     });
 
     runCheckpoint(registry, CHECKPOINTS.MODIFIERS, ctx);
-    const test = rollTest({ target: baseTarget, modifiers: ctx.modifiers, label: 'to-hit', unnatural: unnaturalToHit }, rng);
+    // Spray (p.149) — THE no-attack-roll mode: the weapon does not test BS; every
+    // creature in the cone is struck (this tool models one representative target,
+    // always the Body) and makes a Challenging (+0) Agility test to AVOID the hit
+    // (the quality's ON_HIT `require_test … avoids_hit`). No Called Shots.
+    const isSpray = hasQuality(qualities, 'Spray');
+    let test;
+    if (isSpray) {
+        test = {
+            roll: 0, target: baseTarget, modifiers: {}, modifierTotal: 0, modifiedTarget: baseTarget,
+            success: true, dos: 1, dof: 0, unnatural: 0, bonusDos: 0,
+            autoFailure: false, autoSuccess: false, autoHit: true,
+        };
+    } else {
+        test = rollTest({ target: baseTarget, modifiers: ctx.modifiers, label: 'to-hit', unnatural: unnaturalToHit }, rng);
+    }
     test.characteristic = isMelee ? 'WS' : 'BS';
     ctx.test = test;
     ctx.success = test.success;
-    ctx.effects = [];
+    if (isSpray) {
+        ctx.effects.push({ name: 'Spray', effect: 'no attack roll — everyone in the 30° cone is struck unless they pass a Challenging (+0) Agility test; always hits the Body; cannot make Called Shots' });
+    }
     runCheckpoint(registry, CHECKPOINTS.POST_ROLL, ctx);   // jam / overheat / all-out
 
     const base = {
@@ -318,6 +347,9 @@ function runToHit(input, rng, registry) {
                     penetration: ctx.pen, penetrationModifiers: ctx.penModifiers, totalPenetration: totalPen,
                 };
             }
+            // Smoke (p.149): the smokescreen still lands at the scatter point —
+            // WITHOUT damage unless the weapon also detonates (Blast composes).
+            if (ctx.smokeScreens?.length) scatter.smoke = ctx.smokeScreens;
         }
         return { ctx, base, success: false, scatter, hitMeta: null };
     }
@@ -337,8 +369,10 @@ function runToHit(input, rng, registry) {
     // locations + penetration
     const sb = Math.floor((characteristics.s ?? 0) / 10) + unnaturalStrength;
     const sbTimes = strengthBonusMultiple(weapon, isMelee);
-    const firstLocation = (action === 'Called Shot' && input.calledShotLocation)
-        ? input.calledShotLocation : getHitLocationForRoll(test.roll);
+    // Spray always strikes the Body and cannot make Called Shots (p.149)
+    const firstLocation = isSpray ? 'Body'
+        : (action === 'Called Shot' && input.calledShotLocation)
+            ? input.calledShotLocation : getHitLocationForRoll(test.roll);
     const pen = Number(weapon.pen) || 0;
     ctx.pen = pen; ctx.penModifiers = {}; ctx.firstLocation = firstLocation;
     runCheckpoint(registry, CHECKPOINTS.PENETRATION, ctx);
@@ -346,7 +380,7 @@ function runToHit(input, rng, registry) {
     const totalPen = pen + Object.values(penModifiers).reduce((a, b) => a + b, 0);
     const locations = [];
     for (let i = 0; i <= additionalHits; i++) {
-        locations.push((action === 'Called Shot' && input.calledShotLocation)
+        locations.push((!isSpray && action === 'Called Shot' && input.calledShotLocation)
             ? input.calledShotLocation : ADDITIONAL_HIT_LOCATIONS[firstLocation][Math.min(i, 5)]);
     }
 
@@ -366,6 +400,8 @@ function rollHitDamage(weapon, action, hitMeta, location, dos, src, rng, registr
         rangeBand: weapon.isMelee ? 'Melee' : (src.rangeBand ?? 'Normal Range'),
         craftsmanship: weapon.craftsmanship ?? 'Common', targetArmour,
         target: src.target ?? null,   // target.* scoped facts at the damage checkpoints
+        psyRating: Number(src.psyRating) || 0,   // Force (p.145)
+        characteristics: src.characteristics ?? {},   // ws_bonus/bs_bonus (Mighty Shot, Crushing Blow)
     }, rng, registry);
 }
 
@@ -378,6 +414,7 @@ function applyOnHit(hit, attacker, target, dmg, registry, rng, autoRoll, reduced
     const ctx = new RollContext({
         qualities: canonList(attacker.weapon?.qualities), target, location: hit.location, rng,
         targetArmour: effArmour ?? (Number(target?.armour) || 0),
+        characteristics: attacker.characteristics ?? {},   // bs_bonus etc. for ON_HIT expressions (Indirect's 1d10 − bs_bonus)
         isMelee: !!attacker.weapon?.isMelee, action: attacker.action ?? 'Standard Attack',
         talents: canonList(attacker.talents), traits: canonList(attacker.traits), statuses: attacker.conditions ?? attacker.statuses ?? [], circumstances: attacker.circumstances ?? [],
         damageDealt: dmg.error ? 0 : dmg.total, woundsInflicted: hit.soak?.woundsInflicted ?? null,
@@ -407,6 +444,21 @@ function applyOnHit(hit, attacker, target, dmg, registry, rng, autoRoll, reduced
             const ac = t.resolved.appliedCondition;
             te.statuses.push({ source: t.source, status: ac.name, value: ac.value ?? null, duration: ac.duration ?? null, location: ac.location ?? null, reason: `failed ${t.characteristic} test` });
         }
+    }
+    // a PASSED avoids_hit test negates the hit entirely (Spray, p.149) —
+    // wounds are voided by the caller when totalling.
+    if (te.tests.some((t) => t.avoidsHit && t.resolved?.success)) {
+        hit.avoided = true;
+        hit.avoidedBy = te.tests.find((t) => t.avoidsHit && t.resolved?.success)?.characteristic;
+    }
+    // smokescreens declared at the impact point (Smoke (X), p.149)
+    if (ctx.smokeScreens?.length) hit.smoke = ctx.smokeScreens;
+    // per-hit scatter (Indirect (X), p.147): direction from the Scatter Diagram
+    if (ctx.hitScatterDistance != null) {
+        const dirTable = registry.table('Scatter Diagram');
+        const dir = dirTable ? resolveTable(dirTable, rng) : { roll: d(10, rng, 'scatter direction') };
+        hit.scatter = { direction: dir.roll, distance: ctx.hitScatterDistance };
+        if (dir.text) hit.scatter.directionText = dir.text;
     }
     if (te.tests.length || te.statuses.length || te.armour.length || tableRolls.length) {
         if (tableRolls.length) te.tableRolls = tableRolls;
@@ -462,10 +514,14 @@ export function resolveAttack(input, rng = Math.random, registry = defaultRegist
             });
         }
         applyOnHit(hit, input, target, dmg, registry, rng, autoResolveTests, reduced, effArmour);
+        // Spray: a natural 9 on any damage die jams the weapon (after this attack)
+        if (dmg.sprayJam && !result.effects.some((e) => e.name === 'Jam')) {
+            result.effects.push({ name: 'Jam', effect: 'Spray: a natural 9 was rolled on a damage die — the weapon jams after this attack (p.149)' });
+        }
         result.hits.push(hit);
     }
     result.totalWounds = target
-        ? result.hits.reduce((a, h) => a + (h.soak?.woundsInflicted ?? 0) + (h.corrosiveWounds ?? 0), 0)
+        ? result.hits.reduce((a, h) => a + (h.avoided ? 0 : (h.soak?.woundsInflicted ?? 0) + (h.corrosiveWounds ?? 0)), 0)
         : undefined;
     return result;
 }
@@ -705,7 +761,7 @@ export function engageOnHit(attacker, defender, damageHits, evaded, options = {}
         applyOnHit(hit, attacker, target, hit.damage, registry, rng, options.autoResolveTests, reduced, effArmour);
         return hit;
     });
-    const totalWounds = hits.reduce((a, h) => a + ((h.evaded || h.fieldAbsorbed) ? 0 : ((h.soak?.woundsInflicted ?? 0) + (h.corrosiveWounds ?? 0))), 0);
+    const totalWounds = hits.reduce((a, h) => a + ((h.evaded || h.fieldAbsorbed || h.avoided) ? 0 : ((h.soak?.woundsInflicted ?? 0) + (h.corrosiveWounds ?? 0))), 0);
     return { hits, totalWounds, fieldDown };
 }
 

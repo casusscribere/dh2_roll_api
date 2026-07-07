@@ -102,6 +102,11 @@ export const FACT_DEFS = [
     // --- opposing weapon (Parry context) --------------------------------------
     { name: 'present', type: 'bool', summary: 'In a Parry, an opposing (attacking) weapon was supplied (the engagement provides it). Scope: opposing_weapon. Guards Power Field on a bare /api/parry test.', scopes: {
         opposing_weapon: (c) => !!c.opposingProvided } },
+    // --- psyker (Force weapons — static half; the Focus Power rider is Phase 6) --
+    { name: 'psy_rating', type: 'number', summary: 'The attacker\'s psy rating (from attacker.psyRating; 0 = not a psyker). Force weapons add it to damage and penetration in a psyker\'s hands (p.145).', scopes: {
+        attacker: (c) => Number(c.psyRating) || 0 } },
+    { name: 'is_psyker', type: 'bool', summary: 'The attacker has a psy rating > 0.', scopes: {
+        attacker: (c) => (Number(c.psyRating) || 0) > 0 } },
     // --- combat state ----------------------------------------------------------
     { name: 'dual_wielding', type: 'bool', summary: 'Wielding and firing two weapons this turn (set via combat.dualWielding).', scopes: {
         attacker: (c) => !!c.combat?.dualWielding } },

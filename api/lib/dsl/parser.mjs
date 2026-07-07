@@ -483,6 +483,22 @@ class Parser {
                     if (this.isPunct(',')) { this.next(); reason = this.expectString('a reason'); }
                     return { type: 'Action', action: 'declare_damage', value, reason };
                 }
+                if (this.isKw('smoke')) {
+                    // declare smoke <radius-expr> [duration <expr>] — a smokescreen
+                    // at the impact/scatter point (Smoke (X), p.149)
+                    this.next();
+                    const radius = this.parseExpr();
+                    let duration = null;
+                    if (this.isKw('duration')) { this.next(); duration = this.parseExpr(); }
+                    return { type: 'Action', action: 'declare_smoke', radius, duration };
+                }
+                if (this.isKw('scatter_hit')) {
+                    // declare scatter_hit <distance-expr> — this HIT scatters: the
+                    // engine rolls the Scatter Diagram direction and attaches the
+                    // displacement to the hit (Indirect (X), p.147)
+                    this.next();
+                    return { type: 'Action', action: 'declare_scatter_hit', value: this.parseExpr() };
+                }
                 if (this.isKw('event')) {
                     this.next();
                     const name = this.expectString('an event name');
@@ -490,7 +506,7 @@ class Parser {
                     if (this.isPunct(',')) { this.next(); text = this.expectString('event description text'); }
                     return { type: 'Action', action: 'emit', name, text };
                 }
-                throw this.err("Expected 'test', 'status', 'table_roll', 'armour_damage', 'damage' or 'event' after declare");
+                throw this.err("Expected 'test', 'status', 'table_roll', 'armour_damage', 'damage', 'smoke', 'scatter_hit' or 'event' after declare");
             }
             case 'bump_quality': {                       // bump_quality "Blast" by <expr>
                 this.next();
@@ -512,11 +528,15 @@ class Parser {
 
     // --- declaration bodies (shared by the legacy verbs and `declare …`) ------
 
-    // require_test "Char" <modifier-expr> "on-fail" [=> roll_on "T" | apply_status …]
+    // require_test "Char" <modifier-expr> "on-fail" [avoids_hit] [=> roll_on "T" | apply_status … | damage e]
     parseRequireTest() {
         const characteristic = this.expectString('a characteristic name (e.g. "Toughness")');
         const value = this.parseExpr();                       // the test modifier
         const onFail = this.expectString('the on-fail consequence text');
+        // avoids_hit: INVERTED stakes — a PASSED test negates the hit entirely
+        // (Spray's Agility test, p.149). The engine voids the hit's wounds.
+        let avoidsHit = false;
+        if (this.isKw('avoids_hit')) { this.next(); avoidsHit = true; }
         // optional follow-up on a FAILED test: roll on a roll_table, apply a
         // condition (Flame → On Fire), or suffer damage (Toxified's 1d10).
         let onFailRollTable = null, onFailApply = null, onFailDamage = null;
@@ -536,7 +556,7 @@ class Parser {
                 onFailApply = { name, value, duration, location };
             } else throw this.err("Expected 'roll_on', 'apply_status' or 'damage' after =>");
         }
-        return { type: 'Action', action: 'require_test', characteristic, value, onFail, onFailRollTable, onFailApply, onFailDamage };
+        return { type: 'Action', action: 'require_test', characteristic, value, onFail, onFailRollTable, onFailApply, onFailDamage, avoidsHit };
     }
 
     // roll_on "Table" [+ <modifier>] [area <expr>]

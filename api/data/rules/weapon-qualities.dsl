@@ -211,6 +211,101 @@ quality "Scatter" {
     then add modifier "scatter" = -3
 }
 
+# --- Force (DH2 core p.145) — the STATIC half ---------------------------------
+# In a psyker's hands (psy_rating > 0) a Force weapon deals +psy-rating damage,
+# gains +psy-rating penetration, and its damage type becomes Energy. The Focus
+# Power rider (+1d10 per DoS ignoring Armour and Toughness, Opposed Willpower)
+# needs the psychic subsystem — Phase 6. Force weapons are immune to Power Field
+# (already checked by that rule).
+quality "Force" {
+  meta { page 145 }
+  on DAMAGE_POOL
+  priority 0
+  when has_quality("Force") and is_psyker
+  then set damage_type = "Energy"
+}
+quality "Force" {
+  meta { page 145 }
+  on DAMAGE_MODS
+  when has_quality("Force") and is_psyker
+  then add modifier "force (psy rating)" = psy_rating
+}
+quality "Force" {
+  meta { page 145 }
+  on PENETRATION
+  when has_quality("Force") and is_psyker
+  then set pen += psy_rating
+}
+
+# --- Indirect (X) (DH2 core p.147) --------------------------------------------
+# Fired in a high arc without line of sight: −10 to the attack and a Full Action
+# (surfaced as a note — the tool does not hard-block action economy). EVERY HIT
+# scatters — it strikes the ground 1d10 − BS-bonus metres (min 0) from the
+# intended target, direction from the Scatter Diagram (declare scatter_hit).
+# On a miss the shot scatters X×1d10 metres (approximation of Xd10 — noted).
+quality "Indirect" {
+  meta { page 147 }
+  on MODIFIERS
+  when has_quality("Indirect")
+  then add modifier "indirect" = -10
+}
+quality "Indirect" {
+  meta { page 147 }
+  on POST_ROLL
+  when has_quality("Indirect")
+  then emit "Indirect", "fired without line of sight — requires a Full Action; the GM may add penalties for poor target awareness (p.147)"
+}
+quality "Indirect" {
+  meta { page 147 }
+  on ON_HIT
+  when has_quality("Indirect")
+  then declare scatter_hit 1d10 - bs_bonus
+}
+quality "Indirect" {
+  meta { page 147 }
+  on ON_MISS
+  priority 5
+  when is_ranged and has_quality("Indirect") and not success and roll <= jam_threshold
+  then set scatter = quality_level("Indirect", 1) * 1d10; roll_on "Scatter Diagram"
+}
+
+# --- Smoke (X) (DH2 core p.149) -------------------------------------------------
+# No damage: a hit creates a smokescreen with an X-metre radius at the impact
+# point, lasting 1d10+10 rounds. Like Blast, a Smoke weapon SCATTERS on a miss —
+# the screen still forms at the scatter point, but only Blast also detonates its
+# damage there (the two compose: a Smoke+Blast weapon scatters once, detonates
+# via Blast's rule, and smokes via this one).
+quality "Smoke" {
+  meta { page 149 }
+  on ON_HIT
+  when has_quality("Smoke")
+  then declare smoke quality_level("Smoke", 1) duration 1d10 + 10
+}
+quality "Smoke" {
+  meta { page 149 }
+  on ON_MISS
+  priority 1
+  when is_ranged and has_quality("Smoke") and not success and roll <= jam_threshold and not has_quality("Blast")
+    then set scatter = 1d5; roll_on "Scatter Diagram"; declare smoke quality_level("Smoke", 1) duration 1d10 + 10
+  when is_ranged and has_quality("Smoke") and not success and roll <= jam_threshold and has_quality("Blast")
+    then declare smoke quality_level("Smoke", 1) duration 1d10 + 10
+}
+
+# --- Spray (DH2 core p.149) ------------------------------------------------------
+# The no-attack-roll cone: the ENGINE skips the BS test entirely for a Spray
+# weapon (auto-hit, always the Body, Called Shots impossible — see runToHit) and
+# this rule gives the struck target its Challenging (+0) Agility test; a PASSED
+# test AVOIDS the hit (avoids_hit). Untrained-wielder bonuses (+20/+30) are GM
+# adjustments via the test note. A natural 9 on any damage die jams the weapon
+# (engine — surfaced as a Jam effect). Cone multi-targeting is out of scope
+# (single representative target).
+quality "Spray" {
+  meta { page 149 }
+  on ON_HIT
+  when has_quality("Spray")
+  then require_test "Agility" 0 "struck by the spray" avoids_hit
+}
+
 # (Maximal — the high-power firing mode — moved to configurations.dsl, the
 #  Configurations category.)
 
