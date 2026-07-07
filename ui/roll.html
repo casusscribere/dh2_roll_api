@@ -38,6 +38,8 @@
     </div>
     <div class="row3">
       <div><label title="Unnatural Characteristic (X): a successful test gains ⌈X/2⌉ bonus degrees of success (DH2 p.139). 0 = none.">Unnatural (X)</label><input type="number" id="t-unnatural" value="0" min="0"></div>
+      <div><label title="Optional tag rules can gate on (test.* pipeline), e.g. Fear, Athletics, Acquisition">Test name</label><input id="t-name" placeholder="e.g. Fear"></div>
+      <div><label title="Comma separated — test.* rules (built-in or custom) gated on these apply">Talents / Conditions</label><input id="t-rules" placeholder="e.g. Resistance (Fear)"></div>
     </div>
     <button onclick="doTest()">Roll Test</button>
     <div class="result" id="t-result">&mdash;</div>
@@ -198,6 +200,21 @@
     </div>
     <div class="result" id="a-result">&mdash;</div>
   </fieldset>
+
+  <!-- ===================== ENCOUNTER TRACKER (Phase 4) ===================== -->
+  <fieldset style="grid-column: 1 / -1;">
+    <legend>Encounter Tracker</legend>
+    <p class="note">Carries state ACROSS engagements and turns: Corrosive armour loss, applied conditions (severity/duration/decay), the Recharge cooldown, wounds. Enable it, resolve engagements as usual (attacker/defender), then tick turns — On Fire burns at turn start, Toxified tests at turn end, durations &amp; the Haywire Field decay at round end.</p>
+    <div class="checks">
+      <label><input type="checkbox" id="enc-enabled" onchange="renderEncounter()"> track state across engagements</label>
+      <button class="minibtn" style="margin:0" onclick="encTick('TURN_START')">⟳ Turn start</button>
+      <button class="minibtn" style="margin:0" onclick="encTick('TURN_END')">⟲ Turn end</button>
+      <button class="minibtn" style="margin:0" onclick="encTick('ROUND_END')">⏭ End round</button>
+      <button class="minibtn" style="margin:0" onclick="encReset()">Reset encounter</button>
+    </div>
+    <div class="result" id="enc-state" style="display:none"></div>
+    <div class="result" id="enc-events" style="display:none"></div>
+  </fieldset>
 </div>
 
 <script src="rules-store.js"></script>
@@ -255,6 +272,59 @@ function collectRules(side, cat) {
     else out.push(raw != null ? `${cb.value} (${raw})` : cb.value);
   });
   return out;
+}
+
+// --- encounter tracker (Phase 4 — EncounterState + upkeep ticks) -------------
+const ENC_KEY = 'dh2.encounter';
+const encounterEnabled = () => $('enc-enabled')?.checked;
+const encounterLoad = () => {
+  try { return JSON.parse(localStorage.getItem(ENC_KEY)) ?? emptyEnc(); } catch { return emptyEnc(); }
+};
+const emptyEnc = () => ({ schemaVersion: 1, kind: 'dh2.encounter', round: 1, actors: {} });
+const encounterSave = (enc) => localStorage.setItem(ENC_KEY, JSON.stringify(enc));
+function encReset() { encounterSave(emptyEnc()); $('enc-events').style.display = 'none'; renderEncounter(); }
+function renderEncounter() {
+  const box = $('enc-state');
+  if (!encounterEnabled()) { box.style.display = 'none'; return; }
+  const enc = encounterLoad();
+  box.style.display = 'block';
+  let s = `<span class="gold">Round ${enc.round}</span>`;
+  const actors = Object.entries(enc.actors);
+  if (!actors.length) s += ` <span class="dim">— no state yet: resolve an engagement to populate attacker/defender</span>`;
+  for (const [key, a] of actors) {
+    s += `\n<span class="gold">${key}</span>${a.name && a.name !== key ? ` <span class="dim">(${a.name})</span>` : ''}:`;
+    const conds = (a.conditions ?? []).map((c) =>
+      `${c.name}${c.severity != null ? ` (sev ${c.severity})` : ''}${c.duration != null ? ` [${c.duration}r]` : ''}${c.decay != null ? ` ↓${c.decay}/round` : ''}`);
+    s += `\n  conditions: ${conds.length ? conds.join(', ') : '<span class="dim">none</span>'}`;
+    const ap = Object.entries(a.armourDamage ?? {}).map(([loc, n]) => `${loc} −${n} AP`);
+    if (ap.length) s += `\n  armour damage: <span class="bad">${ap.join(', ')}</span>`;
+    if (a.cooldowns?.recharge) s += `\n  <span class="bad">weapon recharging</span> (clears at turn end)`;
+    if (a.wounds?.taken) s += `\n  wounds recorded: <span class="bad">${a.wounds.taken}</span>`;
+  }
+  box.innerHTML = s;
+}
+async function encTick(phase) {
+  if (!encounterEnabled()) { $('enc-events').style.display = 'block'; $('enc-events').innerHTML = '<span class="dim">enable tracking first</span>'; return; }
+  const body = { encounter: encounterLoad(), phase };
+  const disabled = RulesStore.disabledBuiltins();
+  if (disabled.length) body.disabledRules = disabled;
+  const custom = RulesStore.activeDsl();
+  if (custom.trim()) body.customRules = custom;
+  const r = await api('/api/encounter/tick', body);
+  if (r.error) { $('enc-events').style.display = 'block'; $('enc-events').innerHTML = `<span class="bad">${r.error}</span>`; return; }
+  encounterSave(r.encounter);
+  renderEncounter();
+  const evBox = $('enc-events');
+  evBox.style.display = 'block';
+  const icon = { damage: '🔥', test: '🎲', expired: '✓', decay: '↓', cooldown: '⚡', note: '⚑' };
+  evBox.innerHTML = `<span class="gold">${phase}</span>` + (r.events.length
+    ? r.events.map((e) => {
+        if (e.type === 'damage') return `\n${icon.damage} ${e.actor}: <span class="bad">${e.amount} damage</span> — ${e.source}${e.reason ? ` <span class="dim">(${e.reason})</span>` : ''}`;
+        if (e.type === 'test') return `\n${icon.test} ${e.actor}: ${e.source} ${e.characteristic} test roll <span class="gold">${e.roll}</span> vs ${e.threshold} — ` +
+          (e.success ? '<span class="ok">resisted</span>' : `<span class="bad">FAILED</span>${e.damage ? ` → ${e.damage} damage` : ''}${e.applied ? ` → ${e.applied}` : ''}`);
+        return `\n${icon[e.type] ?? '•'} ${e.actor}: ${e.source} <span class="dim">${e.reason ?? ''}</span>`;
+      }).join('')
+    : ' <span class="dim">— nothing ticked</span>');
 }
 
 // --- character import / export (schema v1 — ROADMAP Phase 2 Lane B) ----------
@@ -459,18 +529,32 @@ window.addEventListener('focus', refreshActiveRules); // pick up edits made on t
 const sign = (n) => (n >= 0 ? '+' : '') + n;
 
 async function doTest() {
-  const r = await api('/api/test', {
+  // Runs through the test.* pipeline: active rules (built-in toggles + custom
+  // DSL) gated on test_name / talents / conditions apply their modifiers.
+  const namedRules = $('t-rules').value.split(',').map(x => x.trim()).filter(Boolean);
+  const body = {
     target: +$('t-target').value,
+    testName: $('t-name').value.trim(),
     modifiers: { difficulty: +$('t-difficulty').value, modifier: +$('t-mod').value },
     unnatural: +$('t-unnatural').value,
-  });
+    talents: namedRules, conditions: namedRules,
+  };
+  const disabled = RulesStore.disabledBuiltins();
+  if (disabled.length) body.disabledRules = disabled;
+  const custom = RulesStore.activeDsl();
+  if (custom.trim()) body.customRules = custom;
+  const r = await api('/api/test', body);
+  if (r.error) { $('t-result').innerHTML = `<span class="bad">${r.error}</span>`; return; }
   const unnat = r.bonusDos ? ` <span class="dim">(incl. +${r.bonusDos} from Unnatural ${r.unnatural})</span>` : '';
-  $('t-result').innerHTML =
+  const modList = Object.entries(r.modifiers).filter(([, v]) => v).map(([k, v]) => `${sign(v)} ${k}`).join(' ');
+  let out =
     `Roll: <span class="gold">${r.roll}</span> vs ${r.modifiedTarget} ` +
-    `<span class="dim">(${r.target} ${sign(r.modifierTotal)})</span>\n` +
+    `<span class="dim">(${r.target}${modList ? ' ' + modList : ''})</span>\n` +
     (r.success
       ? `<span class="ok">SUCCESS</span> — ${r.dos} degree${r.dos !== 1 ? 's' : ''} of success${r.autoSuccess ? ' (natural 1!)' : ''}${unnat}`
       : `<span class="bad">FAILURE</span> — ${r.dof} degree${r.dof !== 1 ? 's' : ''} of failure${r.autoFailure ? ' (natural 100!)' : ''}`);
+  for (const e of (r.effects ?? [])) out += `\n<span class="rf">⚑ ${e.name}</span>${e.effect ? ` <span class="dim">${e.effect}</span>` : ''}`;
+  $('t-result').innerHTML = out;
 }
 
 async function doDamage() {
@@ -607,6 +691,12 @@ async function engReroll() { await engRunCurrent(); }   // re-roll the current p
 async function engRunPhase(phase) {
   ENG.busy = true; ENG.error = null; ENG.finished = false; engRender();
   const body = { phase, attacker: ENG.attacker, defender: ENG.defender, options: ENG.options, state: ENG.state };
+  // Encounter tracker (Phase 4): thread the persistent state through the phases
+  if (encounterEnabled()) {
+    body.encounter = encounterLoad();
+    body.attackerKey = 'attacker';
+    body.defenderKey = 'defender';
+  }
   if (ENG.forced[phase]?.some(v => v != null)) body.forcedRolls = ENG.forced[phase];
   if (ENG.customRules) body.customRules = ENG.customRules;
   if (ENG.disabledRules) body.disabledRules = ENG.disabledRules;
@@ -644,7 +734,11 @@ function engApply(phase, r) {
   if (phase === 'attack') ENG.state.attack = r;
   else if (phase === 'damage') ENG.state.attack.hits = r.hits;
   else if (phase === 'evasion') { ENG.state.reaction = r.reaction; ENG.state.evaded = Math.min(r.evaded, ENG.state.attack.hits.length); }
-  else if (phase === 'onhit') { ENG.state.attack.hits = r.hits; ENG.state.attack.totalWounds = r.totalWounds; ENG.state.fieldDown = r.fieldDown; }
+  else if (phase === 'onhit') {
+    ENG.state.attack.hits = r.hits; ENG.state.attack.totalWounds = r.totalWounds; ENG.state.fieldDown = r.fieldDown;
+    // Encounter tracker: persist the updated document (corrosion, conditions, cooldowns)
+    if (encounterEnabled() && r.encounter) { encounterSave(r.encounter); renderEncounter(); }
+  }
 }
 
 function engRender() { $('a-result').innerHTML = renderEngagement(ENG); }

@@ -84,6 +84,33 @@ world on **`dark-heresy-3rd-edition`, Foundry 14.360**, module
 change for Foundry timing; Actor⇄schema mapping works both directions.
 Phase 3's pack export can proceed against this validated target.
 
+### Pack export v1 — SHIPPED (2026-07-07, Roadmap Phase 3 Lane C)
+
+`npm run export:packs` (part of `deploy:foundry`) generates compendia from the
+DSL source per the format decision above: 4 `roll_table` declarations → native
+**RollTable** documents; 35 weapon-quality rules → **`attackSpecial` Items**
+(`hasLevel` from the valued-names analysis; package · book · page provenance in
+descriptions and `flags['dh2-roll-vm']`). Source JSON in
+`foundry/dh2-roll-vm/packs-src/`, compiled to **LevelDB** directories via
+`@foundryvtt/foundryvtt-cli` v3 (embedded results carry `!tables.results!`
+keys), deterministic name-hashed ids. Round-trip verified with `extractPack`;
+the join smoke now asserts both packs index in-world and that Corrosive loads
+with its p.145 cite. Module v0.3.0 declares the packs (`attack-specials` bound
+to `system: dark-heresy-3rd-edition`; tables system-agnostic).
+
+### ActiveEffect mirror — SHIPPED (2026-07-07, Roadmap Phase 4 Lane C)
+
+Module v0.4.0 adds the EncounterState ⇄ ActiveEffect mirror:
+`game.dh2vm.syncEncounterToActor(actor, actorState)` writes the actor's
+conditions as module-managed AEs (condition `duration` → AE `duration.rounds`;
+`severity`/`location`/`decay` → `flags['dh2-roll-vm']`), and
+`readEncounterFromActor(actor)` reads them back into a state document; the
+vendored `tickEncounter` then runs the same upkeep the headless engine runs
+(On Fire burn, Toxified test, decay/expiry). The join smoke gained two checks:
+AE round-trip parity on a temp actor, and an in-page deterministic tick
+(On Fire burns a forced 7). Run the smoke to validate on your world; the
+combat-hook automation (auto-tick on `updateCombat`) is Phase 8 material.
+
 ### Consequences for earlier sections
 
 - The **module-vs-new-system decision stands** (module), but the primary

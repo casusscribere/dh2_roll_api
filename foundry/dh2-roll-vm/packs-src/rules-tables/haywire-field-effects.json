@@ -1,0 +1,97 @@
+{
+  "_id": "L0bYTVOVVbHByK0p",
+  "_key": "!tables!L0bYTVOVVbHByK0p",
+  "name": "Haywire Field Effects",
+  "img": "icons/svg/d20-grey.svg",
+  "description": "Generated from the dh2_roll_api DSL (roll_table \"Haywire Field Effects\").",
+  "formula": "1d10",
+  "replacement": true,
+  "displayRoll": true,
+  "results": [
+    {
+      "_id": "HKWw6jnHDsbNa7ml",
+      "_key": "!tables.results!L0bYTVOVVbHByK0p.HKWw6jnHDsbNa7ml",
+      "type": 0,
+      "text": "Insignificant — some machine spirits are unsettled, but no noticeable effect on nearby technology.",
+      "img": "icons/svg/d20-black.svg",
+      "weight": 2,
+      "range": [
+        1,
+        2
+      ],
+      "drawn": false,
+      "documentCollection": "",
+      "documentId": null,
+      "flags": {}
+    },
+    {
+      "_id": "y3Y9JFoQp2N7kWus",
+      "_key": "!tables.results!L0bYTVOVVbHByK0p.y3Y9JFoQp2N7kWus",
+      "type": 0,
+      "text": "Minor Disruption — powered actions (non-Primitive ranged attacks, Tech-Use, power-armour/cybernetic actions) suffer -10; power-armour move -1.",
+      "img": "icons/svg/d20-black.svg",
+      "weight": 2,
+      "range": [
+        3,
+        4
+      ],
+      "drawn": false,
+      "documentCollection": "",
+      "documentId": null,
+      "flags": {}
+    },
+    {
+      "_id": "7NcnYxSjzs47PhXi",
+      "_key": "!tables.results!L0bYTVOVVbHByK0p.7NcnYxSjzs47PhXi",
+      "type": 0,
+      "text": "Major Disruption — those actions suffer -20; power-armour move -3; technological melee weapons function as Primitive.",
+      "img": "icons/svg/d20-black.svg",
+      "weight": 2,
+      "range": [
+        5,
+        6
+      ],
+      "drawn": false,
+      "documentCollection": "",
+      "documentId": null,
+      "flags": {}
+    },
+    {
+      "_id": "3StbiafxU5nLV07W",
+      "_key": "!tables.results!L0bYTVOVVbHByK0p.3StbiafxU5nLV07W",
+      "type": 0,
+      "text": "Dead Zone — technology ceases; power armour unpowered (move 1); cybernetic organs cause 1 level of Fatigue per round.",
+      "img": "icons/svg/d20-black.svg",
+      "weight": 2,
+      "range": [
+        7,
+        8
+      ],
+      "drawn": false,
+      "documentCollection": "",
+      "documentId": null,
+      "flags": {}
+    },
+    {
+      "_id": "70clhlNpPdnBkF08",
+      "_key": "!tables.results!L0bYTVOVVbHByK0p.70clhlNpPdnBkF08",
+      "type": 0,
+      "text": "Prolonged Dead Zone — as Dead Zone for 1d5 rounds, then lessens to Major Disruption.",
+      "img": "icons/svg/d20-black.svg",
+      "weight": 2,
+      "range": [
+        9,
+        10
+      ],
+      "drawn": false,
+      "documentCollection": "",
+      "documentId": null,
+      "flags": {}
+    }
+  ],
+  "flags": {
+    "dh2-roll-vm": {
+      "generated": true
+    }
+  }
+}

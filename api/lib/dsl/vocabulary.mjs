@@ -69,6 +69,8 @@ export const FACT_DEFS = [
     // --- action context -------------------------------------------------------
     { name: 'action', type: 'string', summary: 'The current action name, e.g. "Standard Attack", "Called Shot", "Parry", "Dodge" — set in every flow including reactions.', scopes: {
         attacker: (c) => c.action ?? '' } },
+    { name: 'test_name', type: 'string', summary: 'The generic test\'s name/tag in the test.* pipeline (e.g. "Fear", "Athletics", "Acquisition") — "" outside it. Gate test-affecting rules on it: when test_name == "Fear" …', scopes: {
+        attacker: (c) => c.testName ?? '' } },
     { name: 'action_type', type: 'string', summary: 'The current action\'s type: "Half" | "Full" | "Reaction" | "Free" (from the Actions taxonomy), or "" if unknown.', scopes: {
         attacker: (c) => actionType(c.action) } },
     { name: 'is_attack', type: 'bool', summary: 'The current action carries the "attack" subtype (the key designation, e.g. Standard Attack, Charge). Used by Defensive (-10 to attacks) and many others.', scopes: {
@@ -109,14 +111,10 @@ export const FACT_DEFS = [
         attacker: (c) => !!c.combat?.firingBoth } },
 ];
 
-/** Legacy prefixed fact names → [scope, base]. Still valid; scoped paths preferred. */
-export const FACT_ALIASES = {
-    target_sb: ['target', 'sb'],
-    target_tb: ['target', 'tb'],
-    target_armour: ['target', 'armour'],
-    target_unnatural_toughness: ['target', 'unnatural_toughness'],
-    opposing_present: ['opposing_weapon', 'present'],
-};
+/** dsl 3: the legacy prefixed fact aliases (target_sb, target_armour,
+ *  opposing_present, …) were REMOVED — use the scoped paths (target.sb, …).
+ *  tools/migrate-dsl.mjs rewrites old text. */
+export const FACT_ALIASES = {};
 
 /** Functions. Same shape: per-scope implementations, attacker = unscoped. */
 export const FUNCTION_DEFS = [
@@ -136,8 +134,6 @@ export const FUNCTION_DEFS = [
     { name: 'trait_level', signature: 'trait_level("Name", default)', returns: 'number', summary: 'Numeric level parsed from a trait like "Brutal Charge (3)" → 3; returns default if absent/unnumbered. Scopes: attacker (default) or target.', scopes: {
         attacker: (c, [n, d]) => qualityLevel(c.traits, String(n), d),
         target: (c, [n, d]) => qualityLevel(c.target?.traits, String(n), d) } },
-    { name: 'has_status', signature: 'has_status("Name")', returns: 'bool', summary: 'Alias of has_condition() (back-compat). A named Condition is active on the character.', scopes: {
-        attacker: (c, [n]) => hasNamed(c.statuses ?? c.actor?.statuses, n) } },
     { name: 'has_condition', signature: 'has_condition("Name")', returns: 'bool', summary: 'A named Condition is active on the character (from conditions[] / statuses[]), e.g. "On Fire", "Full Aim", "Stunned".', scopes: {
         attacker: (c, [n]) => hasNamed(c.statuses ?? c.actor?.statuses, n) } },
     { name: 'has_circumstance', signature: 'has_circumstance("Name")', returns: 'bool', summary: 'A named environmental Circumstance is in effect (from circumstances[]).', scopes: {
@@ -145,8 +141,6 @@ export const FUNCTION_DEFS = [
     { name: 'circumstance_severity', signature: 'circumstance_severity("Name", default)', returns: 'number', summary: 'Severity of a structured Circumstance in circumstances[] (e.g. the Haywire Field strength 1–5), or default.', scopes: {
         attacker: (c, [n, d]) => findNamed(c.circumstances ?? c.actor?.circumstances, n)?.severity ?? num(d) } },
     { name: 'configuration', signature: 'configuration("Name")', returns: 'bool', summary: 'A per-character Configuration toggle is on (from configs[] / firingModes[]), e.g. configuration("Maximal").', scopes: {
-        attacker: (c, [n]) => hasNamed(c.configs ?? c.firingModes, n) } },
-    { name: 'firing_mode', signature: 'firing_mode("Name")', returns: 'bool', summary: 'Alias of configuration() — reads the same toggle list (configs[] / firingModes[]), e.g. firing_mode("Maximal").', scopes: {
         attacker: (c, [n]) => hasNamed(c.configs ?? c.firingModes, n) } },
     { name: 'is_action', signature: 'is_action("Name")', returns: 'bool', summary: 'The current action is the named one (case-insensitive), e.g. is_action("Parry"). Works in every flow including reactions.', scopes: {
         attacker: (c, [n]) => isAction(c.action, n) } },
@@ -174,10 +168,9 @@ export const FUNCTION_DEFS = [
 ];
 
 /** Legacy prefixed function names → [scope, base]. */
-export const FUNCTION_ALIASES = {
-    target_has_trait: ['target', 'has_trait'],
-    opposing_has_quality: ['opposing_weapon', 'has_quality'],
-};
+/** dsl 3: the legacy prefixed function aliases (target_has_trait,
+ *  opposing_has_quality) were REMOVED — use the scoped calls. */
+export const FUNCTION_ALIASES = {};
 
 // ---------------------------------------------------------------------------
 // WRITABLE SLOTS and FLAGS (Stage 3, F1) — the `then` side of the vocabulary.

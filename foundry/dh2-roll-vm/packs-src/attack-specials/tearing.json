@@ -1,0 +1,20 @@
+{
+  "_id": "69aO4ioyRz9woUed",
+  "_key": "!items!69aO4ioyRz9woUed",
+  "name": "Tearing",
+  "type": "attackSpecial",
+  "img": "icons/svg/sword.svg",
+  "system": {
+    "description": "Dark Heresy 2e Core Rulebook p.150. Generated from the dh2_roll_api DSL rule dh2.core.weapon-qualities/tearing (checkpoint DAMAGE_POOL).",
+    "hasLevel": false,
+    "level": 0
+  },
+  "effects": [],
+  "flags": {
+    "dh2-roll-vm": {
+      "generated": true,
+      "qualifiedId": "dh2.core.weapon-qualities/tearing",
+      "page": 150
+    }
+  }
+}

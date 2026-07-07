@@ -1,0 +1,20 @@
+{
+  "_id": "x40MQy89SLIQg0GP",
+  "_key": "!items!x40MQy89SLIQg0GP",
+  "name": "Crippling",
+  "type": "attackSpecial",
+  "img": "icons/svg/sword.svg",
+  "system": {
+    "description": "Dark Heresy 2e Core Rulebook p.145. Generated from the dh2_roll_api DSL rule dh2.core.weapon-qualities/crippling (checkpoint ON_HIT; takes a level (X)).",
+    "hasLevel": true,
+    "level": 0
+  },
+  "effects": [],
+  "flags": {
+    "dh2-roll-vm": {
+      "generated": true,
+      "qualifiedId": "dh2.core.weapon-qualities/crippling",
+      "page": 145
+    }
+  }
+}

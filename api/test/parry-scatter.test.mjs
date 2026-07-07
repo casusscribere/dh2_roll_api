@@ -80,7 +80,7 @@ test('Blast does not scatter on a hit', () => {
 });
 
 test('the 1d5 base is set before another DSL rule increases the scatter distance', () => {
-    const reg = buildRegistry('generic "Wild Throw" { on ON_MISS then set scatter += 3 }');
+    const reg = buildRegistry('miscellaneous "Wild Throw" { on ON_MISS then set scatter += 3 }');
     const r = resolveAttack({ characteristics: { bs: 40, s: 30, t: 30 }, weapon: FRAG, action: 'Standard Attack' },
         riggedDice([d100(80), die(3, 5), die(7, 10), die(2, 10), die(2, 10)]), reg);
     assert.equal(r.scatter.baseDistance, 3);          // Blast's 1d5 base
@@ -89,7 +89,7 @@ test('the 1d5 base is set before another DSL rule increases the scatter distance
 });
 
 test('a DSL rule can decrease the scatter distance, floored at zero', () => {
-    const reg = buildRegistry('generic "Pinpoint" { on ON_MISS then set scatter += -10 }');
+    const reg = buildRegistry('miscellaneous "Pinpoint" { on ON_MISS then set scatter += -10 }');
     const r = resolveAttack({ characteristics: { bs: 40, s: 30, t: 30 }, weapon: FRAG, action: 'Standard Attack' },
         riggedDice([d100(80), die(3, 5), die(5, 10), die(1, 10), die(1, 10)]), reg);
     assert.equal(r.scatter.distance, 0);              // max(0, 3 − 10)

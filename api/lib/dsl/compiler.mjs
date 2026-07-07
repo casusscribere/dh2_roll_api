@@ -24,7 +24,10 @@ const slug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^
  * more than one branch.
  */
 export function compileRule(rule, pkg = null) {
-    if (!KNOWN_CHECKPOINTS.has(rule.on)) {
+    // Namespaced pipelines (Phase 3): the `attack` pipeline is the default
+    // namespace — `on attack.MODIFIERS` normalises to the unqualified id.
+    const checkpoint = rule.on?.startsWith('attack.') ? rule.on.slice('attack.'.length) : rule.on;
+    if (!KNOWN_CHECKPOINTS.has(checkpoint)) {
         throw new DslError(`Unknown checkpoint '${rule.on}' in rule "${rule.name}"`, rule.line, rule.col);
     }
 
@@ -81,8 +84,10 @@ export function compileRule(rule, pkg = null) {
         name: rule.name,
         tier: rule.tier ?? null,
         source: rule.kind,
-        checkpoint: rule.on,
+        checkpoint,
         priority: rule.priority ?? 0,            // branch order preserved by insertion order
+        // layered-registry override (Phase 3): qualified/rule ids this rule replaces
+        replaces: rule.replaces ?? null,
         // Provenance (Stage 0): rule meta + the file's package header.
         page: rule.meta?.page ?? null,
         ref: rule.meta?.ref ?? null,

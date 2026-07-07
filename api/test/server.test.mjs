@@ -200,7 +200,7 @@ test('POST /api/rules/validate reports a parse error with line/col', async () =>
 });
 
 test('POST /api/rules/validate rejects an unknown fact (safety)', async () => {
-    const res = await postJson('/api/rules/validate', { rules: 'rule "x" { on MODIFIERS when secret then fail }' });
+    const res = await postJson('/api/rules/validate', { rules: 'miscellaneous "x" { on MODIFIERS when secret then flag attack_failed }' });
     assert.equal(res.status, 400);
     assert.match((await res.json()).message, /Unknown fact 'secret'/);
 });
@@ -225,7 +225,7 @@ test('POST /api/attack applies a custom rule supplied as DSL text', async () => 
         characteristics: { bs: 50, s: 30, t: 30 },
         weapon: { name: 'Pistol', isMelee: false, damage: '1d10', pen: 0, damageType: 'Impact', rof: { single: true, burst: 0, full: 0 }, qualities: [] },
         action: 'Standard Attack',
-        customRules: 'rule "Squad Buff" { on MODIFIERS then add modifier "squad" = 10 }',
+        customRules: 'miscellaneous "Squad Buff" { on MODIFIERS then add modifier "squad" = 10 }',
     });
     const body = await res.json();
     assert.equal(body.test.modifiers.squad, 10);
@@ -235,7 +235,7 @@ test('POST /api/attack returns 400 on invalid customRules', async () => {
     const res = await postJson('/api/attack', {
         characteristics: { bs: 50 },
         weapon: { name: 'Pistol', isMelee: false, damage: '1d10', rof: { single: true, burst: 0, full: 0 }, qualities: [] },
-        customRules: 'rule "bad" { on NOWHERE then fail }',
+        customRules: 'miscellaneous "bad" { on NOWHERE then flag attack_failed }',
     });
     assert.equal(res.status, 400);
     assert.match((await res.json()).error, /Unknown checkpoint/);

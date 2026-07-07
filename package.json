@@ -9,13 +9,15 @@
     "test": "node --test \"api/test/**/*.test.mjs\"",
     "build:static": "node scripts/build-static.mjs",
     "build:foundry": "node scripts/build-foundry.mjs",
-    "deploy:foundry": "node scripts/build-foundry.mjs && node scripts/deploy-foundry.mjs",
+    "export:packs": "node scripts/export-packs.mjs",
+    "deploy:foundry": "node scripts/build-foundry.mjs && node scripts/export-packs.mjs && node scripts/deploy-foundry.mjs",
     "serve:static": "node scripts/serve-static.mjs"
   },
   "dependencies": {
     "express": "^4.19.0"
   },
   "devDependencies": {
+    "@foundryvtt/foundryvtt-cli": "^3.0.4",
     "esbuild": "^0.28.1"
   }
 }

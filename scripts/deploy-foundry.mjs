@@ -30,13 +30,27 @@ if (!existsSync(bundle)) {
 }
 
 const destDir = join(dataDir, 'modules', 'dh2-roll-vm');
-mkdirSync(join(dataDir, 'modules'), { recursive: true });
-// Clean copy: module.json + README + built scripts/ (NOT src/ — the module ships the bundle only).
-rmSync(destDir, { recursive: true, force: true });
 mkdirSync(join(destDir, 'scripts'), { recursive: true });
+// module.json + README + built scripts/ (NOT src/ — the module ships the bundle only).
 cpSync(join(srcDir, 'module.json'), join(destDir, 'module.json'));
 cpSync(join(srcDir, 'README.md'), join(destDir, 'README.md'));
 cpSync(join(srcDir, 'scripts'), join(destDir, 'scripts'), { recursive: true });
+// Generated compendium packs (LevelDB dirs from export-packs.mjs). A RUNNING
+// Foundry holds LevelDB locks on deployed packs — replace them only when free,
+// and warn instead of failing so code-only deploys still land.
+let packsDeployed = false;
+if (existsSync(join(srcDir, 'packs'))) {
+    try {
+        rmSync(join(destDir, 'packs'), { recursive: true, force: true });
+        cpSync(join(srcDir, 'packs'), join(destDir, 'packs'), { recursive: true });
+        packsDeployed = true;
+    } catch (err) {
+        if (err.code === 'EPERM' || err.code === 'EBUSY') {
+            console.warn('⚠ packs are LOCKED (Foundry is running) — bundle/manifest deployed; packs NOT updated.');
+            console.warn('  Close Foundry (or return to Setup) and re-run `npm run deploy:foundry` to refresh the packs.');
+        } else throw err;
+    }
+}
 
 const manifest = JSON.parse(readFileSync(join(srcDir, 'module.json'), 'utf8'));
 console.log(`✓ Deployed ${manifest.id} v${manifest.version} → ${destDir}`);

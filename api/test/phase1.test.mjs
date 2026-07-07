@@ -62,19 +62,18 @@ test('scope validation: unknown scope and out-of-scope facts fail at compile tim
         /not available in scope 'target'/);
 });
 
-test('legacy prefixed aliases still work and equal their scoped forms', () => {
-    const reg = buildRegistry(`
-        quality "AliasCheck" {
-            on DAMAGE_MODS
-            when has_quality("AliasCheck") and target_tb == target.tb
-            then add modifier "alias_ok" = 1
-        }
-    `);
-    const r = resolveAttack({
-        characteristics: { bs: 60, s: 30, t: 30 }, weapon: gun(['AliasCheck']),
-        action: 'Standard Attack', target: { armour: 0, toughnessBonus: 4 },
-    }, riggedDice([d100(20), die(5, 10)]), reg);
-    assert.equal(r.hits[0].damage.modifiers.alias_ok, 1);
+test('the removed v1 prefixed aliases are REJECTED at compile time (dsl 3)', () => {
+    assert.throws(() => buildRegistry('quality "A" { on DAMAGE_MODS when has_quality("A") and target_tb > 0 then add modifier "x" = 1 }'),
+        /Unknown fact 'target_tb'/);
+    assert.throws(() => buildRegistry('quality "A" { on PENETRATION when target_has_trait("Daemonic") then set pen += 1 }'),
+        /Unknown function 'target_has_trait/);
+    assert.throws(() => buildRegistry('quality "A" { on POST_PARRY when opposing_present then emit "x" }'),
+        /Unknown fact 'opposing_present'/);
+});
+
+test('explicit dsl 1/2 pragmas are rejected with a migration pointer', () => {
+    assert.throws(() => compile('dsl 2\nquality "X" { on MODIFIERS when has_quality("X") then add modifier "x" = 1 }'),
+        /dsl 2 is no longer supported.*migrate-dsl/);
 });
 
 test('single-source parity: docs facts/functions ARE the interpreter whitelists', () => {

@@ -1,0 +1,20 @@
+{
+  "_id": "8VBUhIQ7BK7mkchm",
+  "_key": "!items!8VBUhIQ7BK7mkchm",
+  "name": "Felling",
+  "type": "attackSpecial",
+  "img": "icons/svg/sword.svg",
+  "system": {
+    "description": "Dark Heresy 2e Core Rulebook p.145. Generated from the dh2_roll_api DSL rule dh2.core.weapon-qualities/felling (checkpoint PENETRATION; takes a level (X)).",
+    "hasLevel": true,
+    "level": 0
+  },
+  "effects": [],
+  "flags": {
+    "dh2-roll-vm": {
+      "generated": true,
+      "qualifiedId": "dh2.core.weapon-qualities/felling",
+      "page": 145
+    }
+  }
+}

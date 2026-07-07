@@ -156,14 +156,24 @@ export function buildDefaultRegistry() {
 }
 
 /**
- * Build a registry = built-ins (minus any disabled by id) + optional
- * user-supplied DSL rules. Combat-action core mechanics are always included.
+ * Build a registry = built-ins (minus any disabled by id, minus any REPLACED by
+ * a user-layer rule) + optional user-supplied DSL rules. Combat-action core
+ * mechanics are always included. Layering (Phase 3): the built-ins are the
+ * `core` layer; `customRules` is the user/campaign layer above it — a user rule
+ * with `replaces "<package>/<rule-id>"` (or a bare rule id) drops the named
+ * rule's effects entirely, statically (the id-based successor to the runtime
+ * `suppress`, which remains for same-layer overrides like Overheats→Jam).
  * Throws a DslError if `customRules` fails to tokenize/parse/compile.
  */
 export function buildRegistry(customRules, disabledIds = []) {
     const disabled = new Set(disabledIds);
-    // Disable by ruleId (covers every branch of a multi-branch rule) or effect id.
-    const keep = (effects) => effects.filter((e) => !disabled.has(e.ruleId) && !disabled.has(e.id));
+    // The user layer compiles first so its `replaces` can filter the core layer.
+    const custom = (customRules && String(customRules).trim()) ? compile(customRules) : [];
+    const replaced = new Set(custom.flatMap((e) => e.replaces ?? []));
+    // Drop by ruleId / effect id (toggles), or by qualifiedId / ruleId (replaces).
+    const keep = (effects) => effects.filter((e) =>
+        !disabled.has(e.ruleId) && !disabled.has(e.id)
+        && !replaced.has(e.qualifiedId) && !replaced.has(e.ruleId));
     const registry = new Registry()
         .addAll(combatActionEffects)
         .addAll(qualityConflictEffects)
@@ -175,8 +185,8 @@ export function buildRegistry(customRules, disabledIds = []) {
         .addAll(keep(configurationEffects))
         .addAll(keep(mechanicEffects))
         .addTables(rollTables);
-    if (customRules && String(customRules).trim()) {
-        registry.addAll(compile(customRules));
+    if (custom.length) {
+        registry.addAll(custom);
         registry.addTables(compileTables(customRules));   // user-defined roll tables
     }
     return registry;

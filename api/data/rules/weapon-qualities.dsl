@@ -1,4 +1,4 @@
-dsl 2
+dsl 3
 package "dh2.core.weapon-qualities" {
   system "dh2"
   source "Dark Heresy 2e Core Rulebook"
@@ -19,7 +19,7 @@ quality "Tearing" {
   on DAMAGE_POOL
   priority 10
   when has_quality("Tearing")
-  then add_die 1; keep_highest          # roll one extra die, keep the original count highest
+  then set extra_dice += 1; flag keep_highest          # roll one extra die, keep the original count highest
 }
 
 # --- per-die adjustment + Righteous Fury threshold ---------------------------
@@ -99,7 +99,7 @@ quality "Twin-Linked" {
   on HIT_COUNT_BONUS
   priority 10
   when has_quality("Twin-Linked") and dos > 1
-  then add_hits 1
+  then set extra_hits += 1
 }
 
 # --- penetration -------------------------------------------------------------
@@ -157,7 +157,7 @@ quality "Flexible" {
   meta { page 145 }
   on POST_ROLL
   when has_quality("Flexible")
-  then prevent_parry
+  then flag no_parry
 }
 
 # Graviton (DH2 core p.146): on a hit, inflicts additional damage equal to the
@@ -168,7 +168,7 @@ quality "Graviton" {
   meta { page 146 }
   on DAMAGE_MODS
   when has_quality("Graviton")
-  then add modifier "graviton" = target_armour
+  then add modifier "graviton" = target.armour
 }
 
 # Jam is a base weapon MECHANIC (see mechanics.dsl), not a quality. These two
@@ -222,7 +222,7 @@ quality "Concussive" {
   on ON_HIT
   when has_quality("Concussive")
     then require_test "Toughness" (-10 * quality_level("Concussive", 0)) "Stunned for 1 round per degree of failure"
-  when has_quality("Concussive") and damage_dealt > target_sb
+  when has_quality("Concussive") and damage_dealt > target.sb
     then apply_status "Prone", "damage dealt exceeds the target's Strength Bonus"
 }
 
@@ -288,7 +288,7 @@ quality "Felling" {
   meta { page 145 }
   on PENETRATION
   when has_quality("Felling")
-  then reduce_unnatural_toughness quality_level("Felling", 1)
+  then set unnatural_toughness_reduction += quality_level("Felling", 1)
 }
 
 # Flame (DH2 core p.145): whenever a target is struck by a Flame attack (even if it
@@ -357,8 +357,8 @@ quality "Sanctified" {
   meta { page 148 }
   on PENETRATION
   priority 30
-  when has_quality("Sanctified") and target_has_trait("Daemonic")
-  then reduce_unnatural_toughness target_unnatural_toughness
+  when has_quality("Sanctified") and target.has_trait("Daemonic")
+  then set unnatural_toughness_reduction += target.unnatural_toughness
 }
 
 # --- defensive / parry qualities (DH2 core p.150) ---------------------------
@@ -408,7 +408,7 @@ quality "Unwieldy" {
   meta { page 150 }
   on PARRY
   when has_quality("Unwieldy")
-  then cannot_parry
+  then flag cannot_parry
 }
 quality "Unwieldy" {
   meta { page 150 }
@@ -426,9 +426,9 @@ quality "Unwieldy" {
 quality "Power Field" {
   meta { page 148 }
   on POST_PARRY
-  when has_quality("Power Field") and success and opposing_present
-    and not opposing_has_quality("Power Field") and not opposing_has_quality("Force")
-    and not opposing_has_quality("Warp Weapon") and not opposing_has_quality("Natural Weapon")
+  when has_quality("Power Field") and success and opposing_weapon.present
+    and not opposing_weapon.has_quality("Power Field") and not opposing_weapon.has_quality("Force")
+    and not opposing_weapon.has_quality("Warp Weapon") and not opposing_weapon.has_quality("Natural Weapon")
   then roll_on "Power Field Destruction"
 }
 
@@ -448,5 +448,5 @@ quality "Blast" {
   on ON_MISS
   priority 0
   when is_ranged and has_quality("Blast") and not success and roll <= jam_threshold
-  then set scatter = 1d5; detonate; roll_on "Scatter Diagram"
+  then set scatter = 1d5; flag detonate; roll_on "Scatter Diagram"
 }

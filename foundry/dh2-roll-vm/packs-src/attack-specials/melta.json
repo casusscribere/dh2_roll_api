@@ -1,0 +1,20 @@
+{
+  "_id": "pszmeCuBhv703A3a",
+  "_key": "!items!pszmeCuBhv703A3a",
+  "name": "Melta",
+  "type": "attackSpecial",
+  "img": "icons/svg/sword.svg",
+  "system": {
+    "description": "Dark Heresy 2e Core Rulebook p.148. Generated from the dh2_roll_api DSL rule dh2.core.weapon-qualities/melta (checkpoint PENETRATION).",
+    "hasLevel": false,
+    "level": 0
+  },
+  "effects": [],
+  "flags": {
+    "dh2-roll-vm": {
+      "generated": true,
+      "qualifiedId": "dh2.core.weapon-qualities/melta",
+      "page": 148
+    }
+  }
+}

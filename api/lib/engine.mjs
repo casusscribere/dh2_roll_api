@@ -72,6 +72,43 @@ export function rollTest({ target = 0, modifiers = {}, label = 'test', unnatural
     };
 }
 
+// ------------------------------------------------------------ generic test --
+
+/**
+ * Resolve a GENERIC characteristic/skill test through the `test.*` pipeline
+ * (Phase 3): rule effects at test.MODIFIERS accumulate modifiers (gated on
+ * test_name / talents / conditions / circumstances), the d100 rolls (with the
+ * Unnatural bonus-DoS), then test.POST_ROLL fires for narrative effects (which
+ * may `fail` the result). This is the pipeline behind /api/test — and, later,
+ * Fear/Pinning and acquisition tests.
+ *
+ * input = { target, testName?, modifiers?{...}, unnatural?, talents?, traits?,
+ *           conditions?, circumstances?, label? }
+ */
+export function resolveTest(input, rng = Math.random, registry = defaultRegistry) {
+    const ctx = new RollContext({
+        input,
+        action: 'Test', testName: input.testName ?? '',
+        isMelee: false, rangeBand: '', aimValue: 0, rng,
+        qualities: [], craftsmanship: 'Common',
+        talents: canonList(input.talents), traits: canonList(input.traits),
+        statuses: input.conditions ?? input.statuses ?? [], circumstances: input.circumstances ?? [],
+        combat: { dualWielding: false, firingOffhand: false, firingBoth: false },
+        modifiers: { ...(input.modifiers ?? {}) },
+        effects: [],
+    });
+    runCheckpoint(registry, CHECKPOINTS.TEST_MODIFIERS, ctx);
+    const test = rollTest({
+        target: input.target ?? 0, modifiers: ctx.modifiers,
+        label: input.label ?? (input.testName ? `${input.testName} test` : 'test'),
+        unnatural: input.unnatural ?? 0,
+    }, rng);
+    ctx.test = test;
+    ctx.success = test.success;
+    runCheckpoint(registry, CHECKPOINTS.TEST_POST_ROLL, ctx);
+    return { ...test, success: ctx.success, testName: ctx.testName, effects: ctx.effects, log: ctx.log };
+}
+
 // ------------------------------------------------------------ damage roll ---
 
 /**
@@ -472,9 +509,13 @@ function resolveTargetTests(tests, target, rng, autoRoll = true, registry = null
                 t.resolved.tableRoll = tbl ? resolveTable(tbl, rng) : { table: t.onFailRollTable, error: 'unknown roll_table' };
             }
             if (!tt.success && t.onFailApply) t.resolved.appliedCondition = t.onFailApply;   // Flame → On Fire
+            // lazy on-fail damage (Toxified's 1d10) — the dice roll only happens here
+            if (!tt.success && typeof t.onFailDamage === 'function') t.resolved.damage = t.onFailDamage();
         } else if (t.onFailApply) {
             t.appliedConditionOnFail = t.onFailApply;   // manual mode: note what a failure applies
         }
+        // thunks are not serialisable — replace with a marker for the report
+        if (typeof t.onFailDamage === 'function') t.onFailDamage = 'rolled on failure';
     }
 }
 
@@ -643,6 +684,9 @@ export function engageOnHit(attacker, defender, damageHits, evaded, options = {}
     const field = defender.field;
     let fieldDown = false;
     const reduced = new Map();   // location → AP corroded so far (Corrosive, cumulative)
+    // Phase 4: persistent AP damage from earlier engagements (EncounterState's
+    // armourDamage) seeds the accumulator, so corrosion carries across attacks.
+    for (const [loc, n] of Object.entries(options.armourDamage ?? {})) reduced.set(loc, Number(n) || 0);
     const hits = damageHits.map((h, i) => {
         const hit = { ...h };
         if (i < evaded) { hit.evaded = true; return hit; }

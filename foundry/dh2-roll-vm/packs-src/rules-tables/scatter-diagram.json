@@ -1,0 +1,177 @@
+{
+  "_id": "hLfPJQ5Dj0E0ggKm",
+  "_key": "!tables!hLfPJQ5Dj0E0ggKm",
+  "name": "Scatter Diagram",
+  "img": "icons/svg/d20-grey.svg",
+  "description": "Generated from the dh2_roll_api DSL (roll_table \"Scatter Diagram\").",
+  "formula": "1d10",
+  "replacement": true,
+  "displayRoll": true,
+  "results": [
+    {
+      "_id": "Wrcd8jEZdoLlbFsU",
+      "_key": "!tables.results!hLfPJQ5Dj0E0ggKm.Wrcd8jEZdoLlbFsU",
+      "type": 0,
+      "text": "directly beyond the target (overshoot)",
+      "img": "icons/svg/d20-black.svg",
+      "weight": 1,
+      "range": [
+        1,
+        1
+      ],
+      "drawn": false,
+      "documentCollection": "",
+      "documentId": null,
+      "flags": {}
+    },
+    {
+      "_id": "ZNYdkGLAnrAgrmD5",
+      "_key": "!tables.results!hLfPJQ5Dj0E0ggKm.ZNYdkGLAnrAgrmD5",
+      "type": 0,
+      "text": "beyond and to the right",
+      "img": "icons/svg/d20-black.svg",
+      "weight": 1,
+      "range": [
+        2,
+        2
+      ],
+      "drawn": false,
+      "documentCollection": "",
+      "documentId": null,
+      "flags": {}
+    },
+    {
+      "_id": "mGgxamiNcovsb9ss",
+      "_key": "!tables.results!hLfPJQ5Dj0E0ggKm.mGgxamiNcovsb9ss",
+      "type": 0,
+      "text": "to the right",
+      "img": "icons/svg/d20-black.svg",
+      "weight": 1,
+      "range": [
+        3,
+        3
+      ],
+      "drawn": false,
+      "documentCollection": "",
+      "documentId": null,
+      "flags": {}
+    },
+    {
+      "_id": "UH3DM68mzYhJUMgK",
+      "_key": "!tables.results!hLfPJQ5Dj0E0ggKm.UH3DM68mzYhJUMgK",
+      "type": 0,
+      "text": "short and to the right",
+      "img": "icons/svg/d20-black.svg",
+      "weight": 1,
+      "range": [
+        4,
+        4
+      ],
+      "drawn": false,
+      "documentCollection": "",
+      "documentId": null,
+      "flags": {}
+    },
+    {
+      "_id": "QG39VSO572ORydNx",
+      "_key": "!tables.results!hLfPJQ5Dj0E0ggKm.QG39VSO572ORydNx",
+      "type": 0,
+      "text": "directly short — back toward the firer",
+      "img": "icons/svg/d20-black.svg",
+      "weight": 1,
+      "range": [
+        5,
+        5
+      ],
+      "drawn": false,
+      "documentCollection": "",
+      "documentId": null,
+      "flags": {}
+    },
+    {
+      "_id": "7em6Eo2Kyeo6ouWi",
+      "_key": "!tables.results!hLfPJQ5Dj0E0ggKm.7em6Eo2Kyeo6ouWi",
+      "type": 0,
+      "text": "short and to the left",
+      "img": "icons/svg/d20-black.svg",
+      "weight": 1,
+      "range": [
+        6,
+        6
+      ],
+      "drawn": false,
+      "documentCollection": "",
+      "documentId": null,
+      "flags": {}
+    },
+    {
+      "_id": "gYM5DOTDsPOlrtRN",
+      "_key": "!tables.results!hLfPJQ5Dj0E0ggKm.gYM5DOTDsPOlrtRN",
+      "type": 0,
+      "text": "to the left",
+      "img": "icons/svg/d20-black.svg",
+      "weight": 1,
+      "range": [
+        7,
+        7
+      ],
+      "drawn": false,
+      "documentCollection": "",
+      "documentId": null,
+      "flags": {}
+    },
+    {
+      "_id": "ey3wiTTOUHt64T4t",
+      "_key": "!tables.results!hLfPJQ5Dj0E0ggKm.ey3wiTTOUHt64T4t",
+      "type": 0,
+      "text": "beyond and to the left",
+      "img": "icons/svg/d20-black.svg",
+      "weight": 1,
+      "range": [
+        8,
+        8
+      ],
+      "drawn": false,
+      "documentCollection": "",
+      "documentId": null,
+      "flags": {}
+    },
+    {
+      "_id": "omUucNQlTV3O7Tur",
+      "_key": "!tables.results!hLfPJQ5Dj0E0ggKm.omUucNQlTV3O7Tur",
+      "type": 0,
+      "text": "wide of the mark",
+      "img": "icons/svg/d20-black.svg",
+      "weight": 1,
+      "range": [
+        9,
+        9
+      ],
+      "drawn": false,
+      "documentCollection": "",
+      "documentId": null,
+      "flags": {}
+    },
+    {
+      "_id": "O8bExQBPvUav7f9U",
+      "_key": "!tables.results!hLfPJQ5Dj0E0ggKm.O8bExQBPvUav7f9U",
+      "type": 0,
+      "text": "wildly off-axis",
+      "img": "icons/svg/d20-black.svg",
+      "weight": 1,
+      "range": [
+        10,
+        10
+      ],
+      "drawn": false,
+      "documentCollection": "",
+      "documentId": null,
+      "flags": {}
+    }
+  ],
+  "flags": {
+    "dh2-roll-vm": {
+      "generated": true
+    }
+  }
+}

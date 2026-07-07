@@ -1,4 +1,4 @@
-dsl 2
+dsl 3
 package "dh2.core.mechanics" {
   system "dh2"
   source "Dark Heresy 2e Core Rulebook"
@@ -15,7 +15,7 @@ mechanic "Jam" {
   on POST_ROLL
   priority 50
   when is_ranged and roll > jam_threshold
-  then emit "Jam", "The weapon jams!"; fail
+  then emit "Jam", "The weapon jams!"; flag attack_failed
 }
 
 # ===== Weapon craftsmanship (DH2 core p.149) =================================

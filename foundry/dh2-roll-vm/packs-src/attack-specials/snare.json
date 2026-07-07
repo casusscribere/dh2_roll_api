@@ -1,0 +1,20 @@
+{
+  "_id": "EOZ80FGqFZaKD5YC",
+  "_key": "!items!EOZ80FGqFZaKD5YC",
+  "name": "Snare",
+  "type": "attackSpecial",
+  "img": "icons/svg/sword.svg",
+  "system": {
+    "description": "Dark Heresy 2e Core Rulebook p.149. Generated from the dh2_roll_api DSL rule dh2.core.weapon-qualities/snare (checkpoint ON_HIT; takes a level (X)).",
+    "hasLevel": true,
+    "level": 0
+  },
+  "effects": [],
+  "flags": {
+    "dh2-roll-vm": {
+      "generated": true,
+      "qualifiedId": "dh2.core.weapon-qualities/snare",
+      "page": 149
+    }
+  }
+}

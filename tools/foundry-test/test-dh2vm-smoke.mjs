@@ -145,7 +145,53 @@ try {
             if (actor) await actor.delete();
         }
 
-        // 7. dh2Attack — needs a controlled token + target; run only if present
+        // 7. generated compendium packs (Phase 3 pack export v1)
+        const tablesPack = game.packs.get('dh2-roll-vm.rules-tables');
+        const specialsPack = game.packs.get('dh2-roll-vm.attack-specials');
+        check('rules-tables pack present', !!tablesPack, tablesPack ? `${tablesPack.index.size} tables` : 'missing');
+        check('attack-specials pack present', !!specialsPack, specialsPack ? `${specialsPack.index.size} qualities` : 'missing');
+        if (tablesPack) {
+            const idx = [...tablesPack.index.values()].map((e) => e.name);
+            check('Scatter Diagram table in pack', idx.includes('Scatter Diagram'), idx.join(', ').slice(0, 80));
+        }
+        if (specialsPack) {
+            const entry = [...specialsPack.index.values()].find((e) => e.name === 'Corrosive');
+            let detail = 'index entry missing';
+            if (entry) {
+                const item = await specialsPack.getDocument(entry._id);
+                detail = item?.system?.description?.slice(0, 60) ?? 'no description';
+            }
+            check('Corrosive attackSpecial loads with provenance', !!entry && /p\.145/.test(detail), detail);
+        }
+
+        // 8. EncounterState ⇄ ActiveEffect mirror (Phase 4) — round-trip parity
+        {
+            let actor = null;
+            try {
+                actor = await Actor.create({ name: 'AE Mirror Test', type: 'acolyte' });
+                const enc = vm.emptyEncounter();
+                const entry = vm.encounterActor(enc, 'AE Mirror Test');
+                entry.conditions.push({ name: 'On Fire', severity: null, duration: null, location: null });
+                entry.conditions.push({ name: 'Toxified', severity: 3, duration: 2, location: 'Body' });
+                entry.conditions.push({ name: 'Haywire Field', severity: 3, duration: null, location: null, decay: 1 });
+                const written = await vm.syncEncounterToActor(actor, enc.actors['AE Mirror Test']);
+                const back = vm.readEncounterFromActor(actor, 'AE Mirror Test');
+                const a = enc.actors['AE Mirror Test'].conditions, b = back.actors['AE Mirror Test'].conditions;
+                const same = a.length === b.length && a.every((c, i) =>
+                    c.name === b[i].name && (c.severity ?? null) === (b[i].severity ?? null)
+                    && (c.duration ?? null) === (b[i].duration ?? null) && (c.decay ?? undefined) === (b[i].decay ?? undefined));
+                check('AE mirror round-trip (conditions ⇄ ActiveEffects)', written === 3 && same,
+                    b.map((c) => `${c.name}${c.severity != null ? `(${c.severity})` : ''}${c.duration != null ? `[${c.duration}r]` : ''}`).join(', '));
+                // and the headless tick runs in-page against the mirrored state
+                const tick = vm.tickEncounter(back, 'TURN_START', vm.buildRegistry(), vm.rollScript([7]), 'AE Mirror Test');
+                check('upkeep tick in-page (On Fire burns 7)', tick.events.some((e) => e.type === 'damage' && e.amount === 7),
+                    JSON.stringify(tick.events[0] ?? {}));
+            } finally {
+                if (actor) await actor.delete();
+            }
+        }
+
+        // 9. dh2Attack — needs a controlled token + target; run only if present
         const controlled = canvas?.tokens?.controlled?.[0];
         const targeted = game.user?.targets?.first?.();
         if (controlled && targeted) {

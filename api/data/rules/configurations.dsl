@@ -1,4 +1,4 @@
-dsl 2
+dsl 3
 package "dh2.core.configurations" {
   system "dh2"
   source "Dark Heresy 2e Core Rulebook"

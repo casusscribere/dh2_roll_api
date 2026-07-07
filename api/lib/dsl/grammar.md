@@ -31,7 +31,9 @@ compiler/interpreter (AST → executable Effect) is a separate module.
 program     = [ pragma ] { rule | roll_table | action_decl | package } ;
 
 (* --- v2 file header: version pragma + package provenance (Stage 0) --- *)
-pragma      = "dsl" INT ;                        (* grammar version; files without it are dsl 1 *)
+pragma      = "dsl" INT ;                        (* grammar version. CURRENT: 3 — pragma-less text
+                                                    is treated as current; an explicit dsl 1/2 is
+                                                    rejected (tools/migrate-dsl.mjs upgrades it) *)
 package     = "package" STRING "{" { "system" STRING | "source" STRING | "requires" STRING } "}" ;
             (* one per file. `system` = rule system id ("dh2", "rt1", …);
                `source` = source book; `requires` = package dependency (reserved
@@ -41,24 +43,33 @@ package     = "package" STRING "{" { "system" STRING | "source" STRING | "requir
 (* --- rule: compiles to one Effect per branch --- *)
 rule        = kind STRING [ "tier" INT ] "{" { clause } "}" ;
 kind        = "quality" | "talent" | "trait" | "circumstance" | "condition"
-            | "configuration" | "mechanic" | "miscellaneous"
-            | "status" | "generic" | "rule" ;   (* aliases, normalised below *)
+            | "configuration" | "mechanic" | "miscellaneous" ;
             (* The kind is the player-facing CATEGORY label; gate behaviour with
-               the matching has_*()/configuration() function. Aliases normalise:
-               status -> condition, generic/rule -> miscellaneous. The old
-               situational `condition` sense is now `circumstance`; the active
-               sense (On Fire, Aiming, Stunned) is `condition`. *)
+               the matching has_*()/configuration() function. The v1 aliases
+               (status/generic/rule) were REMOVED in dsl 3 — the migrator
+               rewrites them. The situational sense is `circumstance`; the
+               active sense (On Fire, Aiming, Stunned) is `condition`. *)
 
 (* A rule body has exactly one `on`, an optional `priority`, and one or more
    `when …? then …` branches (any order, but a `when` must be immediately
    followed by its `then`). Each branch compiles to its own effect. A branch with
    no `when` is unconditional. *)
-clause      = "on" IDENT                          (* checkpoint; required, once *)
+clause      = "on" IDENT [ "." IDENT ]            (* pipeline.checkpoint; required, once.
+                                                      A bare name is the default `attack`
+                                                      pipeline (an explicit `attack.` prefix
+                                                      is normalised away); other pipelines
+                                                      are qualified: `on test.MODIFIERS` *)
             | "priority" INT                       (* ordering; optional *)
             | "meta" "{" { "page" INT | "ref" STRING | "source" STRING } "}"
                                                    (* rule provenance: book page, free-text
                                                       cross-reference, per-rule source-book
                                                       override (else the package's) *)
+            | "replaces" STRING                    (* layered override (Phase 3): drop the named
+                                                      rule's effects entirely when this rule's
+                                                      layer is active. Takes a qualifiedId
+                                                      ("dh2.core.mechanics/jam") or bare rule id.
+                                                      The static successor to `suppress` — prefer
+                                                      it for cross-layer overrides; may repeat *)
             | branch ;
 branch      = [ "when" predicate ] "then" action { ";" action } ;
 
@@ -87,42 +98,44 @@ path        = IDENT [ "." IDENT ] ;               (* scoped fact (Stage 2): targ
                                                      unscoped = the attacker scope *)
 call        = path "(" [ expr { "," expr } ] ")" ;  (* scoped fn: opposing_weapon.has_quality("Force") *)
 
-(* --- action: a fixed set of checkpoint-scoped mutations --- *)
+(* --- action (dsl 3): three PRIMITIVES + the retained rich verbs.
+       The v1 thin-sugar verbs (add_die, keep_highest, add_hits, fail,
+       prevent_parry, cannot_parry, detonate, reduce_unnatural_toughness) were
+       REMOVED — tools/migrate-dsl.mjs rewrites old text to the primitives. --- *)
 action      = "add" "modifier" STRING "=" expr
             | "set" "modifier" STRING "=" expr
             | "cancel" "modifier" STRING
-            (* --- Stage-3 PRIMITIVES: everything below the line compiles to these --- *)
-            | "set" IDENT ( "+=" | "=" ) expr       (* write a REGISTERED SLOT (pen, jam_threshold,
-                                                       scatter, damage_type, extra_dice, extra_hits,
-                                                       rf_threshold, unnatural_toughness_reduction);
+            | "set" IDENT ( "+=" | "=" ) expr       (* PRIMITIVE: write a REGISTERED SLOT (pen,
+                                                       jam_threshold, scatter, damage_type,
+                                                       extra_dice, extra_hits, rf_threshold,
+                                                       unnatural_toughness_reduction);
                                                        compiler validates name + mode *)
-            | "flag" IDENT                          (* raise a REGISTERED FLAG (no_parry, cannot_parry,
-                                                       detonate, attack_failed, keep_highest) *)
-            | "declare" declaration                 (* structured record the engine resolves *)
-            (* --- sugar verbs (v1) — parse to the primitives above --- *)
-            | "add_die" expr                        (* = set extra_dice += e *)
-            | "keep_highest"                        (* = flag keep_highest *)
-            | "add_hits" expr                       (* = set extra_hits += e *)
+            | "flag" IDENT                          (* PRIMITIVE: raise a REGISTERED FLAG (no_parry,
+                                                       cannot_parry, detonate, attack_failed,
+                                                       keep_highest) *)
+            | "declare" declaration                 (* PRIMITIVE: structured record the engine resolves *)
+            (* --- retained rich verbs (ergonomic surface over the primitives) --- *)
             | "multiply_hits" expr
             | "floor_die" expr                      (* raise any die below N to N (Proven) *)
             | "cap_die" expr                        (* cap any die above N at N (Primitive) *)
             | "emit" STRING [ "," STRING ]          (* = declare event *)
-            | "fail"                                (* = flag attack_failed *)
-            | "suppress" STRING                     (* skip another rule by name this run (Overheats → Jam) *)
-            | "prevent_parry"                       (* = flag no_parry (Flexible) *)
-            | "cannot_parry"                        (* = flag cannot_parry (Unwieldy) *)
-            | "detonate"                            (* = flag detonate (Blast) *)
+            | "suppress" STRING                     (* skip another rule by name this run — RUNTIME
+                                                       conditional override (Overheats → Jam);
+                                                       `replaces` is the static cross-layer form *)
             | "corrode" expr                        (* = declare armour_damage (Corrosive) *)
             | "bump_quality" STRING "by" expr       (* raise an existing quality's rating *)
             | "add_quality" STRING                  (* grant a quality this shot (Maximal → Recharge) *)
-            | "reduce_unnatural_toughness" expr     (* = set unnatural_toughness_reduction += e (Felling) *)
             | "roll_on" STRING [ "+" expr ] [ "area" expr ]   (* = declare table_roll *)
             | "require_test" STRING expr STRING [ "=>" ( "roll_on" STRING | "apply_status" STRING { "value" expr | "duration" expr | "location" expr } ) ]
             | "apply_status" STRING { "value" expr | "duration" expr | "location" expr } [ "," STRING ] ;
 
 declaration = "test" <require_test body> | "status" <apply_status body>
             | "table_roll" <roll_on body> | "armour_damage" expr
+            | "damage" expr [ "," STRING ]          (* direct damage vs the actor (upkeep ticks —
+                                                       On Fire's 1d10/round); reason optional *)
             | "event" STRING [ "," STRING ] ;
+(* require_test's on-fail follow-up also accepts `=> damage <expr>` — the dice
+   roll happens ONLY on a failed test (Toxified's end-of-turn 1d10). *)
 
 (* --- arithmetic expression (action values) --- *)
 expr        = addExpr ;
@@ -140,7 +153,8 @@ factor      = "(" expr ")" | value ;
 - `DICE` — `INT "d" INT`, e.g. `1d10` (rolled at apply time via the injected RNG)
 - `STRING` — `"..."` or `'...'`, with `\` escapes
 - `BOOL` — `true` | `false`
-- operators `== != >= <= += => > < = + - * /`; punctuation `{ } ( ) , ; :`
+- operators `== != >= <= += => > < = + - * /`; punctuation `{ } ( ) , ; : .`
+  (`.` joins scoped fact paths and pipeline-qualified checkpoints)
 - comments: `// ...` or `# ...` to end of line
 
 ## Checkpoints (`on`)
@@ -148,28 +162,41 @@ factor      = "(" expr ")" | value ;
 `PENETRATION`, `DAMAGE_POOL`, `DIE_ADJUST`, `DAMAGE_MODS`, `ON_HIT`, `PARRY`,
 `POST_PARRY`, `EVASION` (validated by the compiler against `lib/pipeline.mjs`).
 
+**Pipelines:** the ids above are the default **`attack`** pipeline (unqualified).
+Other pipelines use qualified ids:
+- **`test.MODIFIERS`**, **`test.POST_ROLL`** (Phase 3) — the generic
+  characteristic/skill-test pipeline behind `/api/test`; gate rules on `test_name`.
+- **`upkeep.TURN_START`**, **`upkeep.TURN_END`**, **`upkeep.ROUND_END`**
+  (Phase 4) — per-actor ticks against the EncounterState (`/api/encounter/tick`).
+  Rules read the actor's conditions and `declare damage …` / `require_test … =>
+  damage …`; the ENGINE owns duration decrement/expiry, `decay: N` severity
+  reduction (Haywire Field), and the Recharge cooldown clear at TURN_END.
+
+Planned per ROADMAP.md: `power.*`, `ship_attack.*`.
+
 ## Vocabulary (`when` / expressions)
 Facts and functions are exposed to the interpreter over a whitelist. **The
 authoritative, always-current list lives in `lib/dsl/docs.mjs`, served at
 `/api/dsl-docs` and rendered on the Rules page.** Highlights:
 
 - weapon/actor: `is_melee`, `is_ranged`, `pen`, `sb`, `tb`, `bs_bonus`, `ws_bonus`
-- test/outcome: `roll`, `dos`, `dof`, `success`
+- test/outcome: `roll`, `dos`, `dof`, `success`; generic-test tag: `test_name`
 - action context: `action`, `action_type`, `is_attack`, `aim`, `half_aim`,
   `full_aim`, `range`, `location`, `damage_type`, `hit_index`
 - mechanic: `jam_threshold`, `craftsmanship`
-- per-hit/target: `damage_dealt`, `wounds`, `target_sb`, `target_tb`, `target_armour`,
-  `target_unnatural_toughness`
+- per-hit outcome: `damage_dealt`, `wounds`
+- target scope: `target.sb`, `target.tb`, `target.armour`,
+  `target.unnatural_toughness`, `target.has_trait("…")`, `target.trait_level(…)`
 - combat state: `dual_wielding`, `firing_offhand`, `firing_both`
-- parry: `opposing_present`, `opposing_has_quality("…")` (the parried attacking
-  weapon — Power Field)
-- functions: `has_quality`, `has_talent`, `has_trait`, `target_has_trait`,
-  `has_condition`
-  (`has_status` alias), `has_circumstance`, `circumstance_severity`,
-  `configuration` (`firing_mode` alias),
+- parry (opposing_weapon scope): `opposing_weapon.present`,
+  `opposing_weapon.has_quality("…")` (the parried attacking weapon — Power Field)
+- functions: `has_quality`, `has_talent`, `has_trait`, `has_condition`,
+  `has_circumstance`, `circumstance_severity`, `configuration`,
   `is_action`, `is_reaction`, `action_subtype`, `quality_level`, `trait_level`,
   `condition_severity`, `condition_duration`, `condition_location`, `tens`,
-  `is_natural`
+  `is_natural`, `ceil`, `floor`, `half`
+  (dsl 3 removed the prefixed aliases `target_*`/`opposing_*` and the
+  `has_status`/`firing_mode` aliases — use the scoped/canonical forms)
 
 ## Examples
 

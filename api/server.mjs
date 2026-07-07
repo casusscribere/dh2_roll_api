@@ -32,7 +32,7 @@ for (const path of ['/api/weapons', '/api/options', '/api/rules', '/api/dsl-docs
 //   /api/test  /api/damage  /api/soak  /api/parry  /api/attack
 //   /api/resolve                  full engagement (forcedRolls → rollTrace)
 //   /api/engage                   one engagement phase (stepped UI)
-for (const path of ['/api/rules/validate', '/api/character/validate', '/api/test', '/api/damage', '/api/soak', '/api/parry', '/api/attack', '/api/resolve', '/api/engage']) {
+for (const path of ['/api/rules/validate', '/api/character/validate', '/api/test', '/api/damage', '/api/soak', '/api/parry', '/api/attack', '/api/resolve', '/api/engage', '/api/encounter/tick']) {
     app.post(path, (req, res) => send(res, dispatch('POST', path, req.body ?? {})));
 }
 

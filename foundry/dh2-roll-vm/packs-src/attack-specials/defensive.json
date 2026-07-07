@@ -1,0 +1,20 @@
+{
+  "_id": "o3Z1fr7HNy40OtLq",
+  "_key": "!items!o3Z1fr7HNy40OtLq",
+  "name": "Defensive",
+  "type": "attackSpecial",
+  "img": "icons/svg/sword.svg",
+  "system": {
+    "description": "Dark Heresy 2e Core Rulebook p.145. Generated from the dh2_roll_api DSL rule dh2.core.weapon-qualities/defensive (checkpoint PARRY).",
+    "hasLevel": false,
+    "level": 0
+  },
+  "effects": [],
+  "flags": {
+    "dh2-roll-vm": {
+      "generated": true,
+      "qualifiedId": "dh2.core.weapon-qualities/defensive",
+      "page": 145
+    }
+  }
+}

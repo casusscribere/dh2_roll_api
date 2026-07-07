@@ -10,9 +10,17 @@
  * This file contains ZERO game-rule content. It is pure plumbing.
  */
 
-/** The named seams in the roll/attack flows where effects may fire. */
+/**
+ * The named seams where effects may fire, grouped into PIPELINES (Phase 3 /
+ * DSL_ARCHITECTURE.md F3). The `attack` pipeline is the DEFAULT namespace — its
+ * checkpoint ids stay unqualified ("MODIFIERS") for v1 compatibility, and the
+ * compiler normalises an explicit `attack.` prefix away. Every other pipeline
+ * uses qualified ids ("test.MODIFIERS"). New pipelines land here as they are
+ * built: `test` (generic characteristic/skill tests) now; `power`, `upkeep`,
+ * `ship_attack` per the roadmap.
+ */
 export const CHECKPOINTS = Object.freeze({
-    // --- to-hit test ---
+    // --- attack pipeline (default namespace) — to-hit test ---
     MODIFIERS: 'MODIFIERS',           // accumulate to-hit modifiers before the d100
     POST_ROLL: 'POST_ROLL',           // after the d100: jam / overheat / all-out, may cancel success
     ON_MISS: 'ON_MISS',               // after a missed attack (e.g. Blast scatter)
@@ -30,6 +38,23 @@ export const CHECKPOINTS = Object.freeze({
     PARRY: 'PARRY',                   // modifiers for a Parry (WS) test
     POST_PARRY: 'POST_PARRY',         // after the Parry test, once success is known (Power Field weapon destruction)
     EVASION: 'EVASION',               // modifiers for a Dodge (Ag) evasion test
+    // --- test pipeline: generic characteristic / skill tests (d100 box, Fear,
+    //     acquisition, …). Rules gate on test_name / has_talent / conditions. ---
+    TEST_MODIFIERS: 'test.MODIFIERS', // accumulate modifiers before a generic test
+    TEST_POST_ROLL: 'test.POST_ROLL', // after a generic test resolves (narrative effects, may cancel)
+    // --- upkeep pipeline (Phase 4): per-actor ticks against the EncounterState.
+    //     Rules read the actor's active conditions and declare damage / tests;
+    //     the engine owns duration decrement, severity decay, and cooldowns. ---
+    UPKEEP_TURN_START: 'upkeep.TURN_START', // start of the actor's turn (On Fire burns, …)
+    UPKEEP_TURN_END: 'upkeep.TURN_END',     // end of the actor's turn (Toxified test, cooldowns clear)
+    UPKEEP_ROUND_END: 'upkeep.ROUND_END',   // end of the round (Haywire decay, durations tick)
+});
+
+/** pipeline → its checkpoint ids (unqualified ids belong to `attack`). */
+export const PIPELINES = Object.freeze({
+    attack: Object.values(CHECKPOINTS).filter((c) => !c.includes('.')),
+    test: Object.values(CHECKPOINTS).filter((c) => c.startsWith('test.')),
+    upkeep: Object.values(CHECKPOINTS).filter((c) => c.startsWith('upkeep.')),
 });
 
 const CHECKPOINT_SET = new Set(Object.values(CHECKPOINTS));

@@ -1,0 +1,49 @@
+{
+  "_id": "FiABDiKLfhn1N6Mo",
+  "_key": "!tables!FiABDiKLfhn1N6Mo",
+  "name": "Power Field Destruction",
+  "img": "icons/svg/d20-grey.svg",
+  "description": "Generated from the dh2_roll_api DSL (roll_table \"Power Field Destruction\").",
+  "formula": "1d100",
+  "replacement": true,
+  "displayRoll": true,
+  "results": [
+    {
+      "_id": "5w1fsEQuQeidTew7",
+      "_key": "!tables.results!FiABDiKLfhn1N6Mo.5w1fsEQuQeidTew7",
+      "type": 0,
+      "text": "The blow is turned aside; the attacker's weapon survives.",
+      "img": "icons/svg/d20-black.svg",
+      "weight": 25,
+      "range": [
+        1,
+        25
+      ],
+      "drawn": false,
+      "documentCollection": "",
+      "documentId": null,
+      "flags": {}
+    },
+    {
+      "_id": "DqiUBg9hoEMPcAXY",
+      "_key": "!tables.results!FiABDiKLfhn1N6Mo.DqiUBg9hoEMPcAXY",
+      "type": 0,
+      "text": "The power field shears clean through — the attacker's weapon is DESTROYED.",
+      "img": "icons/svg/d20-black.svg",
+      "weight": 75,
+      "range": [
+        26,
+        100
+      ],
+      "drawn": false,
+      "documentCollection": "",
+      "documentId": null,
+      "flags": {}
+    }
+  ],
+  "flags": {
+    "dh2-roll-vm": {
+      "generated": true
+    }
+  }
+}

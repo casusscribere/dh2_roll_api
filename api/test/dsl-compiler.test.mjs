@@ -39,7 +39,7 @@ test('compiled when() reads facts/functions off the context', () => {
 
 // --- action mutation ---------------------------------------------------------
 test('compiled apply() mutates the context (Tearing: pool + keep-highest)', () => {
-    const [eff] = compile(`quality "Tearing" { on DAMAGE_POOL when has_quality("Tearing") then add_die 1; keep_highest }`);
+    const [eff] = compile(`quality "Tearing" { on DAMAGE_POOL when has_quality("Tearing") then set extra_dice += 1; flag keep_highest }`);
     const ctx = { qualities: ['Tearing'], parsed: { count: 2 }, extraDice: 0, keepHighest: null, tearing: false };
     eff.apply(ctx);
     assert.equal(ctx.extraDice, 1);
@@ -56,7 +56,7 @@ test('set pen += pen writes to the rule-named penetration slot', () => {
 
 // --- dice expressions use the injected RNG -----------------------------------
 test('a Dice expression rolls via ctx.rng', () => {
-    const node = parseRule(`rule "x" { on DAMAGE_MODS then add modifier "m" = 2d10 }`).actions[0].value;
+    const node = parseRule(`miscellaneous "x" { on DAMAGE_MODS then add modifier "m" = 2d10 }`).actions[0].value;
     const value = evalNode(node, { rng: riggedDice([die(7, 10), die(3, 10)]) });
     assert.equal(value, 10); // 7 + 3
 });
@@ -80,14 +80,14 @@ test('a multi-branch rule compiles to one effect per branch, sharing ruleId', ()
 });
 
 test('a single-branch rule keeps its plain id and ruleId', () => {
-    const [eff] = compile(`quality "Tearing" { on DAMAGE_POOL when has_quality("Tearing") then keep_highest }`);
+    const [eff] = compile(`quality "Tearing" { on DAMAGE_POOL when has_quality("Tearing") then flag keep_highest }`);
     assert.equal(eff.id, 'tearing');
     assert.equal(eff.ruleId, 'tearing');
 });
 
 // --- semantic validation (safety boundary) -----------------------------------
 test('compile rejects an unknown checkpoint', () => {
-    assert.throws(() => compile(`rule "x" { on TELEPORT then fail }`), (e) => {
+    assert.throws(() => compile(`miscellaneous "x" { on TELEPORT then flag attack_failed }`), (e) => {
         assert.ok(e instanceof DslError);
         assert.match(e.rawMessage, /Unknown checkpoint 'TELEPORT'/);
         return true;
@@ -95,9 +95,9 @@ test('compile rejects an unknown checkpoint', () => {
 });
 
 test('compile rejects an unknown fact', () => {
-    assert.throws(() => compile(`rule "x" { on MODIFIERS when secret_backdoor then fail }`), /Unknown fact 'secret_backdoor'/);
+    assert.throws(() => compile(`miscellaneous "x" { on MODIFIERS when secret_backdoor then flag attack_failed }`), /Unknown fact 'secret_backdoor'/);
 });
 
 test('compile rejects an unknown function', () => {
-    assert.throws(() => compile(`rule "x" { on MODIFIERS when exec("rm -rf") then fail }`), /Unknown function 'exec\(\)'/);
+    assert.throws(() => compile(`miscellaneous "x" { on MODIFIERS when exec("rm -rf") then flag attack_failed }`), /Unknown function 'exec\(\)'/);
 });

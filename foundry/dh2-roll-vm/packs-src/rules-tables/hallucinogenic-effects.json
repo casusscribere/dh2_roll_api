@@ -1,0 +1,177 @@
+{
+  "_id": "4PHRJIWsWOvs05h3",
+  "_key": "!tables!4PHRJIWsWOvs05h3",
+  "name": "Hallucinogenic Effects",
+  "img": "icons/svg/d20-grey.svg",
+  "description": "Generated from the dh2_roll_api DSL (roll_table \"Hallucinogenic Effects\").",
+  "formula": "1d10",
+  "replacement": true,
+  "displayRoll": true,
+  "results": [
+    {
+      "_id": "B92si7xRcg2Au5pB",
+      "_key": "!tables.results!4PHRJIWsWOvs05h3.B92si7xRcg2Au5pB",
+      "type": 0,
+      "text": "Bugsbugsbugs! He drops to the floor clawing at imaginary insects devouring his flesh.  → applies: Prone, Stunned",
+      "img": "icons/svg/d20-black.svg",
+      "weight": 1,
+      "range": [
+        1,
+        1
+      ],
+      "drawn": false,
+      "documentCollection": "",
+      "documentId": null,
+      "flags": {}
+    },
+    {
+      "_id": "KnLIpgNRXO2aU7hx",
+      "_key": "!tables.results!4PHRJIWsWOvs05h3.KnLIpgNRXO2aU7hx",
+      "type": 0,
+      "text": "My hands…! He drops everything and spends the duration staring at his hands, screaming.  → applies: Stunned",
+      "img": "icons/svg/d20-black.svg",
+      "weight": 1,
+      "range": [
+        2,
+        2
+      ],
+      "drawn": false,
+      "documentCollection": "",
+      "documentId": null,
+      "flags": {}
+    },
+    {
+      "_id": "dPle6027aWjD7Q5n",
+      "_key": "!tables.results!4PHRJIWsWOvs05h3.dPle6027aWjD7Q5n",
+      "type": 0,
+      "text": "They're coming through the walls! Each turn he fires at a random piece of terrain in sight.",
+      "img": "icons/svg/d20-black.svg",
+      "weight": 1,
+      "range": [
+        3,
+        3
+      ],
+      "drawn": false,
+      "documentCollection": "",
+      "documentId": null,
+      "flags": {}
+    },
+    {
+      "_id": "4ojAxlot7CGeyUs9",
+      "_key": "!tables.results!4PHRJIWsWOvs05h3.4ojAxlot7CGeyUs9",
+      "type": 0,
+      "text": "Nobody can see me! He wanders aimlessly, using a Full Action to move (retains Reactions).",
+      "img": "icons/svg/d20-black.svg",
+      "weight": 1,
+      "range": [
+        4,
+        4
+      ],
+      "drawn": false,
+      "documentCollection": "",
+      "documentId": null,
+      "flags": {}
+    },
+    {
+      "_id": "XLWe4kYS5zkCUAXT",
+      "_key": "!tables.results!4PHRJIWsWOvs05h3.XLWe4kYS5zkCUAXT",
+      "type": 0,
+      "text": "I can fly! He flaps his arms; if above ground level he may hurl himself off in a random direction.",
+      "img": "icons/svg/d20-black.svg",
+      "weight": 1,
+      "range": [
+        5,
+        5
+      ],
+      "drawn": false,
+      "documentCollection": "",
+      "documentId": null,
+      "flags": {}
+    },
+    {
+      "_id": "IMlmrMoPkdjnH2FX",
+      "_key": "!tables.results!4PHRJIWsWOvs05h3.IMlmrMoPkdjnH2FX",
+      "type": 0,
+      "text": "They've got it in for me! Paranoid, he moves to cover out of line of sight and stays hidden.",
+      "img": "icons/svg/d20-black.svg",
+      "weight": 1,
+      "range": [
+        6,
+        6
+      ],
+      "drawn": false,
+      "documentCollection": "",
+      "documentId": null,
+      "flags": {}
+    },
+    {
+      "_id": "blWqXPAk3zM7UorG",
+      "_key": "!tables.results!4PHRJIWsWOvs05h3.blWqXPAk3zM7UorG",
+      "type": 0,
+      "text": "They got me! He collapses as if dead and counts as Helpless.  → applies: Helpless",
+      "img": "icons/svg/d20-black.svg",
+      "weight": 1,
+      "range": [
+        7,
+        7
+      ],
+      "drawn": false,
+      "documentCollection": "",
+      "documentId": null,
+      "flags": {}
+    },
+    {
+      "_id": "hbzfTV069KGmXt7i",
+      "_key": "!tables.results!4PHRJIWsWOvs05h3.hbzfTV069KGmXt7i",
+      "type": 0,
+      "text": "I'll take you all on! Filled with rage, he becomes Frenzied and attacks the closest opponent.  → applies: Frenzied",
+      "img": "icons/svg/d20-black.svg",
+      "weight": 1,
+      "range": [
+        8,
+        8
+      ],
+      "drawn": false,
+      "documentCollection": "",
+      "documentId": null,
+      "flags": {}
+    },
+    {
+      "_id": "iS4Y2FAzKP9ksGjS",
+      "_key": "!tables.results!4PHRJIWsWOvs05h3.iS4Y2FAzKP9ksGjS",
+      "type": 0,
+      "text": "I'm only little! He believes he has shrunk; all others count as having the Fear (3) trait to him.",
+      "img": "icons/svg/d20-black.svg",
+      "weight": 1,
+      "range": [
+        9,
+        9
+      ],
+      "drawn": false,
+      "documentCollection": "",
+      "documentId": null,
+      "flags": {}
+    },
+    {
+      "_id": "kq8Dchsg5u1CO19t",
+      "_key": "!tables.results!4PHRJIWsWOvs05h3.kq8Dchsg5u1CO19t",
+      "type": 0,
+      "text": "The worms! Convinced a worm crawls up his leg, he attacks his own leg (1 hit, 1d5 DoS, normal damage).",
+      "img": "icons/svg/d20-black.svg",
+      "weight": 1,
+      "range": [
+        10,
+        10
+      ],
+      "drawn": false,
+      "documentCollection": "",
+      "documentId": null,
+      "flags": {}
+    }
+  ],
+  "flags": {
+    "dh2-roll-vm": {
+      "generated": true
+    }
+  }
+}

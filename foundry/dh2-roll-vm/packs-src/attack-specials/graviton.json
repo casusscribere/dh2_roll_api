@@ -1,0 +1,20 @@
+{
+  "_id": "yZqa5MwjbPYcUFQW",
+  "_key": "!items!yZqa5MwjbPYcUFQW",
+  "name": "Graviton",
+  "type": "attackSpecial",
+  "img": "icons/svg/sword.svg",
+  "system": {
+    "description": "Dark Heresy 2e Core Rulebook p.146. Generated from the dh2_roll_api DSL rule dh2.core.weapon-qualities/graviton (checkpoint DAMAGE_MODS).",
+    "hasLevel": false,
+    "level": 0
+  },
+  "effects": [],
+  "flags": {
+    "dh2-roll-vm": {
+      "generated": true,
+      "qualifiedId": "dh2.core.weapon-qualities/graviton",
+      "page": 146
+    }
+  }
+}

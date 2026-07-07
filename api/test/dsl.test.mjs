@@ -13,9 +13,9 @@ import { parse, parseRule } from '../lib/dsl/parser.mjs';
 
 // --- tokenizer ---------------------------------------------------------------
 test('tokenizer: classifies idents, numbers, dice, strings, ops, comments', () => {
-    const toks = tokenize(`when dos >= 3 // note\n add_die 1d10 = "hi"`);
+    const toks = tokenize(`when dos >= 3 // note\n set extra_dice += 1d10 = "hi"`);
     const kinds = toks.map((t) => t.type);
-    assert.deepEqual(kinds, ['ident', 'ident', 'op', 'number', 'ident', 'dice', 'op', 'string', 'eof']);
+    assert.deepEqual(kinds, ['ident', 'ident', 'op', 'number', 'ident', 'ident', 'op', 'dice', 'op', 'string', 'eof']);
     const dice = toks.find((t) => t.type === 'dice');
     assert.deepEqual([dice.count, dice.sides], [1, 10]);
 });
@@ -59,7 +59,7 @@ test('parser: full talent rule with tier, when, priority, actions', () => {
 
 test('parser: program with multiple rules', () => {
     const prog = parse(`
-        quality "Tearing" { on DAMAGE_POOL when has_quality("Tearing") then add_die 1; keep_highest }
+        quality "Tearing" { on DAMAGE_POOL when has_quality("Tearing") then set extra_dice += 1; flag keep_highest }
         quality "Storm"   { on HIT_COUNT_MULT when has_quality("Storm") then multiply_hits 2 }
     `);
     assert.equal(prog.rules.length, 2);
@@ -74,7 +74,7 @@ test('parser: program with multiple rules', () => {
 // --- predicate precedence + grouping ----------------------------------------
 test('parser: and binds tighter than or', () => {
     // a or b and c  ==>  a or (b and c)
-    const { when } = parseRule(`rule "x" { on MODIFIERS when a or b and c then fail }`);
+    const { when } = parseRule(`miscellaneous "x" { on MODIFIERS when a or b and c then flag attack_failed }`);
     assert.equal(when.op, 'or');
     assert.equal(when.left.type, 'Identifier');
     assert.equal(when.right.type, 'Logical');
@@ -85,7 +85,7 @@ test('parser: parentheses override precedence; not + comparison + call', () => {
     const { when } = parseRule(
         `quality "Jam" { on POST_ROLL
            when is_ranged and ((not has_quality("Reliable") and roll > 96) or roll == 100)
-           then emit "Jam", "The weapon jams!"; fail }`);
+           then emit "Jam", "The weapon jams!"; flag attack_failed }`);
     assert.equal(when.op, 'and');
     assert.equal(when.left.type, 'Identifier');        // left is the is_ranged fact
     assert.equal(when.right.op, 'or');                 // grouped sub-predicate
@@ -108,7 +108,7 @@ test('parser: comparison RHS and emit/fail actions', () => {
 
 // --- expression forms --------------------------------------------------------
 test('parser: arithmetic precedence and dice/call operands in action values', () => {
-    const rule = parseRule(`rule "x" { on DAMAGE_MODS then add modifier "m" = 1d10 + sb * 2 }`);
+    const rule = parseRule(`miscellaneous "x" { on DAMAGE_MODS then add modifier "m" = 1d10 + sb * 2 }`);
     const v = rule.actions[0].value;
     assert.equal(v.type, 'Binary');
     assert.equal(v.op, '+');
@@ -164,7 +164,7 @@ test('parser: multiple when…then branches in one rule', () => {
 });
 
 test('parser: an unconditional branch mixes with conditional ones', () => {
-    const rule = parseRule(`generic "Mix" {
+    const rule = parseRule(`miscellaneous "Mix" {
       on MODIFIERS
       then add modifier "base" = 5
       when dos >= 2 then add modifier "bonus" = 5
@@ -175,20 +175,20 @@ test('parser: an unconditional branch mixes with conditional ones', () => {
 });
 
 test('parser: missing on clause errors', () => {
-    assert.throws(() => parseRule(`talent "X" { then fail }`), /missing an 'on/);
+    assert.throws(() => parseRule(`talent "X" { then flag attack_failed }`), /missing an 'on/);
 });
 
 test('parser: unknown action errors with position', () => {
-    assert.throws(() => parseRule(`rule "x" { on MODIFIERS then teleport 3 }`), (e) => {
+    assert.throws(() => parseRule(`miscellaneous "x" { on MODIFIERS then teleport 3 }`), (e) => {
         assert.match(e.rawMessage, /Unknown action 'teleport'/);
         return true;
     });
 });
 
 test('parser: unterminated rule body errors', () => {
-    assert.throws(() => parse(`talent "X" { on MODIFIERS then fail`), /Unterminated rule body/);
+    assert.throws(() => parse(`talent "X" { on MODIFIERS then flag attack_failed`), /Unterminated rule body/);
 });
 
 test('parser: duplicate clause errors', () => {
-    assert.throws(() => parseRule(`rule "x" { on MODIFIERS on POST_ROLL then fail }`), /Duplicate 'on'/);
+    assert.throws(() => parseRule(`miscellaneous "x" { on MODIFIERS on POST_ROLL then flag attack_failed }`), /Duplicate 'on'/);
 });

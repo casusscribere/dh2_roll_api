@@ -92,10 +92,24 @@ async function loadSource() {
   renderActiveInactive();
 }
 
+// Which built-ins are REPLACED by an enabled user-layer rule (Phase 3: the
+// `replaces "<pkg>/<rule-id>"` clause) — replaced ids → the replacing rule name.
+function replacedBuiltins() {
+  const map = new Map();
+  for (const u of RulesStore.load()) {
+    if (!u.enabled || !u.valid) continue;
+    for (const e of (u.effects ?? [])) {
+      for (const target of (e.replaces ?? [])) map.set(target, e.name);
+    }
+  }
+  return map;
+}
+
 // Built-in rules as clickable toggle boxes, grouped by category.
 function renderBuiltin() {
   const box = $('builtin-rules');
   if (!BUILTIN.length) { box.innerHTML = '<p class="note">none</p>'; return; }
+  const replaced = replacedBuiltins();
   const groups = {};
   for (const r of BUILTIN) (groups[r.category] ??= []).push(r);
   let h = '';
@@ -103,10 +117,15 @@ function renderBuiltin() {
     h += `<label class="gold" style="margin-top:.6rem">${esc(cat)}</label><div class="chips">`;
     for (const r of list) {
       const active = RulesStore.isBuiltinActive(r.id);
+      const replacedBy = replaced.get(r.qualifiedId) ?? replaced.get(r.id);
       // provenance (Stage 0): page cite on the chip, package/source in the tooltip
       const cite = r.page ? ` <span class="dim">p.${r.page}</span>` : '';
       const prov = [r.kind + ' @ ' + r.checkpoint, r.package, r.sourceBook ? `${r.sourceBook}${r.page ? ` p.${r.page}` : ''}` : null].filter(Boolean).join(' · ');
-      h += `<span class="toggle-box ${active ? 'active' : 'inactive'}" data-id="${r.id}" title="${esc(prov)}">${esc(r.name)}${cite}</span>`;
+      if (replacedBy) {
+        h += `<span class="toggle-box inactive" data-id="${r.id}" style="text-decoration:line-through" title="${esc(prov)} — REPLACED by your rule &quot;${esc(replacedBy)}&quot; (layered override)">${esc(r.name)}${cite} <span class="dim">⇐ ${esc(replacedBy)}</span></span>`;
+      } else {
+        h += `<span class="toggle-box ${active ? 'active' : 'inactive'}" data-id="${r.id}" title="${esc(prov)}">${esc(r.name)}${cite}</span>`;
+      }
     }
     h += '</div>';
   }

@@ -20,16 +20,17 @@
  */
 import { tokenize, DslError } from './tokenizer.mjs';
 
-// Canonical rule kinds + accepted aliases. Aliases normalise to a canonical kind
-// (see KIND_ALIAS): the old `status` → `condition`, `condition`'s old situational
-// sense is now `circumstance`, and `generic`/`rule` → `miscellaneous`.
+// Canonical rule kinds (dsl 3 — the v1 aliases status/generic/rule were removed;
+// tools/migrate-dsl.mjs rewrites old text).
 const RULE_KINDS = new Set([
     'quality', 'talent', 'trait', 'circumstance', 'condition', 'configuration', 'mechanic', 'miscellaneous',
-    'status', 'generic', 'rule',   // back-compat aliases
 ]);
 // `roll_table` and `action` are top-level DECLARATIONS, not checkpoint rules.
 const ACTION_TYPES = new Set(['Half', 'Full', 'Reaction', 'Free']);
-const KIND_ALIAS = { status: 'condition', generic: 'miscellaneous', rule: 'miscellaneous' };
+/** The current (and only accepted) grammar version. dsl 1/2 text — kind aliases
+ *  (status/generic/rule), prefixed alias facts (target_*, opposing_*), and the
+ *  thin sugar verbs — was removed; `tools/migrate-dsl.mjs` rewrites old files. */
+export const CURRENT_DSL_VERSION = 3;
 const COMPARE_OPS = new Set(['==', '!=', '>=', '<=', '>', '<']);
 
 class Parser {
@@ -63,8 +64,15 @@ class Parser {
         // joined text contains one header per original file.
         while (!this.atEof()) {
             if (this.isKw('dsl') && this.peek(1)?.type === 'number') {
+                const tok = this.peek();
                 this.next();
                 const v = this.next().value;
+                // dsl 3 gate: legacy grammar (v1/v2) was removed — old files get a
+                // pointed error instead of confusing parse failures. Pragma-less
+                // text is treated as current (the strict grammar applies anyway).
+                if (v < CURRENT_DSL_VERSION) {
+                    throw new DslError(`dsl ${v} is no longer supported (current: dsl ${CURRENT_DSL_VERSION}) — run \`node tools/migrate-dsl.mjs <file> --write\` to upgrade`, tok.line, tok.col);
+                }
                 if (dslVersion === null) dslVersion = v;
             }
             else if (this.isKw('roll_table')) tables.push(this.parseTable());
@@ -72,7 +80,7 @@ class Parser {
             else if (this.isKw('package')) packages.push(this.parsePackage());
             else rules.push(this.parseRule());
         }
-        return { type: 'Program', rules, tables, actions, dslVersion: dslVersion ?? 1, package: packages[0] ?? null, packages };
+        return { type: 'Program', rules, tables, actions, dslVersion: dslVersion ?? CURRENT_DSL_VERSION, package: packages[0] ?? null, packages };
     }
 
     // package "dh2.core.weapon-qualities" { system "dh2"  source "Book"  [requires "pkg"]* }
@@ -181,8 +189,8 @@ class Parser {
         const name = this.expectString('a quoted rule name');
 
         const rule = {
-            type: 'Rule', kind: KIND_ALIAS[kindTok.value] ?? kindTok.value, name,
-            tier: null, on: null, priority: null, meta: null, branches: [],
+            type: 'Rule', kind: kindTok.value, name,
+            tier: null, on: null, priority: null, meta: null, replaces: null, branches: [],
             line: kindTok.line, col: kindTok.col,
         };
 
@@ -221,7 +229,21 @@ class Parser {
             if (cp.type !== 'ident') throw this.err('Expected a checkpoint name after on');
             this.next();
             if (rule.on) throw this.err("Duplicate 'on' clause", t);
-            rule.on = cp.value;
+            // Namespaced pipelines (Phase 3): `on test.MODIFIERS`. A bare name
+            // belongs to the default `attack` pipeline; an explicit `attack.`
+            // prefix is accepted and normalised away by the compiler.
+            let name = cp.value;
+            if (this.isPunct('.') && this.peek(1)?.type === 'ident') {
+                this.next();
+                name = `${name}.${this.next().value}`;
+            }
+            rule.on = name;
+        } else if (this.isKw('replaces')) {
+            // replaces "<package>/<rule-id>" — layered-registry override (Phase 3):
+            // when this rule's layer is active, the named rule's effects are
+            // dropped entirely (the static, id-based successor to `suppress`).
+            this.next();
+            (rule.replaces ??= []).push(this.expectString('a qualified rule id (e.g. "dh2.core.mechanics/jam")'));
         } else if (this.isKw('priority')) {
             this.next();
             const n = this.peek();
@@ -258,7 +280,7 @@ class Parser {
             this.next();
             rule.branches.push({ when: null, actions: this.parseActionList() });
         } else {
-            throw this.err(`Unexpected '${t.value ?? t.type}' in rule body (expected on | priority | meta | when | then)`);
+            throw this.err(`Unexpected '${t.value ?? t.type}' in rule body (expected on | priority | meta | replaces | when | then)`);
         }
     }
 
@@ -421,11 +443,6 @@ class Parser {
                 this.expectKw('modifier');
                 return { type: 'Action', action: 'cancel_modifier', name: this.expectString('a modifier name') };
             }
-            // --- sugar over slots/flags (Stage 3): the v1 verbs parse to the
-            // same set_slot / set_flag actions the generic forms produce -------
-            case 'add_die': { this.next(); return { type: 'Action', action: 'set_slot', slot: 'extra_dice', op: '+=', value: this.parseExpr() }; }
-            case 'keep_highest': { this.next(); return { type: 'Action', action: 'set_flag', flag: 'keep_highest' }; }
-            case 'add_hits': { this.next(); return { type: 'Action', action: 'set_slot', slot: 'extra_hits', op: '+=', value: this.parseExpr() }; }
             case 'multiply_hits': { this.next(); return { type: 'Action', action: 'multiply_hits', value: this.parseExpr() }; }
             case 'floor_die': { this.next(); return { type: 'Action', action: 'floor_die', value: this.parseExpr() }; }
             case 'cap_die': { this.next(); return { type: 'Action', action: 'cap_die', value: this.parseExpr() }; }
@@ -436,14 +453,10 @@ class Parser {
                 if (this.isPunct(',')) { this.next(); text = this.expectString('effect description text'); }
                 return { type: 'Action', action: 'emit', name, text };
             }
-            case 'fail': { this.next(); return { type: 'Action', action: 'set_flag', flag: 'attack_failed' }; }
             case 'suppress': {                           // suppress "Jam" — skip another rule this checkpoint run
                 this.next();
                 return { type: 'Action', action: 'suppress', name: this.expectString('the name of a rule to suppress') };
             }
-            case 'prevent_parry': { this.next(); return { type: 'Action', action: 'set_flag', flag: 'no_parry' }; }
-            case 'cannot_parry': { this.next(); return { type: 'Action', action: 'set_flag', flag: 'cannot_parry' }; }
-            case 'detonate': { this.next(); return { type: 'Action', action: 'set_flag', flag: 'detonate' }; }
             case 'flag': {                               // generic Stage-3 form: flag <name>
                 this.next();
                 const t2 = this.peek();
@@ -455,12 +468,21 @@ class Parser {
             case 'declare': {
                 // Stage-3 declaration namespace — alternative surface syntax for
                 // the record-producing verbs: declare test | status | table_roll |
-                // armour_damage | event.
+                // armour_damage | damage | event.
                 this.next();
                 if (this.isKw('test')) { this.next(); return this.parseRequireTest(); }
                 if (this.isKw('status')) { this.next(); return this.parseApplyStatus(); }
                 if (this.isKw('table_roll')) { this.next(); return this.parseRollOn(); }
                 if (this.isKw('armour_damage')) { this.next(); return { type: 'Action', action: 'corrode', value: this.parseExpr() }; }
+                if (this.isKw('damage')) {
+                    // declare damage <expr> [, "reason"] — direct damage declared
+                    // against the actor (Phase 4: upkeep ticks — On Fire's 1d10/round)
+                    this.next();
+                    const value = this.parseExpr();
+                    let reason = null;
+                    if (this.isPunct(',')) { this.next(); reason = this.expectString('a reason'); }
+                    return { type: 'Action', action: 'declare_damage', value, reason };
+                }
                 if (this.isKw('event')) {
                     this.next();
                     const name = this.expectString('an event name');
@@ -468,7 +490,7 @@ class Parser {
                     if (this.isPunct(',')) { this.next(); text = this.expectString('event description text'); }
                     return { type: 'Action', action: 'emit', name, text };
                 }
-                throw this.err("Expected 'test', 'status', 'table_roll', 'armour_damage' or 'event' after declare");
+                throw this.err("Expected 'test', 'status', 'table_roll', 'armour_damage', 'damage' or 'event' after declare");
             }
             case 'bump_quality': {                       // bump_quality "Blast" by <expr>
                 this.next();
@@ -479,10 +501,6 @@ class Parser {
             case 'add_quality': {                        // add_quality "Recharge"
                 this.next();
                 return { type: 'Action', action: 'add_quality', name: this.expectString('a quality name') };
-            }
-            case 'reduce_unnatural_toughness': {         // sugar: set unnatural_toughness_reduction += <expr> (Felling)
-                this.next();
-                return { type: 'Action', action: 'set_slot', slot: 'unnatural_toughness_reduction', op: '+=', value: this.parseExpr() };
             }
             case 'require_test': { this.next(); return this.parseRequireTest(); }
             case 'roll_on': { this.next(); return this.parseRollOn(); }
@@ -499,12 +517,13 @@ class Parser {
         const characteristic = this.expectString('a characteristic name (e.g. "Toughness")');
         const value = this.parseExpr();                       // the test modifier
         const onFail = this.expectString('the on-fail consequence text');
-        // optional follow-up on a FAILED test: roll on a roll_table OR
-        // apply a condition (e.g. Flame → On Fire).
-        let onFailRollTable = null, onFailApply = null;
+        // optional follow-up on a FAILED test: roll on a roll_table, apply a
+        // condition (Flame → On Fire), or suffer damage (Toxified's 1d10).
+        let onFailRollTable = null, onFailApply = null, onFailDamage = null;
         if (this.isOp('=>')) {
             this.next();
-            if (this.isKw('roll_on') || this.isKw('table_roll')) { this.next(); onFailRollTable = this.expectString('a roll_table name'); }
+            if (this.isKw('damage')) { this.next(); onFailDamage = this.parseExpr(); }
+            else if (this.isKw('roll_on') || this.isKw('table_roll')) { this.next(); onFailRollTable = this.expectString('a roll_table name'); }
             else if (this.isKw('apply_status') || this.isKw('status')) {
                 this.next();
                 const name = this.expectString('a condition name');
@@ -515,9 +534,9 @@ class Parser {
                     else { this.next(); location = this.parseExpr(); }
                 }
                 onFailApply = { name, value, duration, location };
-            } else throw this.err("Expected 'roll_on' or 'apply_status' after =>");
+            } else throw this.err("Expected 'roll_on', 'apply_status' or 'damage' after =>");
         }
-        return { type: 'Action', action: 'require_test', characteristic, value, onFail, onFailRollTable, onFailApply };
+        return { type: 'Action', action: 'require_test', characteristic, value, onFail, onFailRollTable, onFailApply, onFailDamage };
     }
 
     // roll_on "Table" [+ <modifier>] [area <expr>]

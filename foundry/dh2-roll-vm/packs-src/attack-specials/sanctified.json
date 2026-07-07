@@ -1,0 +1,20 @@
+{
+  "_id": "Nel1x7guosbxKk6c",
+  "_key": "!items!Nel1x7guosbxKk6c",
+  "name": "Sanctified",
+  "type": "attackSpecial",
+  "img": "icons/svg/sword.svg",
+  "system": {
+    "description": "Dark Heresy 2e Core Rulebook p.148. Generated from the dh2_roll_api DSL rule dh2.core.weapon-qualities/sanctified (checkpoint DAMAGE_POOL).",
+    "hasLevel": false,
+    "level": 0
+  },
+  "effects": [],
+  "flags": {
+    "dh2-roll-vm": {
+      "generated": true,
+      "qualifiedId": "dh2.core.weapon-qualities/sanctified",
+      "page": 148
+    }
+  }
+}

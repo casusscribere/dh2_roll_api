@@ -13,7 +13,7 @@ import { resolveAttack } from '../lib/engine.mjs';
 import { riggedDice, d100, die } from './helpers.mjs';
 
 const SRC = `
-dsl 2
+dsl 3
 package "test.pkg" {
   system "dh2"
   source "Test Book"
@@ -37,7 +37,7 @@ quality "Bare" {
 // --- Stage 0: pragma + package + meta ----------------------------------------
 test('parser: dsl pragma, package header, and rule meta are captured', () => {
     const program = parse(SRC);
-    assert.equal(program.dslVersion, 2);
+    assert.equal(program.dslVersion, 3);
     assert.equal(program.package.name, 'test.pkg');
     assert.equal(program.package.system, 'dh2');
     assert.equal(program.package.source, 'Test Book');
@@ -47,9 +47,9 @@ test('parser: dsl pragma, package header, and rule meta are captured', () => {
     assert.equal(program.rules[1].meta, null);
 });
 
-test('programInfo defaults: a header-less v1 file is dsl 1, no package', () => {
+test('programInfo defaults: a header-less file is the CURRENT version, no package', () => {
     const info = programInfo('quality "X" { on MODIFIERS when has_quality("X") then add modifier "x" = 1 }');
-    assert.equal(info.dslVersion, 1);
+    assert.equal(info.dslVersion, 3);
     assert.equal(info.package, null);
 });
 
@@ -74,10 +74,10 @@ test('rule meta { source } overrides the package source book', () => {
     assert.equal(eff.sourceBook, 'Errata');
 });
 
-test('every built-in file declares dsl 2 and a dh2.core.* package', () => {
+test('every built-in file declares dsl 3 and a dh2.core.* package', () => {
     assert.equal(builtinSources.length, 9);
     for (const b of builtinSources) {
-        assert.equal(b.dslVersion, 2, `${b.file} should declare dsl 2`);
+        assert.equal(b.dslVersion, 3, `${b.file} should declare dsl 3`);
         assert.ok(b.package?.name?.startsWith('dh2.core.'), `${b.file} should have a dh2.core.* package`);
         assert.equal(b.package.system, 'dh2');
         assert.ok(b.package.source, `${b.file} should name a source book`);

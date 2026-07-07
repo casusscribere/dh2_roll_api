@@ -1,0 +1,20 @@
+{
+  "_id": "FI6rvsLc9KCSuW7y",
+  "_key": "!items!FI6rvsLc9KCSuW7y",
+  "name": "Storm",
+  "type": "attackSpecial",
+  "img": "icons/svg/sword.svg",
+  "system": {
+    "description": "Dark Heresy 2e Core Rulebook p.149. Generated from the dh2_roll_api DSL rule dh2.core.weapon-qualities/storm (checkpoint HIT_COUNT_MULT).",
+    "hasLevel": false,
+    "level": 0
+  },
+  "effects": [],
+  "flags": {
+    "dh2-roll-vm": {
+      "generated": true,
+      "qualifiedId": "dh2.core.weapon-qualities/storm",
+      "page": 149
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "_id": "z4uqrX4wCqYQmp6s",
+  "_key": "!items!z4uqrX4wCqYQmp6s",
+  "name": "Corrosive",
+  "type": "attackSpecial",
+  "img": "icons/svg/sword.svg",
+  "system": {
+    "description": "Dark Heresy 2e Core Rulebook p.145. Generated from the dh2_roll_api DSL rule dh2.core.weapon-qualities/corrosive (checkpoint ON_HIT).",
+    "hasLevel": false,
+    "level": 0
+  },
+  "effects": [],
+  "flags": {
+    "dh2-roll-vm": {
+      "generated": true,
+      "qualifiedId": "dh2.core.weapon-qualities/corrosive",
+      "page": 145
+    }
+  }
+}

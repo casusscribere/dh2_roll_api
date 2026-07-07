@@ -27,6 +27,7 @@ import { buildRegistry, builtinRules, availableQualities } from '../../../api/li
 import { DSL_DOCS } from '../../../api/lib/dsl/docs.mjs';
 import { compile } from '../../../api/lib/dsl/compiler.mjs';
 import { validateCharacter, migrateCharacter, characterToCombatant } from '../../../api/lib/character-schema.mjs';
+import { emptyEncounter, encounterActor, tickEncounter, harvestEngagement } from '../../../api/lib/encounter.mjs';
 
 const MODULE_ID = 'dh2-roll-vm';
 
@@ -157,11 +158,51 @@ async function importCharacter(raw) {
     return actor;
 }
 
+/**
+ * EncounterState ⇄ ActiveEffect mirror (Phase 4, Lane C). The state document
+ * was designed to map 1:1 onto AEs: condition.duration → AE duration.rounds,
+ * severity/location/decay → AE flags['dh2-roll-vm']. One rule definition drives
+ * both the headless upkeep tick and live play.
+ */
+async function syncEncounterToActor(actor, actorState) {
+    // replace this module's AEs with the actor's current conditions
+    const mine = actor.effects.filter((e) => e.flags?.['dh2-roll-vm']?.managed);
+    if (mine.length) await actor.deleteEmbeddedDocuments('ActiveEffect', mine.map((e) => e.id));
+    const effects = (actorState.conditions ?? []).map((c) => ({
+        name: c.name,
+        img: 'icons/svg/aura.svg',
+        duration: c.duration != null ? { rounds: c.duration } : {},
+        flags: { 'dh2-roll-vm': { managed: true, severity: c.severity ?? null, location: c.location ?? null, decay: c.decay ?? null } },
+    }));
+    if (effects.length) await actor.createEmbeddedDocuments('ActiveEffect', effects);
+    return effects.length;
+}
+
+/** Read this module's AEs on an Actor back into an EncounterState actor entry. */
+function readEncounterFromActor(actor, key = actor.name) {
+    const enc = emptyEncounter();
+    const entry = encounterActor(enc, key, actor.name);
+    for (const e of actor.effects) {
+        const f = e.flags?.['dh2-roll-vm'];
+        if (!f?.managed) continue;
+        entry.conditions.push({
+            name: e.name,
+            severity: f.severity ?? null,
+            duration: e.duration?.rounds ?? null,
+            location: f.location ?? null,
+            ...(f.decay != null ? { decay: f.decay } : {}),
+        });
+    }
+    return enc;
+}
+
 Hooks.once('ready', () => {
     game.dh2vm = {
         resolveAttack, resolveEngagement, resolveParry, rollTest, rollDamage, applySoak,
         rollScript, buildRegistry, compile, builtinRules, availableQualities, DSL_DOCS,
         validateCharacter, migrateCharacter, characterToCombatant, importCharacter,
+        emptyEncounter, encounterActor, tickEncounter, harvestEngagement,
+        syncEncounterToActor, readEncounterFromActor,
         mapActor, dh2Attack,
     };
     console.log(`${MODULE_ID} | DH2 Roll VM ready — ${builtinRules.length} rules loaded. Try game.dh2vm.dh2Attack() or /dh2attack.`);

@@ -1,0 +1,20 @@
+{
+  "_id": "PLFg80XAAzTWR1uF",
+  "_key": "!items!PLFg80XAAzTWR1uF",
+  "name": "Recharge",
+  "type": "attackSpecial",
+  "img": "icons/svg/sword.svg",
+  "system": {
+    "description": "Dark Heresy 2e Core Rulebook p.148. Generated from the dh2_roll_api DSL rule dh2.core.weapon-qualities/recharge (checkpoint POST_ROLL).",
+    "hasLevel": false,
+    "level": 0
+  },
+  "effects": [],
+  "flags": {
+    "dh2-roll-vm": {
+      "generated": true,
+      "qualifiedId": "dh2.core.weapon-qualities/recharge",
+      "page": 148
+    }
+  }
+}

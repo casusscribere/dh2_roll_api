@@ -1,0 +1,20 @@
+{
+  "_id": "al6PKy45PfO3gMvw",
+  "_key": "!items!al6PKy45PfO3gMvw",
+  "name": "Proven",
+  "type": "attackSpecial",
+  "img": "icons/svg/sword.svg",
+  "system": {
+    "description": "Dark Heresy 2e Core Rulebook p.148. Generated from the dh2_roll_api DSL rule dh2.core.weapon-qualities/proven (checkpoint DIE_ADJUST; takes a level (X)).",
+    "hasLevel": true,
+    "level": 0
+  },
+  "effects": [],
+  "flags": {
+    "dh2-roll-vm": {
+      "generated": true,
+      "qualifiedId": "dh2.core.weapon-qualities/proven",
+      "page": 148
+    }
+  }
+}

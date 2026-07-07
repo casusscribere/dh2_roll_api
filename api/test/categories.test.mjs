@@ -13,24 +13,28 @@ import { compile } from '../lib/dsl/compiler.mjs';
 import { buildRegistry, builtinRules } from '../lib/rules/index.mjs';
 import { riggedDice, d100, die } from './helpers.mjs';
 
-// --- parser accepts the canonical kinds + normalises aliases -----------------
-test('parser accepts the nine kinds and normalises aliases (status→condition, generic/rule→miscellaneous)', () => {
+// --- parser accepts the canonical kinds; v1 aliases are gone (dsl 3) ---------
+test('parser accepts the canonical kinds and REJECTS the removed v1 aliases (dsl 3)', () => {
     const prog = parse(`
-        quality       "a" { on MODIFIERS then fail }
-        talent        "b" { on MODIFIERS then fail }
-        trait         "c" { on MODIFIERS then fail }
-        circumstance  "d" { on MODIFIERS then fail }
-        condition     "e" { on MODIFIERS then fail }
-        mechanic      "f" { on MODIFIERS then fail }
-        miscellaneous "g" { on MODIFIERS then fail }
-        status        "h" { on MODIFIERS then fail }
-        generic       "i" { on MODIFIERS then fail }
-        rule          "j" { on MODIFIERS then fail }
+        quality       "a" { on MODIFIERS then flag attack_failed }
+        talent        "b" { on MODIFIERS then flag attack_failed }
+        trait         "c" { on MODIFIERS then flag attack_failed }
+        circumstance  "d" { on MODIFIERS then flag attack_failed }
+        condition     "e" { on MODIFIERS then flag attack_failed }
+        configuration "f" { on MODIFIERS then flag attack_failed }
+        mechanic      "g" { on MODIFIERS then flag attack_failed }
+        miscellaneous "h" { on MODIFIERS then flag attack_failed }
     `);
     assert.deepEqual(prog.rules.map(r => r.kind),
-        ['quality', 'talent', 'trait', 'circumstance', 'condition', 'mechanic', 'miscellaneous', 'condition', 'miscellaneous', 'miscellaneous']);
+        ['quality', 'talent', 'trait', 'circumstance', 'condition', 'configuration', 'mechanic', 'miscellaneous']);
     assert.equal(compile('condition "On Fire" { on MODIFIERS when has_condition("On Fire") then add modifier "x" = -10 }')[0].source, 'condition');
-    assert.equal(compile('status "On Fire" { on MODIFIERS when has_status("On Fire") then add modifier "x" = -10 }')[0].source, 'condition');
+    // removed aliases fail loudly with a migration pointer
+    for (const bad of ['status "h" { on MODIFIERS then flag attack_failed }',
+                       'generic "i" { on MODIFIERS then flag attack_failed }',
+                       'rule "j" { on MODIFIERS then flag attack_failed }']) {
+        assert.throws(() => parse(bad), /Expected a rule kind/);
+    }
+    assert.throws(() => compile('condition "X" { on MODIFIERS when has_status("X") then add modifier "x" = 1 }'), /Unknown function 'has_status/);
 });
 
 // --- helper ------------------------------------------------------------------

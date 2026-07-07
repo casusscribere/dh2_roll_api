@@ -197,6 +197,18 @@ export function applyAction(action, ctx, meta = {}) {
                     duration: action.onFailApply.duration != null ? evalNode(action.onFailApply.duration, ctx) : null,
                     location: action.onFailApply.location != null ? evalNode(action.onFailApply.location, ctx) : null,
                 } : null,
+                // LAZY: dice roll only if the test actually fails (Toxified's 1d10)
+                onFailDamage: action.onFailDamage ? () => evalNode(action.onFailDamage, ctx) : null,
+            });
+            break;
+        case 'declare_damage':
+            // direct damage declared against the actor (Phase 4 — upkeep ticks,
+            // e.g. On Fire's 1d10 per round). Resolved dice roll NOW (the rule
+            // already decided it applies); the consumer records/applies it.
+            (ctx.declaredDamage ??= []).push({
+                source: meta.ruleName ?? meta.penKey,
+                amount: evalNode(action.value, ctx),
+                reason: action.reason ?? null,
             });
             break;
         case 'roll_on':
