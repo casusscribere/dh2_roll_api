@@ -1,3 +1,9 @@
+dsl 2
+package "dh2.core.configurations" {
+  system "dh2"
+  source "Dark Heresy 2e Core Rulebook"
+}
+
 # Configurations — per-character toggles the player chooses for a shot/turn
 # (grip, dual-wield, firing modes). Gated on configuration("…") (firing_mode is
 # an alias) and supplied per attack via configs: ["…"] (the old firingModes[] is
@@ -24,16 +30,19 @@ configuration "Off-Hand" {
 # gains Recharge — the last three are surfaced as a note (range-in-metres and ammo
 # tracking are deferred — see POTENTIAL_FEATURES.md).
 configuration "Maximal" {
+  meta { page 147 }
   on DAMAGE_MODS
   when has_quality("Maximal") and configuration("Maximal")
   then add modifier "maximal" = 1d10
 }
 configuration "Maximal" {
+  meta { page 147 }
   on PENETRATION
   when has_quality("Maximal") and configuration("Maximal")
   then set pen += 2
 }
 configuration "Maximal" {
+  meta { page 147 }
   on PENETRATION
   priority 5
   when has_quality("Maximal") and configuration("Maximal")
@@ -43,11 +52,13 @@ configuration "Maximal" {
 # so the Recharge quality rule (POST_ROLL) sees it and fires. The note covers the
 # range/ammo costs (no range-in-metres or ammo model yet — see POTENTIAL_FEATURES.md).
 configuration "Maximal" {
+  meta { page 147 }
   on MODIFIERS
   when has_quality("Maximal") and configuration("Maximal")
   then add_quality "Recharge"
 }
 configuration "Maximal" {
+  meta { page 147 }
   on POST_ROLL
   when has_quality("Maximal") and configuration("Maximal")
   then emit "Maximal", "+10 m range and x3 ammunition this shot"

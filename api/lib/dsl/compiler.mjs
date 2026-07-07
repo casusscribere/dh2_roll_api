@@ -11,6 +11,7 @@ import { parse } from './parser.mjs';
 import { DslError } from './tokenizer.mjs';
 import { CHECKPOINTS } from '../pipeline.mjs';
 import { FACTS, FUNCTIONS, evalNode, applyAction, collectNames } from './interpreter.mjs';
+import { SCOPED_FACTS, SCOPED_FUNCTIONS, SCOPE_NAMES, SLOT_DEFS, FLAG_DEFS } from './vocabulary.mjs';
 
 const KNOWN_CHECKPOINTS = new Set(Object.values(CHECKPOINTS));
 
@@ -22,13 +23,13 @@ const slug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^
  * the whole rule with one click) but get distinct effect `id`s when there is
  * more than one branch.
  */
-export function compileRule(rule) {
+export function compileRule(rule, pkg = null) {
     if (!KNOWN_CHECKPOINTS.has(rule.on)) {
         throw new DslError(`Unknown checkpoint '${rule.on}' in rule "${rule.name}"`, rule.line, rule.col);
     }
 
     // Validate every referenced name across all branches.
-    const names = { facts: new Set(), calls: new Set() };
+    const names = { facts: new Set(), calls: new Set(), scopedFacts: new Set(), scopedCalls: new Set() };
     for (const br of rule.branches) {
         if (br.when) collectNames(br.when, names);
         for (const a of br.actions) if (a.value) collectNames(a.value, names);
@@ -38,6 +39,31 @@ export function compileRule(rule) {
     }
     for (const c of names.calls) {
         if (!(c in FUNCTIONS)) throw new DslError(`Unknown function '${c}()' in rule "${rule.name}"`, rule.line, rule.col);
+    }
+    // Scoped paths (Stage 2): the scope must exist AND the fact/function must be
+    // available in that scope (e.g. `target.tb` yes; `target.jam_threshold` no).
+    for (const sf of names.scopedFacts) {
+        const [scope, f] = sf.split('.');
+        if (!SCOPE_NAMES.includes(scope)) throw new DslError(`Unknown scope '${scope}' in rule "${rule.name}" (scopes: ${SCOPE_NAMES.join(', ')})`, rule.line, rule.col);
+        if (!(f in SCOPED_FACTS[scope])) throw new DslError(`Fact '${f}' is not available in scope '${scope}' in rule "${rule.name}"`, rule.line, rule.col);
+    }
+    for (const sc of names.scopedCalls) {
+        const [scope, c] = sc.split('.');
+        if (!SCOPE_NAMES.includes(scope)) throw new DslError(`Unknown scope '${scope}' in rule "${rule.name}" (scopes: ${SCOPE_NAMES.join(', ')})`, rule.line, rule.col);
+        if (!(c in SCOPED_FUNCTIONS[scope])) throw new DslError(`Function '${c}()' is not available in scope '${scope}' in rule "${rule.name}"`, rule.line, rule.col);
+    }
+    // Slots / flags (Stage 3): validate against the registered tables, incl. the
+    // slot's allowed modes (e.g. `set jam_threshold += …` is rejected).
+    for (const br of rule.branches) {
+        for (const a of br.actions) {
+            if (a.action === 'set_slot') {
+                const slot = SLOT_DEFS[a.slot];
+                if (!slot) throw new DslError(`Unknown slot '${a.slot}' in rule "${rule.name}" (slots: ${Object.keys(SLOT_DEFS).join(', ')})`, rule.line, rule.col);
+                if (!slot.modes.includes(a.op ?? '=')) throw new DslError(`Slot '${a.slot}' does not support '${a.op}' in rule "${rule.name}" (modes: ${slot.modes.join(', ')})`, rule.line, rule.col);
+            } else if (a.action === 'set_flag' && !FLAG_DEFS[a.flag]) {
+                throw new DslError(`Unknown flag '${a.flag}' in rule "${rule.name}" (flags: ${Object.keys(FLAG_DEFS).join(', ')})`, rule.line, rule.col);
+            }
+        }
     }
 
     // `set pen += …` writes to a named penetration-modifier slot; default it to
@@ -49,11 +75,20 @@ export function compileRule(rule) {
     return rule.branches.map((br, i) => ({
         id: multi ? `${ruleId}#${i + 1}` : ruleId,
         ruleId,
+        // Stable qualified id — unique across packages (Stage 5 layering keys on
+        // this; ruleId stays the toggle key for back-compat).
+        qualifiedId: pkg?.name ? `${pkg.name}/${ruleId}` : ruleId,
         name: rule.name,
         tier: rule.tier ?? null,
         source: rule.kind,
         checkpoint: rule.on,
         priority: rule.priority ?? 0,            // branch order preserved by insertion order
+        // Provenance (Stage 0): rule meta + the file's package header.
+        page: rule.meta?.page ?? null,
+        ref: rule.meta?.ref ?? null,
+        package: pkg?.name ?? null,
+        system: pkg?.system ?? null,
+        sourceBook: rule.meta?.source ?? pkg?.source ?? null,
         when: br.when ? (ctx) => Boolean(evalNode(br.when, ctx)) : undefined,
         apply: (ctx) => { for (const a of br.actions) applyAction(a, ctx, meta); },
     }));
@@ -62,7 +97,19 @@ export function compileRule(rule) {
 /** Compile DSL source (or a pre-parsed Program) into a flat array of Effects. */
 export function compile(src) {
     const program = typeof src === 'string' ? parse(src) : src;
-    return program.rules.flatMap(compileRule);
+    return program.rules.flatMap((r) => compileRule(r, program.package ?? null));
+}
+
+/** File-level info: the `dsl` version pragma and `package` header (or defaults).
+ *  Used to surface per-file provenance without recompiling effects. */
+export function programInfo(src) {
+    const program = typeof src === 'string' ? parse(src) : src;
+    return {
+        dslVersion: program.dslVersion ?? 1,
+        package: program.package
+            ? { name: program.package.name, system: program.package.system, source: program.package.source, requires: program.package.requires ?? [] }
+            : null,
+    };
 }
 
 /** Compile one roll_table AST node into a runtime table: { name, die, rows }.

@@ -14,7 +14,7 @@
  * freely; user-supplied DSL can later be compiled and merged the same way.
  */
 import { Registry } from '../pipeline.mjs';
-import { compile, compileTables, compileActions, referencedNames, valuedNames } from '../dsl/compiler.mjs';
+import { compile, compileTables, compileActions, referencedNames, valuedNames, programInfo } from '../dsl/compiler.mjs';
 import { combatActionEffects, COMBAT_ACTIONS, RANGE_BANDS, AIM_MODES } from './combat-actions.mjs';
 import { qualityConflictEffects } from './quality-conflicts.mjs';
 import { registerActions, availableActions } from '../actions.mjs';
@@ -71,17 +71,19 @@ export const availableValued = valuedNames(
 /** @deprecated alias kept for callers expecting the old name */
 export const availableStatuses = availableConditions;
 
-/** Raw DSL source of the built-in rule set, by category (for /api/rules/source). */
+/** Raw DSL source of the built-in rule set, by category (for /api/rules/source).
+ *  Each entry carries its file's `package` header + `dsl` version (Stage 0). */
+const withInfo = (entry, src) => ({ ...entry, source: src, ...programInfo(src) });
 export const builtinSources = [
-    { category: 'Weapon qualities', file: 'weapon-qualities.dsl', source: qualitiesSrc },
-    { category: 'Talents', file: 'talents.dsl', source: talentsSrc },
-    { category: 'Traits', file: 'traits.dsl', source: traitsSrc },
-    { category: 'Conditions', file: 'conditions.dsl', source: conditionsSrc },
-    { category: 'Circumstances', file: 'circumstances.dsl', source: circumstancesSrc },
-    { category: 'Configurations', file: 'configurations.dsl', source: configurationsSrc },
-    { category: 'Mechanical', file: 'mechanics.dsl', source: mechanicsSrc },
-    { category: 'Actions', file: 'actions.dsl', source: actionsSrc },
-    { category: 'Roll tables', file: 'roll-tables.dsl', source: rollTablesSrc },
+    withInfo({ category: 'Weapon qualities', file: 'weapon-qualities.dsl' }, qualitiesSrc),
+    withInfo({ category: 'Talents', file: 'talents.dsl' }, talentsSrc),
+    withInfo({ category: 'Traits', file: 'traits.dsl' }, traitsSrc),
+    withInfo({ category: 'Conditions', file: 'conditions.dsl' }, conditionsSrc),
+    withInfo({ category: 'Circumstances', file: 'circumstances.dsl' }, circumstancesSrc),
+    withInfo({ category: 'Configurations', file: 'configurations.dsl' }, configurationsSrc),
+    withInfo({ category: 'Mechanical', file: 'mechanics.dsl' }, mechanicsSrc),
+    withInfo({ category: 'Actions', file: 'actions.dsl' }, actionsSrc),
+    withInfo({ category: 'Roll tables', file: 'roll-tables.dsl' }, rollTablesSrc),
 ];
 
 /** Flat per-RULE list of the (toggleable) built-in rules — one entry per rule
@@ -113,7 +115,12 @@ export const builtinRules = (() => {
     for (const e of all) {
         if (seen.has(e.ruleId)) continue;
         seen.add(e.ruleId);
-        out.push({ id: e.ruleId, name: e.name, kind: e.source, checkpoint: e.checkpoint, category: KIND_GROUP[e.source] ?? 'Other' });
+        out.push({
+            id: e.ruleId, name: e.name, kind: e.source, checkpoint: e.checkpoint, category: KIND_GROUP[e.source] ?? 'Other',
+            // provenance (Stage 0)
+            qualifiedId: e.qualifiedId ?? e.ruleId, page: e.page ?? null, package: e.package ?? null,
+            system: e.system ?? null, sourceBook: e.sourceBook ?? null,
+        });
     }
     // Order by the canonical group order; stable within each group.
     out.sort((a, b) => GROUP_ORDER.indexOf(a.category) - GROUP_ORDER.indexOf(b.category));

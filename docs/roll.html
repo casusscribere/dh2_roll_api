@@ -68,6 +68,21 @@
   <!-- ===================== FULL ATTACK ===================== -->
   <fieldset style="grid-column: 1 / -1;">
     <legend>Full Attack Resolution — Engagement</legend>
+    <details style="margin-bottom:.6rem">
+      <summary class="toggle">Character import / export <span class="dim">— canonical JSON (schema v1; see tools/ for the Google-Sheet &amp; Roll20 adapters)</span></summary>
+      <div class="row" style="margin-top:.4rem">
+        <div><label>Character JSON file</label><input type="file" id="char-file" accept=".json,application/json"></div>
+        <div><label>&nbsp;</label>
+          <div class="checks" style="margin:0">
+            <button class="minibtn" style="margin-top:0" onclick="applyCharacter('a')">→ Attacker</button>
+            <button class="minibtn" style="margin-top:0" onclick="applyCharacter('d')">→ Defender</button>
+            <button class="minibtn" style="margin-top:0" onclick="exportCharacter('a')">Export attacker</button>
+            <button class="minibtn" style="margin-top:0" onclick="exportCharacter('d')">Export defender</button>
+          </div>
+        </div>
+      </div>
+      <div class="result" id="char-status" style="display:none"></div>
+    </details>
     <p class="note">Attacker vs. defender. Resolution: ① to-hit → ② defender reaction (Evasion / Field) → ③ soak &amp; apply → ④ wounds → ⑤ on-hit target effects.</p>
     <div class="grid">
 
@@ -241,6 +256,128 @@ function collectRules(side, cat) {
     else out.push(raw != null ? `${cb.value} (${raw})` : cb.value);
   });
   return out;
+}
+
+// --- character import / export (schema v1 — ROADMAP Phase 2 Lane B) ----------
+// Load canonical character JSON (from tools/ adapters or a previous export),
+// validate via /api/character/validate (field-level errors), and populate the
+// attacker or defender panels; export reverses the mapping.
+const charStatus = (html, bad = false) => {
+  const box = $('char-status');
+  box.style.display = 'block';
+  box.innerHTML = bad ? `<span class="bad">${html}</span>` : html;
+};
+const nameLevel = (x) => {
+  if (x && typeof x === 'object') return { name: String(x.name ?? ''), level: x.level ?? x.severity ?? null };
+  const s = String(x ?? '').trim();
+  const m = /\((\d+)\)\s*$/.exec(s);
+  return m ? { name: s.slice(0, m.index).trim(), level: +m[1] } : { name: s, level: null };
+};
+// check the side's rule-panel rows matching `entries`; set values; report unmatched
+function setRulePanel(side, cat, entries) {
+  const unmatched = [];
+  const rows = [...document.querySelectorAll(`.rtoggle[data-side="${side}"][data-cat="${cat}"]`)];
+  rows.forEach((cb) => { cb.checked = false; const v = cb.closest('.rrow').querySelector('.rval'); if (v) v.value = ''; });
+  for (const entry of (entries ?? [])) {
+    const { name, level } = nameLevel(entry);
+    if (!name) continue;
+    const cb = rows.find((c) => name.toLowerCase().startsWith(c.value.toLowerCase()) || c.value.toLowerCase().startsWith(name.toLowerCase()));
+    if (!cb) { unmatched.push(name); continue; }
+    cb.checked = true;
+    const v = cb.closest('.rrow').querySelector('.rval');
+    if (v && level != null) v.value = level;
+  }
+  return unmatched;
+}
+async function readCharFile() {
+  const f = $('char-file').files[0];
+  if (!f) { charStatus('Choose a character JSON file first.', true); return null; }
+  try { return JSON.parse(await f.text()); }
+  catch { charStatus('Not valid JSON.', true); return null; }
+}
+async function applyCharacter(side) {
+  const raw = await readCharFile();
+  if (!raw) return;
+  const r = await api('/api/character/validate', { character: raw });
+  if (!r.ok) {
+    charStatus(`Schema errors:\n` + r.errors.map(e => `  <span class="bad">${e.path}</span> — ${e.message}`).join('\n'), false);
+    return;
+  }
+  const c = r.character;
+  const set = (id, v) => { const el = $(id); if (el && v !== undefined) el.value = v; };
+  const unmatched = [];
+  if (side === 'a') {
+    set('a-ws', c.characteristics.ws); set('a-bs', c.characteristics.bs);
+    set('a-s', c.characteristics.s); set('a-t', c.characteristics.t);
+    set('a-un-ws', c.unnatural?.ws ?? 0); set('a-un-bs', c.unnatural?.bs ?? 0); set('a-un-s', c.unnatural?.s ?? 0);
+    const w = (c.weapons ?? [])[0];
+    if (w) {
+      $('w-select').value = '';
+      set('w-damage', w.damage); set('w-pen', w.pen ?? 0); set('w-type', w.damageType ?? 'Impact');
+      $('w-melee').value = w.class === 'melee' ? 'yes' : 'no';
+      set('w-burst', w.rof?.burst ?? 0); set('w-full', w.rof?.full ?? 0);
+      set('w-sbx', w.sbMultiplier ?? (w.class === 'melee' ? 1 : 0));
+      set('w-craft', w.craftsmanship ?? 'Common');
+      $('w-qualities').value = (w.qualities ?? []).map(q => nameLevel(q).level != null ? `${nameLevel(q).name} (${nameLevel(q).level})` : nameLevel(q).name).join(', ');
+      syncFiringModes();
+    }
+    for (const [cat, list] of [['talents', c.talents], ['traits', c.traits], ['conditions', c.conditions], ['circumstances', c.circumstances]])
+      unmatched.push(...setRulePanel('a', cat, list));
+  } else {
+    set('d-ws', c.characteristics.ws); set('d-ag', c.characteristics.ag);
+    set('d-t', c.characteristics.t); set('d-s', c.characteristics.s);
+    set('d-un-ws', c.unnatural?.ws ?? 0); set('d-un-ag', c.unnatural?.ag ?? 0);
+    set('d-armour', c.armour?.body ?? 0);
+    set('d-tb', Math.floor((c.characteristics.t ?? 0) / 10));
+    set('d-unnatural-tough', c.unnatural?.t ?? 0);
+    set('d-field', c.field?.rating ?? 0); set('d-overload', c.field?.overloadMax ?? 0);
+    const w = (c.weapons ?? []).find(x => x.class === 'melee');
+    if (w) $('d-qualities').value = (w.qualities ?? []).map(q => nameLevel(q).name).join(', ');
+    for (const [cat, list] of [['talents', c.talents], ['traits', c.traits], ['conditions', c.conditions], ['circumstances', c.circumstances]])
+      unmatched.push(...setRulePanel('d', cat, list));
+  }
+  const warn = (r.warnings ?? []).map(w => `${w.path} — ${w.message}`);
+  charStatus(`<span class="ok">Loaded "${c.name}"</span> → ${side === 'a' ? 'attacker' : 'defender'}` +
+    (unmatched.length ? `\n<span class="dim">no matching rule toggle for: ${unmatched.join(', ')} (not in the active rule set)</span>` : '') +
+    (warn.length ? `\n<span class="dim">warnings: ${warn.join('; ')}</span>` : ''));
+}
+function exportCharacter(side) {
+  const doc = {
+    schemaVersion: 1, kind: 'dh2.character', system: 'dh2',
+    name: side === 'a' ? 'Attacker Export' : 'Defender Export',
+    characteristics: { ws: 0, bs: 0, s: 0, t: 0, ag: 0, int: 30, per: 30, wp: 30, fel: 30 },
+    unnatural: {}, armour: {}, talents: [], traits: [], conditions: [], circumstances: [], weapons: [],
+  };
+  const collectNamed = (cat) => collectRules(side, cat);
+  if (side === 'a') {
+    Object.assign(doc.characteristics, { ws: +$('a-ws').value, bs: +$('a-bs').value, s: +$('a-s').value, t: +$('a-t').value, ag: 30 });
+    doc.unnatural = { ws: +$('a-un-ws').value, bs: +$('a-un-bs').value, s: +$('a-un-s').value };
+    doc.weapons = [{
+      name: $('w-select').selectedOptions[0]?.text.split(' (')[0] || 'Custom weapon',
+      class: $('w-melee').value === 'yes' ? 'melee' : 'basic',
+      damage: $('w-damage').value, pen: +$('w-pen').value, damageType: $('w-type').value,
+      rof: { single: true, burst: +$('w-burst').value, full: +$('w-full').value },
+      qualities: $('w-qualities').value.split(',').map(x => x.trim()).filter(Boolean),
+      craftsmanship: $('w-craft').value,
+      sbMultiplier: $('w-melee').value === 'yes' ? +$('w-sbx').value : 0,
+    }];
+  } else {
+    Object.assign(doc.characteristics, { ws: +$('d-ws').value, ag: +$('d-ag').value, t: +$('d-t').value, s: +$('d-s').value, bs: 30 });
+    doc.unnatural = { ws: +$('d-un-ws').value, ag: +$('d-un-ag').value, t: +$('d-unnatural-tough').value };
+    doc.armour = { body: +$('d-armour').value };
+    doc.field = { rating: +$('d-field').value, overloadMax: +$('d-overload').value };
+  }
+  doc.talents = collectNamed('talents');
+  doc.traits = collectNamed('traits');
+  doc.conditions = collectNamed('conditions');
+  doc.circumstances = collectNamed('circumstances');
+  const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${doc.name.toLowerCase().replace(/\s+/g, '-')}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  charStatus(`<span class="ok">Exported ${side === 'a' ? 'attacker' : 'defender'}</span> as ${a.download}`);
 }
 
 // show a toggle for each firing-mode quality the weapon currently has (e.g. Maximal)

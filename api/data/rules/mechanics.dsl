@@ -1,3 +1,9 @@
+dsl 2
+package "dh2.core.mechanics" {
+  system "dh2"
+  source "Dark Heresy 2e Core Rulebook"
+}
+
 # Weapon mechanics & craftsmanship — authored in the DSL.
 #
 # Jam is a base MECHANIC (not a weapon quality): a ranged weapon jams when the

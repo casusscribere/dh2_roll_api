@@ -55,13 +55,44 @@ class Parser {
 
     // --- program / rule ------------------------------------------------------
     parseProgram() {
-        const rules = [], tables = [], actions = [];
+        const rules = [], tables = [], actions = [], packages = [];
+        let dslVersion = null;
+        // `dsl <N>` pragmas and `package` blocks may appear at any top level
+        // position (the FIRST of each wins) — several sources are routinely
+        // concatenated for cross-file scans (referencedNames/valuedNames), so a
+        // joined text contains one header per original file.
         while (!this.atEof()) {
-            if (this.isKw('roll_table')) tables.push(this.parseTable());
+            if (this.isKw('dsl') && this.peek(1)?.type === 'number') {
+                this.next();
+                const v = this.next().value;
+                if (dslVersion === null) dslVersion = v;
+            }
+            else if (this.isKw('roll_table')) tables.push(this.parseTable());
             else if (this.isKw('action')) actions.push(this.parseActionDecl());
+            else if (this.isKw('package')) packages.push(this.parsePackage());
             else rules.push(this.parseRule());
         }
-        return { type: 'Program', rules, tables, actions };
+        return { type: 'Program', rules, tables, actions, dslVersion: dslVersion ?? 1, package: packages[0] ?? null, packages };
+    }
+
+    // package "dh2.core.weapon-qualities" { system "dh2"  source "Book"  [requires "pkg"]* }
+    // File-level provenance: the rule system this content belongs to, the source
+    // book, and (future — layered registries) package dependencies.
+    parsePackage() {
+        const kw = this.expectKw('package');
+        const name = this.expectString('a quoted package name');
+        this.expectPunct('{');
+        let system = null, source = null;
+        const requires = [];
+        while (!this.isPunct('}')) {
+            if (this.atEof()) throw this.err("Unterminated package (expected '}')");
+            if (this.isKw('system')) { this.next(); system = this.expectString('a system id (e.g. "dh2")'); }
+            else if (this.isKw('source')) { this.next(); source = this.expectString('a source book name'); }
+            else if (this.isKw('requires')) { this.next(); requires.push(this.expectString('a package name')); }
+            else throw this.err("Unexpected clause in package body (expected 'system', 'source' or 'requires')");
+        }
+        this.expectPunct('}');
+        return { type: 'Package', name, system, source, requires, line: kw.line, col: kw.col };
     }
 
     // action "Name" { type Half|Full|Reaction|Free  [attack] [subtype <name>]* }
@@ -151,7 +182,7 @@ class Parser {
 
         const rule = {
             type: 'Rule', kind: KIND_ALIAS[kindTok.value] ?? kindTok.value, name,
-            tier: null, on: null, priority: null, branches: [],
+            tier: null, on: null, priority: null, meta: null, branches: [],
             line: kindTok.line, col: kindTok.col,
         };
 
@@ -197,6 +228,26 @@ class Parser {
             if (n.type !== 'number') throw this.err('Expected an integer after priority');
             this.next();
             rule.priority = n.value;
+        } else if (this.isKw('meta')) {
+            // meta { page <INT> [ref "…"] [source "…"] } — rule-level provenance.
+            // `source` overrides the package's source book for this rule.
+            this.next();
+            this.expectPunct('{');
+            const meta = { page: null, ref: null, source: null };
+            while (!this.isPunct('}')) {
+                if (this.atEof()) throw this.err("Unterminated meta (expected '}')");
+                if (this.isKw('page')) {
+                    this.next();
+                    const n = this.peek();
+                    if (n.type !== 'number') throw this.err('Expected a page number after page');
+                    this.next();
+                    meta.page = n.value;
+                } else if (this.isKw('ref')) { this.next(); meta.ref = this.expectString('a reference string'); }
+                else if (this.isKw('source')) { this.next(); meta.source = this.expectString('a source book name'); }
+                else throw this.err("Unexpected clause in meta body (expected 'page', 'ref' or 'source')");
+            }
+            this.expectPunct('}');
+            rule.meta = meta;
         } else if (this.isKw('when')) {
             this.next();
             const when = this.parsePredicate();
@@ -207,7 +258,7 @@ class Parser {
             this.next();
             rule.branches.push({ when: null, actions: this.parseActionList() });
         } else {
-            throw this.err(`Unexpected '${t.value ?? t.type}' in rule body (expected on | priority | when | then)`);
+            throw this.err(`Unexpected '${t.value ?? t.type}' in rule body (expected on | priority | meta | when | then)`);
         }
     }
 
@@ -302,6 +353,15 @@ class Parser {
         if (t.type === 'ident') {
             if (t.value === 'true' || t.value === 'false') { this.next(); return { type: 'Boolean', value: t.value === 'true' }; }
             this.next();
+            // Scoped path (Stage 2): `scope.fact` or `scope.fn(args)` — e.g.
+            // target.tb, weapon.pen, opposing_weapon.has_quality("Force"). The
+            // scope's validity is checked by the compiler, not here.
+            let scope = null, name = t.value;
+            if (this.isPunct('.') && this.peek(1)?.type === 'ident') {
+                this.next();                                   // the '.'
+                scope = name;
+                name = this.next().value;
+            }
             if (this.isPunct('(')) {
                 this.next();
                 const args = [];
@@ -310,9 +370,9 @@ class Parser {
                     while (this.isPunct(',')) { this.next(); args.push(this.parseExpr()); }
                 }
                 this.expectPunct(')');
-                return { type: 'Call', name: t.value, args };
+                return scope ? { type: 'Call', scope, name, args } : { type: 'Call', name, args };
             }
-            return { type: 'Identifier', name: t.value };
+            return scope ? { type: 'Identifier', scope, name } : { type: 'Identifier', name };
         }
         throw this.err(`Expected a value, got '${t.value ?? t.type}'`);
     }
@@ -333,6 +393,11 @@ class Parser {
                 return { type: 'Action', action: 'add_modifier', name, value: this.parseExpr() };
             }
             case 'set': {
+                // `set modifier "key" = e` (named to-hit/damage modifier) or the
+                // generic Stage-3 form `set <slot> (=|+=) e` over the registered
+                // SLOT table (vocabulary.mjs). The old specials (pen,
+                // jam_threshold, scatter, damage_type, …) ARE slots now — the
+                // grammar is uniform; the compiler validates slot names/modes.
                 this.next();
                 if (this.isKw('modifier')) {
                     this.next();
@@ -341,52 +406,26 @@ class Parser {
                     this.next();
                     return { type: 'Action', action: 'set_modifier', name, value: this.parseExpr() };
                 }
-                if (this.isKw('pen')) {
-                    this.next();
-                    let op;
-                    if (this.isOp('+=')) op = '+=';
-                    else if (this.isOp('=')) op = '=';
-                    else throw this.err("Expected '=' or '+=' after pen");
-                    this.next();
-                    return { type: 'Action', action: 'set_pen', op, value: this.parseExpr() };
-                }
-                if (this.isKw('rf_threshold')) {
-                    this.next();
-                    if (!this.isOp('=')) throw this.err("Expected '=' after rf_threshold");
-                    this.next();
-                    return { type: 'Action', action: 'set_rf_threshold', value: this.parseExpr() };
-                }
-                if (this.isKw('jam_threshold')) {
-                    this.next();
-                    if (!this.isOp('=')) throw this.err("Expected '=' after jam_threshold");
-                    this.next();
-                    return { type: 'Action', action: 'set_jam_threshold', value: this.parseExpr() };
-                }
-                if (this.isKw('scatter')) {
-                    this.next();
-                    let op;
-                    if (this.isOp('+=')) op = '+=';
-                    else if (this.isOp('=')) op = '=';
-                    else throw this.err("Expected '=' or '+=' after scatter");
-                    this.next();
-                    return { type: 'Action', action: 'set_scatter', op, value: this.parseExpr() };
-                }
-                if (this.isKw('damage_type')) {
-                    this.next();
-                    if (!this.isOp('=')) throw this.err("Expected '=' after damage_type");
-                    this.next();
-                    return { type: 'Action', action: 'set_damage_type', value: this.parseExpr() };
-                }
-                throw this.err("Expected 'modifier', 'pen', 'rf_threshold', 'jam_threshold', 'scatter' or 'damage_type' after 'set'");
+                const slotTok = this.peek();
+                if (slotTok.type !== 'ident') throw this.err("Expected 'modifier' or a slot name after 'set'");
+                this.next();
+                let op;
+                if (this.isOp('+=')) op = '+=';
+                else if (this.isOp('=')) op = '=';
+                else throw this.err(`Expected '=' or '+=' after slot '${slotTok.value}'`);
+                this.next();
+                return { type: 'Action', action: 'set_slot', slot: slotTok.value, op, value: this.parseExpr() };
             }
             case 'cancel': {
                 this.next();
                 this.expectKw('modifier');
                 return { type: 'Action', action: 'cancel_modifier', name: this.expectString('a modifier name') };
             }
-            case 'add_die': { this.next(); return { type: 'Action', action: 'add_die', value: this.parseExpr() }; }
-            case 'keep_highest': { this.next(); return { type: 'Action', action: 'keep_highest' }; }
-            case 'add_hits': { this.next(); return { type: 'Action', action: 'add_hits', value: this.parseExpr() }; }
+            // --- sugar over slots/flags (Stage 3): the v1 verbs parse to the
+            // same set_slot / set_flag actions the generic forms produce -------
+            case 'add_die': { this.next(); return { type: 'Action', action: 'set_slot', slot: 'extra_dice', op: '+=', value: this.parseExpr() }; }
+            case 'keep_highest': { this.next(); return { type: 'Action', action: 'set_flag', flag: 'keep_highest' }; }
+            case 'add_hits': { this.next(); return { type: 'Action', action: 'set_slot', slot: 'extra_hits', op: '+=', value: this.parseExpr() }; }
             case 'multiply_hits': { this.next(); return { type: 'Action', action: 'multiply_hits', value: this.parseExpr() }; }
             case 'floor_die': { this.next(); return { type: 'Action', action: 'floor_die', value: this.parseExpr() }; }
             case 'cap_die': { this.next(); return { type: 'Action', action: 'cap_die', value: this.parseExpr() }; }
@@ -397,15 +436,40 @@ class Parser {
                 if (this.isPunct(',')) { this.next(); text = this.expectString('effect description text'); }
                 return { type: 'Action', action: 'emit', name, text };
             }
-            case 'fail': { this.next(); return { type: 'Action', action: 'fail' }; }
+            case 'fail': { this.next(); return { type: 'Action', action: 'set_flag', flag: 'attack_failed' }; }
             case 'suppress': {                           // suppress "Jam" — skip another rule this checkpoint run
                 this.next();
                 return { type: 'Action', action: 'suppress', name: this.expectString('the name of a rule to suppress') };
             }
-            case 'prevent_parry': { this.next(); return { type: 'Action', action: 'prevent_parry' }; }
-            case 'cannot_parry': { this.next(); return { type: 'Action', action: 'cannot_parry' }; }
-            case 'detonate': { this.next(); return { type: 'Action', action: 'detonate' }; }
+            case 'prevent_parry': { this.next(); return { type: 'Action', action: 'set_flag', flag: 'no_parry' }; }
+            case 'cannot_parry': { this.next(); return { type: 'Action', action: 'set_flag', flag: 'cannot_parry' }; }
+            case 'detonate': { this.next(); return { type: 'Action', action: 'set_flag', flag: 'detonate' }; }
+            case 'flag': {                               // generic Stage-3 form: flag <name>
+                this.next();
+                const t2 = this.peek();
+                if (t2.type !== 'ident') throw this.err('Expected a flag name after flag');
+                this.next();
+                return { type: 'Action', action: 'set_flag', flag: t2.value };
+            }
             case 'corrode': { this.next(); return { type: 'Action', action: 'corrode', value: this.parseExpr() }; }
+            case 'declare': {
+                // Stage-3 declaration namespace — alternative surface syntax for
+                // the record-producing verbs: declare test | status | table_roll |
+                // armour_damage | event.
+                this.next();
+                if (this.isKw('test')) { this.next(); return this.parseRequireTest(); }
+                if (this.isKw('status')) { this.next(); return this.parseApplyStatus(); }
+                if (this.isKw('table_roll')) { this.next(); return this.parseRollOn(); }
+                if (this.isKw('armour_damage')) { this.next(); return { type: 'Action', action: 'corrode', value: this.parseExpr() }; }
+                if (this.isKw('event')) {
+                    this.next();
+                    const name = this.expectString('an event name');
+                    let text = null;
+                    if (this.isPunct(',')) { this.next(); text = this.expectString('event description text'); }
+                    return { type: 'Action', action: 'emit', name, text };
+                }
+                throw this.err("Expected 'test', 'status', 'table_roll', 'armour_damage' or 'event' after declare");
+            }
             case 'bump_quality': {                       // bump_quality "Blast" by <expr>
                 this.next();
                 const name = this.expectString('a quality name');
@@ -416,60 +480,66 @@ class Parser {
                 this.next();
                 return { type: 'Action', action: 'add_quality', name: this.expectString('a quality name') };
             }
-            case 'reduce_unnatural_toughness': {         // reduce_unnatural_toughness <expr> (Felling)
+            case 'reduce_unnatural_toughness': {         // sugar: set unnatural_toughness_reduction += <expr> (Felling)
                 this.next();
-                return { type: 'Action', action: 'reduce_unnatural_toughness', value: this.parseExpr() };
+                return { type: 'Action', action: 'set_slot', slot: 'unnatural_toughness_reduction', op: '+=', value: this.parseExpr() };
             }
-            case 'require_test': {
+            case 'require_test': { this.next(); return this.parseRequireTest(); }
+            case 'roll_on': { this.next(); return this.parseRollOn(); }
+            case 'apply_status': { this.next(); return this.parseApplyStatus(); }
+            default:
+                throw this.err(`Unknown action '${kw}'`);
+        }
+    }
+
+    // --- declaration bodies (shared by the legacy verbs and `declare …`) ------
+
+    // require_test "Char" <modifier-expr> "on-fail" [=> roll_on "T" | apply_status …]
+    parseRequireTest() {
+        const characteristic = this.expectString('a characteristic name (e.g. "Toughness")');
+        const value = this.parseExpr();                       // the test modifier
+        const onFail = this.expectString('the on-fail consequence text');
+        // optional follow-up on a FAILED test: roll on a roll_table OR
+        // apply a condition (e.g. Flame → On Fire).
+        let onFailRollTable = null, onFailApply = null;
+        if (this.isOp('=>')) {
+            this.next();
+            if (this.isKw('roll_on') || this.isKw('table_roll')) { this.next(); onFailRollTable = this.expectString('a roll_table name'); }
+            else if (this.isKw('apply_status') || this.isKw('status')) {
                 this.next();
-                const characteristic = this.expectString('a characteristic name (e.g. "Toughness")');
-                const value = this.parseExpr();                       // the test modifier
-                const onFail = this.expectString('the on-fail consequence text');
-                // optional follow-up on a FAILED test: roll on a roll_table OR
-                // apply a condition (e.g. Flame → On Fire).
-                let onFailRollTable = null, onFailApply = null;
-                if (this.isOp('=>')) {
-                    this.next();
-                    if (this.isKw('roll_on')) { this.next(); onFailRollTable = this.expectString('a roll_table name after roll_on'); }
-                    else if (this.isKw('apply_status')) {
-                        this.next();
-                        const name = this.expectString('a condition name after apply_status');
-                        let value = null, duration = null, location = null;   // same optional vars as apply_status
-                        while (this.isKw('value') || this.isKw('duration') || this.isKw('location')) {
-                            if (this.isKw('value')) { this.next(); value = this.parseExpr(); }
-                            else if (this.isKw('duration')) { this.next(); duration = this.parseExpr(); }
-                            else { this.next(); location = this.parseExpr(); }
-                        }
-                        onFailApply = { name, value, duration, location };
-                    } else throw this.err("Expected 'roll_on' or 'apply_status' after =>");
-                }
-                return { type: 'Action', action: 'require_test', characteristic, value, onFail, onFailRollTable, onFailApply };
-            }
-            case 'roll_on': {
-                this.next();
-                const table = this.expectString('a roll_table name');
-                let value = null, area = null;                        // roll_on "X" [+ <modifier>] [area <expr>]
-                if (this.isOp('+')) { this.next(); value = this.parseExpr(); }
-                if (this.isKw('area')) { this.next(); area = this.parseExpr(); }
-                return { type: 'Action', action: 'roll_on', table, value, area };
-            }
-            case 'apply_status': {
-                this.next();
-                const name = this.expectString('a status name');
-                // optional structured variables in any order, then optional reason:
-                //   value <expr> | duration <expr> | location <expr>
-                let value = null, duration = null, location = null, reason = null;
+                const name = this.expectString('a condition name');
+                let value = null, duration = null, location = null;   // same optional vars as apply_status
                 while (this.isKw('value') || this.isKw('duration') || this.isKw('location')) {
                     if (this.isKw('value')) { this.next(); value = this.parseExpr(); }
                     else if (this.isKw('duration')) { this.next(); duration = this.parseExpr(); }
                     else { this.next(); location = this.parseExpr(); }
                 }
-                if (this.isPunct(',')) { this.next(); reason = this.expectString('a reason'); }
-                return { type: 'Action', action: 'apply_status', name, value, duration, location, reason };
-            }
-            default:
-                throw this.err(`Unknown action '${kw}'`);
+                onFailApply = { name, value, duration, location };
+            } else throw this.err("Expected 'roll_on' or 'apply_status' after =>");
         }
+        return { type: 'Action', action: 'require_test', characteristic, value, onFail, onFailRollTable, onFailApply };
+    }
+
+    // roll_on "Table" [+ <modifier>] [area <expr>]
+    parseRollOn() {
+        const table = this.expectString('a roll_table name');
+        let value = null, area = null;
+        if (this.isOp('+')) { this.next(); value = this.parseExpr(); }
+        if (this.isKw('area')) { this.next(); area = this.parseExpr(); }
+        return { type: 'Action', action: 'roll_on', table, value, area };
+    }
+
+    // apply_status "Name" [value e] [duration e] [location e] [, "reason"]
+    parseApplyStatus() {
+        const name = this.expectString('a status name');
+        let value = null, duration = null, location = null, reason = null;
+        while (this.isKw('value') || this.isKw('duration') || this.isKw('location')) {
+            if (this.isKw('value')) { this.next(); value = this.parseExpr(); }
+            else if (this.isKw('duration')) { this.next(); duration = this.parseExpr(); }
+            else { this.next(); location = this.parseExpr(); }
+        }
+        if (this.isPunct(',')) { this.next(); reason = this.expectString('a reason'); }
+        return { type: 'Action', action: 'apply_status', name, value, duration, location, reason };
     }
 }
 

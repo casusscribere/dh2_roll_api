@@ -1,3 +1,9 @@
+dsl 2
+package "dh2.core.talents" {
+  system "dh2"
+  source "Dark Heresy 2e Core Rulebook"
+}
+
 # DH2 TALENTS (XP-bought abilities) that gate on combat state — authored in the DSL.
 # This file holds talents ONLY (kind `talent`, gated on has_talent(...)); innate
 # DH2.0 traits live separately in traits.dsl (kind `trait`, has_trait(...)). The two

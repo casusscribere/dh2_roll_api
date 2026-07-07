@@ -7,10 +7,19 @@
  * actually exposes, so the docs cannot silently drift from the code.
  */
 
+import { FACT_DOCS, FUNCTION_DOCS, SCOPED_ONLY_DOCS, SCOPE_NAMES, SLOT_DOCS, FLAG_DOCS } from './vocabulary.mjs';
+
 export const DSL_DOCS = {
     structure: {
         template:
-`<kind> "<name>" [tier N] {
+`dsl 2                             // optional version pragma (files without it are dsl 1)
+package "dh2.core.example" {      // optional, one per file — provenance for every rule in it
+  system "dh2"                    // rule system id
+  source "Dark Heresy 2e Core Rulebook"
+}
+
+<kind> "<name>" [tier N] {
+  meta { page <N> [ref "…"] }     // optional — rule provenance (book page / cross-ref)
   on <CHECKPOINT>                 // required — where the rule fires
   priority <N>                    // optional — order within a checkpoint (default 0)
   [when <predicate>] then <action> [; <action> ...]   // one or more branches
@@ -30,6 +39,8 @@ export const DSL_DOCS = {
             'priority: lower runs first within a checkpoint. Convention — injectors 0–49, additive bonuses 50–99, cancellers/clamps 100+.',
             'tier N is optional metadata (e.g. talent tier); it does not affect execution.',
             'Comments run from // or # to end of line.',
+            'Provenance (Stage 0): a file may open with a `dsl 2` pragma and one `package "name" { system "…" source "…" }` block; rules may carry `meta { page N }`. Compiled effects then expose page/package/system/sourceBook and a stable qualifiedId ("pkg/rule-id").',
+            'Levelled entries (Stage 1): qualities/talents/traits are canonically { name, level } objects internally; strings like "Proven (3)" or "Vengeful 9" are accepted at the API boundary and parsed once. Both forms work everywhere (has_quality, quality_level, bump_quality, …).',
             'A rule may have several "when … then …" branches; each is evaluated independently (compiles to its own effect, in order). A branch with no "when" is unconditional. Use this for stepped effects — e.g. Accurate adds one die at DoS≥3 and a second only at DoS≥5.',
             'Within a branch, several actions may be separated by ";". Multiple rules may share a file/snippet.',
         ],
@@ -53,67 +64,29 @@ export const DSL_DOCS = {
     ],
 
     // Read-only variables usable in `when` predicates and action expressions.
-    facts: [
-        { name: 'is_melee', type: 'bool', summary: 'The attack is a melee attack.' },
-        { name: 'is_ranged', type: 'bool', summary: 'The attack is a ranged attack.' },
-        { name: 'pen', type: 'number', summary: 'The hit\'s base armour penetration. Meaningful at PENETRATION.' },
-        { name: 'sb', type: 'number', summary: 'Attacker Strength Bonus (tens digit of Strength).' },
-        { name: 'tb', type: 'number', summary: 'Toughness Bonus (tens digit of Toughness).' },
-        { name: 'bs_bonus', type: 'number', summary: 'Ballistic Skill bonus (tens digit of BS).' },
-        { name: 'ws_bonus', type: 'number', summary: 'Weapon Skill bonus (tens digit of WS).' },
-        { name: 'jam_threshold', type: 'number', summary: 'A ranged weapon jams on a roll greater than this (default 96 → jams on 97+). Adjusted by Reliable/Unreliable and craftsmanship; 100 = never jams.' },
-        { name: 'craftsmanship', type: 'string', summary: 'The weapon\'s craftsmanship: "Poor", "Common", "Good", or "Best".' },
-        { name: 'damage_dealt', type: 'number', summary: 'This hit\'s total damage (before soak). Meaningful at ON_HIT.' },
-        { name: 'wounds', type: 'number', summary: 'Wounds this hit inflicted after soak. Meaningful at ON_HIT.' },
-        { name: 'target_sb', type: 'number', summary: 'The target\'s Strength Bonus (from the optional target block).' },
-        { name: 'target_tb', type: 'number', summary: 'The target\'s Toughness Bonus (from the optional target block).' },
-        { name: 'target_armour', type: 'number', summary: 'The struck location\'s current Armour Points (base AP minus any already corroded this attack; 0 if unarmoured). Read at ON_HIT.' },
-        { name: 'target_unnatural_toughness', type: 'number', summary: 'The target\'s Unnatural Toughness bonus (added to TB when soaking; Felling reduces it). 0 if none.' },
-        { name: 'roll', type: 'number', summary: 'The d100 to-hit roll (1–100). Available from POST_ROLL onward.' },
-        { name: 'dos', type: 'number', summary: 'Degrees of Success on the to-hit test (0 on a miss).' },
-        { name: 'dof', type: 'number', summary: 'Degrees of Failure on the to-hit test (0 on a hit).' },
-        { name: 'success', type: 'bool', summary: 'Whether the to-hit test passed. Available from POST_ROLL onward.' },
-        { name: 'action', type: 'string', summary: 'The current action name, e.g. "Standard Attack", "Called Shot", "Parry", "Dodge" — set in every flow including reactions.' },
-        { name: 'action_type', type: 'string', summary: 'The current action\'s type: "Half" | "Full" | "Reaction" | "Free" (from the Actions taxonomy), or "" if unknown.' },
-        { name: 'is_attack', type: 'bool', summary: 'The current action carries the "attack" subtype (the key designation, e.g. Standard Attack, Charge). Used by Defensive (-10 to attacks) and many others.' },
-        { name: 'range', type: 'string', summary: 'The range band, e.g. "Short Range", "Point Blank", "Melee".' },
-        { name: 'aim', type: 'number', summary: 'Aim bonus value applied (0 = none, 10 = half, 20 = full).' },
-        { name: 'half_aim', type: 'bool', summary: 'Aiming as a Half Action (Aim dropdown = Half, or a "Half Aim" status). The aim bonus is +10.' },
-        { name: 'full_aim', type: 'bool', summary: 'Aiming as a Full Action (Aim dropdown = Full, or a "Full Aim" status). The aim bonus is +20.' },
-        { name: 'location', type: 'string', summary: 'The current hit location (e.g. "Head"). Meaningful in the per-hit damage stages.' },
-        { name: 'damage_type', type: 'string', summary: 'The weapon damage type: Impact, Energy, Explosive, or Rending.' },
-        { name: 'hit_index', type: 'number', summary: 'Zero-based index of the current hit in a multi-hit attack.' },
-        { name: 'opposing_present', type: 'bool', summary: 'In a Parry, an opposing (attacking) weapon was supplied (the engagement provides it). Used by Power Field to avoid firing on a bare /api/parry test.' },
-        { name: 'dual_wielding', type: 'bool', summary: 'Wielding and firing two weapons this turn (set via combat.dualWielding).' },
-        { name: 'firing_offhand', type: 'bool', summary: 'This attack uses the off-hand weapon (set via combat.firingOffhand).' },
-        { name: 'firing_both', type: 'bool', summary: 'Firing both weapons this turn (set via combat.firingBoth).' },
-    ],
+    // DERIVED from vocabulary.mjs (Stage 2 — single source): the unscoped facts
+    // plus legacy scoped aliases. Each entry lists the scopes it is available in.
+    facts: FACT_DOCS,
+    // Scoped-only bases (no unscoped form): reach them via <scope>.<name>.
+    scopes: {
+        names: SCOPE_NAMES,
+        summary: 'A fact/function may be read through a scope path — target.tb, weapon.pen, opposing_weapon.has_quality("Force"). The unscoped name is the attacker scope. Legacy prefixed names (target_sb, opposing_has_quality, …) remain as aliases.',
+        scopedOnly: SCOPED_ONLY_DOCS,
+    },
 
-    functions: [
-        { signature: 'has_quality("Name")', returns: 'bool', summary: 'Weapon has the named quality. Prefix match — "Proven (3)" matches has_quality("Proven").' },
-        { signature: 'has_talent("Name")', returns: 'bool', summary: 'Character has the named talent (from the attack\'s talents[] list). Prefix match.' },
-        { signature: 'has_trait("Name")', returns: 'bool', summary: 'Character/creature has the named DH2.0 trait (from traits[]). Prefix match — "Brutal Charge (3)" matches has_trait("Brutal Charge").' },
-        { signature: 'target_has_trait("Name")', returns: 'bool', summary: 'The TARGET/defender has the named trait (from the target block\'s traits[]), e.g. target_has_trait("Daemonic"). Used by Sanctified (Holy damage negates a Daemonic target\'s Unnatural Toughness).' },
-        { signature: 'opposing_has_quality("Name")', returns: 'bool', summary: 'In a Parry (POST_PARRY), the OPPOSING attacking weapon being parried has the named quality. Used by Power Field (immune if the attacker\'s weapon is Force/Warp/etc.).' },
-        { signature: 'has_status("Name")', returns: 'bool', summary: 'Alias of has_condition() (back-compat). A named Condition is active on the character.' },
-        { signature: 'has_condition("Name")', returns: 'bool', summary: 'A named Condition is active on the character (from conditions[] / statuses[]), e.g. "On Fire", "Full Aim", "Stunned".' },
-        { signature: 'has_circumstance("Name")', returns: 'bool', summary: 'A named environmental Circumstance is in effect (from circumstances[]).' },
-        { signature: 'circumstance_severity("Name", default)', returns: 'number', summary: 'Severity of a structured Circumstance in circumstances[] (e.g. the Haywire Field strength 1–5), or default.' },
-        { signature: 'configuration("Name")', returns: 'bool', summary: 'A per-character Configuration toggle is on (from configs[] / firingModes[]), e.g. configuration("Maximal").' },
-        { signature: 'is_action("Name")', returns: 'bool', summary: 'The current action is the named one (case-insensitive), e.g. is_action("Parry"). Works in every flow including reactions.' },
-        { signature: 'is_reaction()', returns: 'bool', summary: 'The current action is a Reaction (Parry, Dodge, …).' },
-        { signature: 'action_subtype("Name")', returns: 'bool', summary: 'The current action carries the named subtype (declared via `subtype`/`attack` on the action). `is_attack` is shorthand for action_subtype("attack").' },
-        { signature: 'firing_mode("Name")', returns: 'bool', summary: 'Alias of configuration() — reads the same toggle list (configs[] / firingModes[]), e.g. firing_mode("Maximal").' },
-        { signature: 'condition_severity("Name", default)', returns: 'number', summary: 'Severity of a structured Condition in conditions[] (e.g. Crippled severity), or default.' },
-        { signature: 'condition_duration("Name", default)', returns: 'number', summary: 'Remaining duration (rounds) of a structured Condition in conditions[], or default.' },
-        { signature: 'condition_location("Name")', returns: 'string', summary: 'Hit location a structured Condition in conditions[] is bound to, or "".' },
-        { signature: 'quality_level("Name", default)', returns: 'number', summary: 'Numeric level parsed from a quality like "Proven (3)" → 3; returns default if absent/unnumbered.' },
-        { signature: 'trait_level("Name", default)', returns: 'number', summary: 'Numeric level parsed from a trait like "Brutal Charge (3)" → 3; returns default if absent/unnumbered.' },
-        { signature: 'tens(n)', returns: 'number', summary: 'The tens digit of n, i.e. floor(n / 10).' },
-        { signature: 'is_natural(n)', returns: 'bool', summary: 'True if the d100 roll equals n exactly.' },
-    ],
+    // DERIVED from vocabulary.mjs (Stage 2 — single source), incl. legacy aliases.
+    functions: FUNCTION_DOCS,
+
+    // Registered mutation targets (Stage 3): `set <slot> (=|+=) <expr>` and
+    // `flag <name>` — the primitives every set-verb/flag-verb is sugar for.
+    // DERIVED from vocabulary.mjs.
+    slots: SLOT_DOCS,
+    flags: FLAG_DOCS,
 
     actions: [
+        { syntax: 'set <slot> (= | +=) <expr>', at: 'per slot', summary: 'THE generic mutation (Stage 3): write a registered slot — see the slots table. The specific set-verbs below (set pen, add_die, reduce_unnatural_toughness, …) are sugar for this.' },
+        { syntax: 'flag <name>', at: 'per flag', summary: 'THE generic boolean state (Stage 3): raise a registered flag — see the flags table. prevent_parry/cannot_parry/detonate/fail/keep_highest are sugar for this.' },
+        { syntax: 'declare test|status|table_roll|armour_damage|event …', at: 'ON_HIT, POST_ROLL, …', summary: 'THE generic declaration namespace (Stage 3): alternative surface syntax for require_test / apply_status / roll_on / corrode / emit.' },
         { syntax: 'add modifier "key" = <expr>', at: 'MODIFIERS, DAMAGE_MODS', summary: 'Add a named modifier (to-hit or damage) with the given value.' },
         { syntax: 'set modifier "key" = <expr>', at: 'MODIFIERS, DAMAGE_MODS', summary: 'Set/overwrite a named modifier\'s value.' },
         { syntax: 'cancel modifier "key"', at: 'MODIFIERS, DAMAGE_MODS', summary: 'Remove a named modifier entirely.' },

@@ -1,0 +1,49 @@
+# DH2 character template — fill column B; File → Download → CSV, then:
+# node tools/import-character.mjs <download>.csv --out=character.json
+key,value
+name,Interrogator Vex
+ws,35
+bs,40
+s,35
+t,30
+ag,35
+int,30
+per,30
+wp,30
+fel,30
+unnatural ws,0
+unnatural bs,0
+unnatural s,0
+unnatural t,0
+unnatural ag,0
+armour head,0
+armour body,4
+armour left arm,2
+armour right arm,2
+armour left leg,2
+armour right leg,2
+wounds max,12
+wounds current,12
+fate max,3
+fate current,3
+talents,"Ambidextrous, Two-Weapon Wielder"
+traits,Brutal Charge (3)
+conditions,
+circumstances,
+field rating,0
+field overload,0
+weapon1 name,Boltgun
+weapon1 class,basic
+weapon1 damage,1d10+9
+weapon1 pen,4
+weapon1 type,explosive
+weapon1 rof burst,3
+weapon1 rof full,0
+weapon1 qualities,Tearing
+weapon1 craftsmanship,Common
+weapon2 name,Sword
+weapon2 class,melee
+weapon2 damage,1d10
+weapon2 pen,0
+weapon2 type,rending
+weapon2 qualities,Balanced

@@ -1,0 +1,18 @@
+{
+  "id": "dh2-roll-vm",
+  "title": "DH2 Roll VM (walking skeleton)",
+  "description": "Seam-validation module: runs the dh2_roll_api DSL VM (engine + rules + data, the same bundle as the GitHub Pages build) inside Foundry. Primary target: dark-heresy-3rd-edition (Foundry v14); compat: dark-heresy-2nd (v12). See README.md for the validation checklist and tools/foundry-test/ for the automated smoke.",
+  "version": "0.2.0",
+  "compatibility": {
+    "minimum": "12",
+    "verified": "14.360"
+  },
+  "esmodules": ["scripts/dh2-vm.js"],
+  "relationships": {
+    "systems": [
+      { "id": "dark-heresy-3rd-edition", "type": "system", "compatibility": { "verified": "1.8.1" } },
+      { "id": "dark-heresy-2nd", "type": "system", "compatibility": { "verified": "1.8.1" } }
+    ]
+  },
+  "authors": [{ "name": "dh2_roll_api (generated)" }]
+}

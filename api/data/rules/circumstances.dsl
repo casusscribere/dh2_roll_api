@@ -1,3 +1,9 @@
+dsl 2
+package "dh2.core.circumstances" {
+  system "dh2"
+  source "Dark Heresy 2e Core Rulebook"
+}
+
 # Circumstances — situational modifiers derived from the environment or the
 # framing of an action (not purchasable talents, not active conditions, not
 # per-character configurations). Gated on has_circumstance("…") (or a fact);
@@ -8,6 +14,7 @@
 # --- Darkness (DH2 core p.229) ----------------------------------------------
 # Fighting in darkness: Weapon Skill tests suffer -20, Ballistic Skill tests -30.
 circumstance "Darkness" {
+  meta { page 229 }
   on MODIFIERS
   when has_circumstance("Darkness") and is_melee  then add modifier "darkness" = -20
   when has_circumstance("Darkness") and is_ranged then add modifier "darkness" = -30
@@ -24,6 +31,7 @@ circumstance "Darkness" {
 # severity threshold: 2 Minor = -10, 3 Major = -20, 4-5 Dead Zone = -60 (technology
 # ceases — powered weapons effectively cannot fire). Primitive weapons are exempt.
 circumstance "Haywire Field" {
+  meta { page 147 }
   on MODIFIERS
   when has_circumstance("Haywire Field") and is_ranged and not has_quality("Primitive") and circumstance_severity("Haywire Field", 0) == 2
     then add modifier "haywire field" = -10

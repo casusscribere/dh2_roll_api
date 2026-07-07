@@ -1,3 +1,9 @@
+dsl 2
+package "dh2.core.actions" {
+  system "dh2"
+  source "Dark Heresy 2e Core Rulebook"
+}
+
 # Actions — every action a character can take (DH2 core p.219+). Each declares a
 # `type` (Half | Full | Reaction | Free) and zero or more `subtype` designations;
 # `attack` is sugar for `subtype attack` — the KEY subtype many rules read (via

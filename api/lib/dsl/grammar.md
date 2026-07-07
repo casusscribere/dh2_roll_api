@@ -28,7 +28,15 @@ compiler/interpreter (AST → executable Effect) is a separate module.
 ## EBNF
 
 ```ebnf
-program     = { rule | roll_table | action_decl } ;
+program     = [ pragma ] { rule | roll_table | action_decl | package } ;
+
+(* --- v2 file header: version pragma + package provenance (Stage 0) --- *)
+pragma      = "dsl" INT ;                        (* grammar version; files without it are dsl 1 *)
+package     = "package" STRING "{" { "system" STRING | "source" STRING | "requires" STRING } "}" ;
+            (* one per file. `system` = rule system id ("dh2", "rt1", …);
+               `source` = source book; `requires` = package dependency (reserved
+               for the Stage-5 layered registry). Compiled effects carry
+               package/system/sourceBook and a stable qualifiedId "pkg/rule-id". *)
 
 (* --- rule: compiles to one Effect per branch --- *)
 rule        = kind STRING [ "tier" INT ] "{" { clause } "}" ;
@@ -47,6 +55,10 @@ kind        = "quality" | "talent" | "trait" | "circumstance" | "condition"
    no `when` is unconditional. *)
 clause      = "on" IDENT                          (* checkpoint; required, once *)
             | "priority" INT                       (* ordering; optional *)
+            | "meta" "{" { "page" INT | "ref" STRING | "source" STRING } "}"
+                                                   (* rule provenance: book page, free-text
+                                                      cross-reference, per-rule source-book
+                                                      override (else the package's) *)
             | branch ;
 branch      = [ "when" predicate ] "then" action { ";" action } ;
 
@@ -70,42 +82,54 @@ andExpr     = notExpr { "and" notExpr } ;
 notExpr     = [ "not" ] comparison ;
 comparison  = atom [ ( "==" | "!=" | ">=" | "<=" | ">" | "<" ) value ] ;
 atom        = "(" predicate ")" | value ;
-value       = NUMBER | STRING | DICE | BOOL | call | IDENT ;
-call        = IDENT "(" [ expr { "," expr } ] ")" ;
+value       = NUMBER | STRING | DICE | BOOL | call | path ;
+path        = IDENT [ "." IDENT ] ;               (* scoped fact (Stage 2): target.tb, weapon.pen;
+                                                     unscoped = the attacker scope *)
+call        = path "(" [ expr { "," expr } ] ")" ;  (* scoped fn: opposing_weapon.has_quality("Force") *)
 
 (* --- action: a fixed set of checkpoint-scoped mutations --- *)
 action      = "add" "modifier" STRING "=" expr
             | "set" "modifier" STRING "=" expr
             | "cancel" "modifier" STRING
-            | "add_die" expr                       (* extra pool dice (weapon die size) *)
-            | "keep_highest"                        (* keep the original die count, highest *)
-            | "add_hits" expr
+            (* --- Stage-3 PRIMITIVES: everything below the line compiles to these --- *)
+            | "set" IDENT ( "+=" | "=" ) expr       (* write a REGISTERED SLOT (pen, jam_threshold,
+                                                       scatter, damage_type, extra_dice, extra_hits,
+                                                       rf_threshold, unnatural_toughness_reduction);
+                                                       compiler validates name + mode *)
+            | "flag" IDENT                          (* raise a REGISTERED FLAG (no_parry, cannot_parry,
+                                                       detonate, attack_failed, keep_highest) *)
+            | "declare" declaration                 (* structured record the engine resolves *)
+            (* --- sugar verbs (v1) — parse to the primitives above --- *)
+            | "add_die" expr                        (* = set extra_dice += e *)
+            | "keep_highest"                        (* = flag keep_highest *)
+            | "add_hits" expr                       (* = set extra_hits += e *)
             | "multiply_hits" expr
-            | "set" "pen" ( "+=" | "=" ) expr
-            | "set" "rf_threshold" "=" expr
-            | "set" "jam_threshold" "=" expr
-            | "set" "scatter" ( "+=" | "=" ) expr   (* base / DSL-alterable scatter distance *)
-            | "set" "damage_type" "=" expr          (* override hit damage type (Sanctified → "Holy") *)
             | "floor_die" expr                      (* raise any die below N to N (Proven) *)
             | "cap_die" expr                        (* cap any die above N at N (Primitive) *)
-            | "emit" STRING [ "," STRING ]          (* push a named effect [+ description] *)
-            | "fail"                                (* cancel success (e.g. Jam) *)
+            | "emit" STRING [ "," STRING ]          (* = declare event *)
+            | "fail"                                (* = flag attack_failed *)
             | "suppress" STRING                     (* skip another rule by name this run (Overheats → Jam) *)
-            | "prevent_parry"                       (* mark the attack un-Parryable (Flexible) *)
-            | "cannot_parry"                        (* mark THIS weapon unable to Parry (Unwieldy) *)
-            | "detonate"                            (* resolve damage at the scatter point (Blast) *)
-            | "corrode" expr                        (* Corrosive: reduce struck-location AP *)
+            | "prevent_parry"                       (* = flag no_parry (Flexible) *)
+            | "cannot_parry"                        (* = flag cannot_parry (Unwieldy) *)
+            | "detonate"                            (* = flag detonate (Blast) *)
+            | "corrode" expr                        (* = declare armour_damage (Corrosive) *)
             | "bump_quality" STRING "by" expr       (* raise an existing quality's rating *)
             | "add_quality" STRING                  (* grant a quality this shot (Maximal → Recharge) *)
-            | "reduce_unnatural_toughness" expr     (* Felling: cut the target's Unnatural Toughness *)
-            | "roll_on" STRING [ "+" expr ] [ "area" expr ]   (* roll on a roll_table (+ modifier; optional radius surfaced with the result — Haywire) *)
+            | "reduce_unnatural_toughness" expr     (* = set unnatural_toughness_reduction += e (Felling) *)
+            | "roll_on" STRING [ "+" expr ] [ "area" expr ]   (* = declare table_roll *)
             | "require_test" STRING expr STRING [ "=>" ( "roll_on" STRING | "apply_status" STRING { "value" expr | "duration" expr | "location" expr } ) ]
             | "apply_status" STRING { "value" expr | "duration" expr | "location" expr } [ "," STRING ] ;
+
+declaration = "test" <require_test body> | "status" <apply_status body>
+            | "table_roll" <roll_on body> | "armour_damage" expr
+            | "event" STRING [ "," STRING ] ;
 
 (* --- arithmetic expression (action values) --- *)
 expr        = addExpr ;
 addExpr     = mulExpr { ( "+" | "-" ) mulExpr } ;
-mulExpr     = unary { ( "*" | "/" ) unary } ;
+mulExpr     = unary { ( "*" | "/" ) unary } ;    (* "/" is integer division rounding UP —
+                                                    the DH2 global rule (p.18); use floor()
+                                                    for round-down, half(n) = ceil(n/2) *)
 unary       = "-" unary | factor ;
 factor      = "(" expr ")" | value ;
 ```

@@ -374,6 +374,29 @@
     }
   };
 
+  // api/lib/rules/_util.mjs
+  var entryName = (x) => x && typeof x === "object" ? String(x.name ?? "") : String(x ?? "");
+  var canonEntry = (x) => {
+    if (x && typeof x === "object") {
+      return { name: String(x.name ?? ""), level: x.level ?? null };
+    }
+    const s = String(x ?? "").trim();
+    const m = /\((\d+)\)\s*$/.exec(s) ?? /\s(\d+)$/.exec(s);
+    return m ? { name: s.slice(0, m.index).trim(), level: parseInt(m[1]) } : { name: s, level: null };
+  };
+  var canonList = (list) => (list ?? []).map(canonEntry);
+  var entryLevel = (x) => {
+    if (x && typeof x === "object") return x.level ?? null;
+    const m = /\((\d+)\)/.exec(String(x ?? "")) ?? /\s(\d+)$/.exec(String(x ?? ""));
+    return m ? parseInt(m[1]) : null;
+  };
+  var hasQuality = (qualities, name) => (qualities ?? []).some((q) => entryName(q).toLowerCase().startsWith(String(name).toLowerCase()));
+  var qualityLevel = (qualities, name, fallback) => {
+    const q = (qualities ?? []).find((x) => entryName(x).toLowerCase().startsWith(String(name).toLowerCase()));
+    if (q === void 0) return fallback;
+    return entryLevel(q) ?? fallback;
+  };
+
   // api/lib/dsl/tokenizer.mjs
   var DslError = class extends Error {
     constructor(message, line, col) {
@@ -389,7 +412,7 @@
   var isIdentPart = (ch) => isIdentStart(ch) || isDigit(ch);
   var TWO_CHAR_OPS = /* @__PURE__ */ new Set(["==", "!=", ">=", "<=", "+=", "=>"]);
   var ONE_CHAR_OPS = /* @__PURE__ */ new Set([">", "<", "=", "+", "-", "*", "/"]);
-  var PUNCT = /* @__PURE__ */ new Set(["{", "}", "(", ")", ",", ";", ":"]);
+  var PUNCT = /* @__PURE__ */ new Set(["{", "}", "(", ")", ",", ";", ":", "."]);
   function tokenize(src) {
     const s = String(src);
     const tokens = [];
@@ -547,13 +570,44 @@
     }
     // --- program / rule ------------------------------------------------------
     parseProgram() {
-      const rules = [], tables = [], actions = [];
+      const rules = [], tables = [], actions = [], packages = [];
+      let dslVersion = null;
       while (!this.atEof()) {
-        if (this.isKw("roll_table")) tables.push(this.parseTable());
+        if (this.isKw("dsl") && this.peek(1)?.type === "number") {
+          this.next();
+          const v = this.next().value;
+          if (dslVersion === null) dslVersion = v;
+        } else if (this.isKw("roll_table")) tables.push(this.parseTable());
         else if (this.isKw("action")) actions.push(this.parseActionDecl());
+        else if (this.isKw("package")) packages.push(this.parsePackage());
         else rules.push(this.parseRule());
       }
-      return { type: "Program", rules, tables, actions };
+      return { type: "Program", rules, tables, actions, dslVersion: dslVersion ?? 1, package: packages[0] ?? null, packages };
+    }
+    // package "dh2.core.weapon-qualities" { system "dh2"  source "Book"  [requires "pkg"]* }
+    // File-level provenance: the rule system this content belongs to, the source
+    // book, and (future — layered registries) package dependencies.
+    parsePackage() {
+      const kw = this.expectKw("package");
+      const name = this.expectString("a quoted package name");
+      this.expectPunct("{");
+      let system = null, source = null;
+      const requires = [];
+      while (!this.isPunct("}")) {
+        if (this.atEof()) throw this.err("Unterminated package (expected '}')");
+        if (this.isKw("system")) {
+          this.next();
+          system = this.expectString('a system id (e.g. "dh2")');
+        } else if (this.isKw("source")) {
+          this.next();
+          source = this.expectString("a source book name");
+        } else if (this.isKw("requires")) {
+          this.next();
+          requires.push(this.expectString("a package name"));
+        } else throw this.err("Unexpected clause in package body (expected 'system', 'source' or 'requires')");
+      }
+      this.expectPunct("}");
+      return { type: "Package", name, system, source, requires, line: kw.line, col: kw.col };
     }
     // action "Name" { type Half|Full|Reaction|Free  [attack] [subtype <name>]* }
     //   `attack` is sugar for `subtype attack` — the key subtype many rules read.
@@ -648,6 +702,7 @@
         tier: null,
         on: null,
         priority: null,
+        meta: null,
         branches: [],
         line: kindTok.line,
         col: kindTok.col
@@ -689,6 +744,28 @@
         if (n.type !== "number") throw this.err("Expected an integer after priority");
         this.next();
         rule.priority = n.value;
+      } else if (this.isKw("meta")) {
+        this.next();
+        this.expectPunct("{");
+        const meta = { page: null, ref: null, source: null };
+        while (!this.isPunct("}")) {
+          if (this.atEof()) throw this.err("Unterminated meta (expected '}')");
+          if (this.isKw("page")) {
+            this.next();
+            const n = this.peek();
+            if (n.type !== "number") throw this.err("Expected a page number after page");
+            this.next();
+            meta.page = n.value;
+          } else if (this.isKw("ref")) {
+            this.next();
+            meta.ref = this.expectString("a reference string");
+          } else if (this.isKw("source")) {
+            this.next();
+            meta.source = this.expectString("a source book name");
+          } else throw this.err("Unexpected clause in meta body (expected 'page', 'ref' or 'source')");
+        }
+        this.expectPunct("}");
+        rule.meta = meta;
       } else if (this.isKw("when")) {
         this.next();
         const when = this.parsePredicate();
@@ -699,7 +776,7 @@
         this.next();
         rule.branches.push({ when: null, actions: this.parseActionList() });
       } else {
-        throw this.err(`Unexpected '${t.value ?? t.type}' in rule body (expected on | priority | when | then)`);
+        throw this.err(`Unexpected '${t.value ?? t.type}' in rule body (expected on | priority | meta | when | then)`);
       }
     }
     parseActionList() {
@@ -816,6 +893,12 @@
           return { type: "Boolean", value: t.value === "true" };
         }
         this.next();
+        let scope = null, name = t.value;
+        if (this.isPunct(".") && this.peek(1)?.type === "ident") {
+          this.next();
+          scope = name;
+          name = this.next().value;
+        }
         if (this.isPunct("(")) {
           this.next();
           const args = [];
@@ -827,9 +910,9 @@
             }
           }
           this.expectPunct(")");
-          return { type: "Call", name: t.value, args };
+          return scope ? { type: "Call", scope, name, args } : { type: "Call", name, args };
         }
-        return { type: "Identifier", name: t.value };
+        return scope ? { type: "Identifier", scope, name } : { type: "Identifier", name };
       }
       throw this.err(`Expected a value, got '${t.value ?? t.type}'`);
     }
@@ -856,60 +939,34 @@
             this.next();
             return { type: "Action", action: "set_modifier", name, value: this.parseExpr() };
           }
-          if (this.isKw("pen")) {
-            this.next();
-            let op;
-            if (this.isOp("+=")) op = "+=";
-            else if (this.isOp("=")) op = "=";
-            else throw this.err("Expected '=' or '+=' after pen");
-            this.next();
-            return { type: "Action", action: "set_pen", op, value: this.parseExpr() };
-          }
-          if (this.isKw("rf_threshold")) {
-            this.next();
-            if (!this.isOp("=")) throw this.err("Expected '=' after rf_threshold");
-            this.next();
-            return { type: "Action", action: "set_rf_threshold", value: this.parseExpr() };
-          }
-          if (this.isKw("jam_threshold")) {
-            this.next();
-            if (!this.isOp("=")) throw this.err("Expected '=' after jam_threshold");
-            this.next();
-            return { type: "Action", action: "set_jam_threshold", value: this.parseExpr() };
-          }
-          if (this.isKw("scatter")) {
-            this.next();
-            let op;
-            if (this.isOp("+=")) op = "+=";
-            else if (this.isOp("=")) op = "=";
-            else throw this.err("Expected '=' or '+=' after scatter");
-            this.next();
-            return { type: "Action", action: "set_scatter", op, value: this.parseExpr() };
-          }
-          if (this.isKw("damage_type")) {
-            this.next();
-            if (!this.isOp("=")) throw this.err("Expected '=' after damage_type");
-            this.next();
-            return { type: "Action", action: "set_damage_type", value: this.parseExpr() };
-          }
-          throw this.err("Expected 'modifier', 'pen', 'rf_threshold', 'jam_threshold', 'scatter' or 'damage_type' after 'set'");
+          const slotTok = this.peek();
+          if (slotTok.type !== "ident") throw this.err("Expected 'modifier' or a slot name after 'set'");
+          this.next();
+          let op;
+          if (this.isOp("+=")) op = "+=";
+          else if (this.isOp("=")) op = "=";
+          else throw this.err(`Expected '=' or '+=' after slot '${slotTok.value}'`);
+          this.next();
+          return { type: "Action", action: "set_slot", slot: slotTok.value, op, value: this.parseExpr() };
         }
         case "cancel": {
           this.next();
           this.expectKw("modifier");
           return { type: "Action", action: "cancel_modifier", name: this.expectString("a modifier name") };
         }
+        // --- sugar over slots/flags (Stage 3): the v1 verbs parse to the
+        // same set_slot / set_flag actions the generic forms produce -------
         case "add_die": {
           this.next();
-          return { type: "Action", action: "add_die", value: this.parseExpr() };
+          return { type: "Action", action: "set_slot", slot: "extra_dice", op: "+=", value: this.parseExpr() };
         }
         case "keep_highest": {
           this.next();
-          return { type: "Action", action: "keep_highest" };
+          return { type: "Action", action: "set_flag", flag: "keep_highest" };
         }
         case "add_hits": {
           this.next();
-          return { type: "Action", action: "add_hits", value: this.parseExpr() };
+          return { type: "Action", action: "set_slot", slot: "extra_hits", op: "+=", value: this.parseExpr() };
         }
         case "multiply_hits": {
           this.next();
@@ -935,7 +992,7 @@
         }
         case "fail": {
           this.next();
-          return { type: "Action", action: "fail" };
+          return { type: "Action", action: "set_flag", flag: "attack_failed" };
         }
         case "suppress": {
           this.next();
@@ -943,19 +1000,56 @@
         }
         case "prevent_parry": {
           this.next();
-          return { type: "Action", action: "prevent_parry" };
+          return { type: "Action", action: "set_flag", flag: "no_parry" };
         }
         case "cannot_parry": {
           this.next();
-          return { type: "Action", action: "cannot_parry" };
+          return { type: "Action", action: "set_flag", flag: "cannot_parry" };
         }
         case "detonate": {
           this.next();
-          return { type: "Action", action: "detonate" };
+          return { type: "Action", action: "set_flag", flag: "detonate" };
+        }
+        case "flag": {
+          this.next();
+          const t2 = this.peek();
+          if (t2.type !== "ident") throw this.err("Expected a flag name after flag");
+          this.next();
+          return { type: "Action", action: "set_flag", flag: t2.value };
         }
         case "corrode": {
           this.next();
           return { type: "Action", action: "corrode", value: this.parseExpr() };
+        }
+        case "declare": {
+          this.next();
+          if (this.isKw("test")) {
+            this.next();
+            return this.parseRequireTest();
+          }
+          if (this.isKw("status")) {
+            this.next();
+            return this.parseApplyStatus();
+          }
+          if (this.isKw("table_roll")) {
+            this.next();
+            return this.parseRollOn();
+          }
+          if (this.isKw("armour_damage")) {
+            this.next();
+            return { type: "Action", action: "corrode", value: this.parseExpr() };
+          }
+          if (this.isKw("event")) {
+            this.next();
+            const name = this.expectString("an event name");
+            let text = null;
+            if (this.isPunct(",")) {
+              this.next();
+              text = this.expectString("event description text");
+            }
+            return { type: "Action", action: "emit", name, text };
+          }
+          throw this.err("Expected 'test', 'status', 'table_roll', 'armour_damage' or 'event' after declare");
         }
         case "bump_quality": {
           this.next();
@@ -969,62 +1063,44 @@
         }
         case "reduce_unnatural_toughness": {
           this.next();
-          return { type: "Action", action: "reduce_unnatural_toughness", value: this.parseExpr() };
+          return { type: "Action", action: "set_slot", slot: "unnatural_toughness_reduction", op: "+=", value: this.parseExpr() };
         }
         case "require_test": {
           this.next();
-          const characteristic = this.expectString('a characteristic name (e.g. "Toughness")');
-          const value = this.parseExpr();
-          const onFail = this.expectString("the on-fail consequence text");
-          let onFailRollTable = null, onFailApply = null;
-          if (this.isOp("=>")) {
-            this.next();
-            if (this.isKw("roll_on")) {
-              this.next();
-              onFailRollTable = this.expectString("a roll_table name after roll_on");
-            } else if (this.isKw("apply_status")) {
-              this.next();
-              const name = this.expectString("a condition name after apply_status");
-              let value2 = null, duration = null, location = null;
-              while (this.isKw("value") || this.isKw("duration") || this.isKw("location")) {
-                if (this.isKw("value")) {
-                  this.next();
-                  value2 = this.parseExpr();
-                } else if (this.isKw("duration")) {
-                  this.next();
-                  duration = this.parseExpr();
-                } else {
-                  this.next();
-                  location = this.parseExpr();
-                }
-              }
-              onFailApply = { name, value: value2, duration, location };
-            } else throw this.err("Expected 'roll_on' or 'apply_status' after =>");
-          }
-          return { type: "Action", action: "require_test", characteristic, value, onFail, onFailRollTable, onFailApply };
+          return this.parseRequireTest();
         }
         case "roll_on": {
           this.next();
-          const table = this.expectString("a roll_table name");
-          let value = null, area = null;
-          if (this.isOp("+")) {
-            this.next();
-            value = this.parseExpr();
-          }
-          if (this.isKw("area")) {
-            this.next();
-            area = this.parseExpr();
-          }
-          return { type: "Action", action: "roll_on", table, value, area };
+          return this.parseRollOn();
         }
         case "apply_status": {
           this.next();
-          const name = this.expectString("a status name");
-          let value = null, duration = null, location = null, reason = null;
+          return this.parseApplyStatus();
+        }
+        default:
+          throw this.err(`Unknown action '${kw}'`);
+      }
+    }
+    // --- declaration bodies (shared by the legacy verbs and `declare …`) ------
+    // require_test "Char" <modifier-expr> "on-fail" [=> roll_on "T" | apply_status …]
+    parseRequireTest() {
+      const characteristic = this.expectString('a characteristic name (e.g. "Toughness")');
+      const value = this.parseExpr();
+      const onFail = this.expectString("the on-fail consequence text");
+      let onFailRollTable = null, onFailApply = null;
+      if (this.isOp("=>")) {
+        this.next();
+        if (this.isKw("roll_on") || this.isKw("table_roll")) {
+          this.next();
+          onFailRollTable = this.expectString("a roll_table name");
+        } else if (this.isKw("apply_status") || this.isKw("status")) {
+          this.next();
+          const name = this.expectString("a condition name");
+          let value2 = null, duration = null, location = null;
           while (this.isKw("value") || this.isKw("duration") || this.isKw("location")) {
             if (this.isKw("value")) {
               this.next();
-              value = this.parseExpr();
+              value2 = this.parseExpr();
             } else if (this.isKw("duration")) {
               this.next();
               duration = this.parseExpr();
@@ -1033,29 +1109,51 @@
               location = this.parseExpr();
             }
           }
-          if (this.isPunct(",")) {
-            this.next();
-            reason = this.expectString("a reason");
-          }
-          return { type: "Action", action: "apply_status", name, value, duration, location, reason };
-        }
-        default:
-          throw this.err(`Unknown action '${kw}'`);
+          onFailApply = { name, value: value2, duration, location };
+        } else throw this.err("Expected 'roll_on' or 'apply_status' after =>");
       }
+      return { type: "Action", action: "require_test", characteristic, value, onFail, onFailRollTable, onFailApply };
+    }
+    // roll_on "Table" [+ <modifier>] [area <expr>]
+    parseRollOn() {
+      const table = this.expectString("a roll_table name");
+      let value = null, area = null;
+      if (this.isOp("+")) {
+        this.next();
+        value = this.parseExpr();
+      }
+      if (this.isKw("area")) {
+        this.next();
+        area = this.parseExpr();
+      }
+      return { type: "Action", action: "roll_on", table, value, area };
+    }
+    // apply_status "Name" [value e] [duration e] [location e] [, "reason"]
+    parseApplyStatus() {
+      const name = this.expectString("a status name");
+      let value = null, duration = null, location = null, reason = null;
+      while (this.isKw("value") || this.isKw("duration") || this.isKw("location")) {
+        if (this.isKw("value")) {
+          this.next();
+          value = this.parseExpr();
+        } else if (this.isKw("duration")) {
+          this.next();
+          duration = this.parseExpr();
+        } else {
+          this.next();
+          location = this.parseExpr();
+        }
+      }
+      if (this.isPunct(",")) {
+        this.next();
+        reason = this.expectString("a reason");
+      }
+      return { type: "Action", action: "apply_status", name, value, duration, location, reason };
     }
   };
   function parse(src) {
     return new Parser(tokenize(src)).parseProgram();
   }
-
-  // api/lib/rules/_util.mjs
-  var hasQuality = (qualities, name) => (qualities ?? []).some((q) => String(q).toLowerCase().startsWith(name.toLowerCase()));
-  var qualityLevel = (qualities, name, fallback) => {
-    const q = (qualities ?? []).map(String).find((x) => x.toLowerCase().startsWith(name.toLowerCase()));
-    if (!q) return fallback;
-    const m = /\((\d+)\)/.exec(q) ?? /\s(\d+)$/.exec(q);
-    return m ? parseInt(m[1]) : fallback;
-  };
 
   // api/lib/actions.mjs
   var ACTIONS = {
@@ -1088,95 +1186,405 @@
   var actionHasSubtype = (name, subtype) => actionSubtypes(name).some((s) => norm(s) === norm(subtype));
   var isAction = (current, name) => norm(current) === norm(name);
 
-  // api/lib/dsl/interpreter.mjs
+  // api/lib/dsl/vocabulary.mjs
   var num = (x) => Number(x) || 0;
   var nameOf = (x) => x && typeof x === "object" ? String(x.name ?? "") : String(x ?? "");
   var hasNamed = (list, name) => (list ?? []).some((x) => nameOf(x).toLowerCase().startsWith(String(name).toLowerCase()));
   var findNamed = (list, name) => (list ?? []).find((x) => nameOf(x).toLowerCase().startsWith(String(name).toLowerCase()));
-  var FACTS = {
-    // weapon / actor
-    is_melee: (c) => !!c.isMelee,
-    is_ranged: (c) => c.isMelee === void 0 ? true : !c.isMelee,
-    pen: (c) => c.pen ?? 0,
-    sb: (c) => c.strengthBonus ?? Math.floor(num(c.characteristics?.s) / 10),
-    tb: (c) => c.toughnessBonus ?? Math.floor(num(c.characteristics?.t) / 10),
-    bs_bonus: (c) => Math.floor(num(c.characteristics?.bs) / 10),
-    ws_bonus: (c) => Math.floor(num(c.characteristics?.ws) / 10),
-    // test / outcome
-    roll: (c) => c.test?.roll ?? c.roll ?? 0,
-    dos: (c) => c.test?.dos ?? c.dos ?? 0,
-    dof: (c) => c.test?.dof ?? c.dof ?? 0,
-    success: (c) => c.test?.success ?? c.success ?? false,
-    // weapon mechanic / craftsmanship
-    jam_threshold: (c) => c.jamThreshold ?? 96,
-    // ranged weapon jams on roll > this
-    craftsmanship: (c) => c.craftsmanship ?? "Common",
-    // action context
-    action: (c) => c.action ?? "",
-    action_type: (c) => actionType(c.action),
-    // 'Half' | 'Full' | 'Reaction' | 'Free'
-    is_attack: (c) => actionHasSubtype(c.action, "attack"),
-    // the action has the key 'attack' subtype
-    range: (c) => c.rangeBand ?? "",
-    aim: (c) => c.aimValue ?? 0,
-    // Aiming conditions — true via the Aim action (aimValue 10/20) OR an applied
-    // "Half Aim" / "Full Aim" status.
-    half_aim: (c) => c.aimValue === 10 || hasNamed(c.statuses, "Half Aim"),
-    full_aim: (c) => c.aimValue === 20 || hasNamed(c.statuses, "Full Aim"),
-    location: (c) => c.location ?? "",
-    damage_type: (c) => c.damageType ?? "",
-    hit_index: (c) => c.hitIndex ?? 0,
-    // per-hit target outcome (ON_HIT): damage dealt and wounds after soak, plus
-    // the target's S/T bonuses (from the optional target block).
-    damage_dealt: (c) => c.damageDealt ?? 0,
-    wounds: (c) => c.woundsInflicted ?? 0,
-    target_sb: (c) => c.target?.strengthBonus ?? Math.floor(num(c.target?.strength) / 10),
-    target_tb: (c) => c.target?.toughnessBonus ?? Math.floor(num(c.target?.toughness) / 10),
-    target_unnatural_toughness: (c) => num(c.target?.unnaturalToughness),
-    // the Unnatural Toughness bonus (Felling reduces it)
-    // current Armour Points at the struck location (base AP minus any already
-    // corroded this attack); 0 if unarmoured. Read at ON_HIT.
-    target_armour: (c) => c.targetArmour ?? num(c.target?.armour),
-    // parry context: the OPPOSING (attacking) weapon being parried — used by
-    // Power Field (destroys the attacker's weapon unless it is immune).
-    opposing_present: (c) => !!c.opposingProvided,
-    // combat state (populated in the dual-wield step; safe defaults until then)
-    dual_wielding: (c) => !!c.combat?.dualWielding,
-    firing_offhand: (c) => !!c.combat?.firingOffhand,
-    firing_both: (c) => !!c.combat?.firingBoth
+  var SCOPE_NAMES = ["attacker", "target", "weapon", "opposing_weapon"];
+  var FACT_DEFS = [
+    // --- weapon / actor ------------------------------------------------------
+    { name: "is_melee", type: "bool", summary: "The attack is a melee attack.", scopes: {
+      attacker: (c) => !!c.isMelee,
+      weapon: (c) => !!c.isMelee
+    } },
+    { name: "is_ranged", type: "bool", summary: "The attack is a ranged attack.", scopes: {
+      attacker: (c) => c.isMelee === void 0 ? true : !c.isMelee,
+      weapon: (c) => c.isMelee === void 0 ? true : !c.isMelee
+    } },
+    { name: "pen", type: "number", summary: "The hit's base armour penetration. Meaningful at PENETRATION.", scopes: {
+      attacker: (c) => c.pen ?? 0,
+      weapon: (c) => c.pen ?? 0
+    } },
+    { name: "sb", type: "number", summary: "Strength Bonus (tens digit of Strength). Scoped: attacker (default) or target.", scopes: {
+      attacker: (c) => c.strengthBonus ?? Math.floor(num(c.characteristics?.s) / 10),
+      target: (c) => c.target?.strengthBonus ?? Math.floor(num(c.target?.strength) / 10)
+    } },
+    { name: "tb", type: "number", summary: "Toughness Bonus (tens digit of Toughness). Scoped: attacker (default) or target.", scopes: {
+      attacker: (c) => c.toughnessBonus ?? Math.floor(num(c.characteristics?.t) / 10),
+      target: (c) => c.target?.toughnessBonus ?? Math.floor(num(c.target?.toughness) / 10)
+    } },
+    { name: "bs_bonus", type: "number", summary: "Ballistic Skill bonus (tens digit of BS).", scopes: {
+      attacker: (c) => Math.floor(num(c.characteristics?.bs) / 10)
+    } },
+    { name: "ws_bonus", type: "number", summary: "Weapon Skill bonus (tens digit of WS).", scopes: {
+      attacker: (c) => Math.floor(num(c.characteristics?.ws) / 10)
+    } },
+    // --- test / outcome ------------------------------------------------------
+    { name: "roll", type: "number", summary: "The d100 to-hit roll (1\u2013100). Available from POST_ROLL onward.", scopes: {
+      attacker: (c) => c.test?.roll ?? c.roll ?? 0
+    } },
+    { name: "dos", type: "number", summary: "Degrees of Success on the to-hit test (0 on a miss).", scopes: {
+      attacker: (c) => c.test?.dos ?? c.dos ?? 0
+    } },
+    { name: "dof", type: "number", summary: "Degrees of Failure on the to-hit test (0 on a hit).", scopes: {
+      attacker: (c) => c.test?.dof ?? c.dof ?? 0
+    } },
+    { name: "success", type: "bool", summary: "Whether the to-hit test passed. Available from POST_ROLL onward.", scopes: {
+      attacker: (c) => c.test?.success ?? c.success ?? false
+    } },
+    // --- weapon mechanic / craftsmanship -------------------------------------
+    { name: "jam_threshold", type: "number", summary: "A ranged weapon jams on a roll greater than this (default 96 \u2192 jams on 97+). Adjusted by Reliable/Unreliable and craftsmanship; 100 = never jams.", scopes: {
+      attacker: (c) => c.jamThreshold ?? 96,
+      weapon: (c) => c.jamThreshold ?? 96
+    } },
+    { name: "craftsmanship", type: "string", summary: `The weapon's craftsmanship: "Poor", "Common", "Good", or "Best".`, scopes: {
+      attacker: (c) => c.craftsmanship ?? "Common",
+      weapon: (c) => c.craftsmanship ?? "Common"
+    } },
+    // --- action context -------------------------------------------------------
+    { name: "action", type: "string", summary: 'The current action name, e.g. "Standard Attack", "Called Shot", "Parry", "Dodge" \u2014 set in every flow including reactions.', scopes: {
+      attacker: (c) => c.action ?? ""
+    } },
+    { name: "action_type", type: "string", summary: `The current action's type: "Half" | "Full" | "Reaction" | "Free" (from the Actions taxonomy), or "" if unknown.`, scopes: {
+      attacker: (c) => actionType(c.action)
+    } },
+    { name: "is_attack", type: "bool", summary: 'The current action carries the "attack" subtype (the key designation, e.g. Standard Attack, Charge). Used by Defensive (-10 to attacks) and many others.', scopes: {
+      attacker: (c) => actionHasSubtype(c.action, "attack")
+    } },
+    { name: "range", type: "string", summary: 'The range band, e.g. "Short Range", "Point Blank", "Melee".', scopes: {
+      attacker: (c) => c.rangeBand ?? ""
+    } },
+    { name: "aim", type: "number", summary: "Aim bonus value applied (0 = none, 10 = half, 20 = full).", scopes: {
+      attacker: (c) => c.aimValue ?? 0
+    } },
+    { name: "half_aim", type: "bool", summary: 'Aiming as a Half Action (Aim dropdown = Half, or a "Half Aim" status). The aim bonus is +10.', scopes: {
+      attacker: (c) => c.aimValue === 10 || hasNamed(c.statuses, "Half Aim")
+    } },
+    { name: "full_aim", type: "bool", summary: 'Aiming as a Full Action (Aim dropdown = Full, or a "Full Aim" status). The aim bonus is +20.', scopes: {
+      attacker: (c) => c.aimValue === 20 || hasNamed(c.statuses, "Full Aim")
+    } },
+    { name: "location", type: "string", summary: 'The current hit location (e.g. "Head"). Meaningful in the per-hit damage stages.', scopes: {
+      attacker: (c) => c.location ?? ""
+    } },
+    { name: "damage_type", type: "string", summary: "The weapon damage type: Impact, Energy, Explosive, or Rending (rules may override it, e.g. Sanctified \u2192 Holy).", scopes: {
+      attacker: (c) => c.damageType ?? "",
+      weapon: (c) => c.damageType ?? ""
+    } },
+    { name: "hit_index", type: "number", summary: "Zero-based index of the current hit in a multi-hit attack.", scopes: {
+      attacker: (c) => c.hitIndex ?? 0
+    } },
+    // --- per-hit target outcome (ON_HIT) --------------------------------------
+    { name: "damage_dealt", type: "number", summary: "This hit's total damage (before soak). Meaningful at ON_HIT.", scopes: {
+      attacker: (c) => c.damageDealt ?? 0
+    } },
+    { name: "wounds", type: "number", summary: "Wounds this hit inflicted after soak. Meaningful at ON_HIT.", scopes: {
+      attacker: (c) => c.woundsInflicted ?? 0
+    } },
+    // --- target-only bases (reachable via target.* or the legacy aliases) -----
+    { name: "armour", type: "number", summary: "The struck location's current Armour Points (base AP minus any already corroded this attack; 0 if unarmoured). Read at ON_HIT. Scope: target.", scopes: {
+      target: (c) => c.targetArmour ?? num(c.target?.armour)
+    } },
+    { name: "unnatural_toughness", type: "number", summary: "The target's Unnatural Toughness bonus (added to TB when soaking; Felling reduces it). 0 if none. Scope: target.", scopes: {
+      target: (c) => num(c.target?.unnaturalToughness)
+    } },
+    // --- opposing weapon (Parry context) --------------------------------------
+    { name: "present", type: "bool", summary: "In a Parry, an opposing (attacking) weapon was supplied (the engagement provides it). Scope: opposing_weapon. Guards Power Field on a bare /api/parry test.", scopes: {
+      opposing_weapon: (c) => !!c.opposingProvided
+    } },
+    // --- combat state ----------------------------------------------------------
+    { name: "dual_wielding", type: "bool", summary: "Wielding and firing two weapons this turn (set via combat.dualWielding).", scopes: {
+      attacker: (c) => !!c.combat?.dualWielding
+    } },
+    { name: "firing_offhand", type: "bool", summary: "This attack uses the off-hand weapon (set via combat.firingOffhand).", scopes: {
+      attacker: (c) => !!c.combat?.firingOffhand
+    } },
+    { name: "firing_both", type: "bool", summary: "Firing both weapons this turn (set via combat.firingBoth).", scopes: {
+      attacker: (c) => !!c.combat?.firingBoth
+    } }
+  ];
+  var FACT_ALIASES = {
+    target_sb: ["target", "sb"],
+    target_tb: ["target", "tb"],
+    target_armour: ["target", "armour"],
+    target_unnatural_toughness: ["target", "unnatural_toughness"],
+    opposing_present: ["opposing_weapon", "present"]
   };
-  var FUNCTIONS = {
-    has_quality: (c, [name]) => hasQuality(c.qualities, String(name)),
-    has_talent: (c, [name]) => hasNamed(c.talents ?? c.actor?.talents, name),
-    has_trait: (c, [name]) => hasNamed(c.traits ?? c.actor?.traits, name),
-    target_has_trait: (c, [name]) => hasNamed(c.target?.traits, name),
-    // a TRAIT on the target/defender (e.g. Daemonic, From Beyond) — for Sanctified
-    opposing_has_quality: (c, [name]) => hasQuality(c.opposingQualities, String(name)),
-    // the parried (attacking) weapon's quality — for Power Field
-    has_status: (c, [name]) => hasNamed(c.statuses ?? c.actor?.statuses, name),
-    // alias of has_condition
-    has_condition: (c, [name]) => hasNamed(c.statuses ?? c.actor?.statuses, name),
-    // active Conditions (Stunned, On Fire, Aiming, …)
-    has_circumstance: (c, [name]) => hasNamed(c.circumstances ?? c.actor?.circumstances, name),
-    // environmental Circumstances
-    circumstance_severity: (c, [name, dflt]) => findNamed(c.circumstances ?? c.actor?.circumstances, name)?.severity ?? num(dflt),
-    // severity of a structured Circumstance (e.g. Haywire Field)
-    configuration: (c, [name]) => hasNamed(c.configs ?? c.firingModes, name),
-    // per-character toggle (Maximal, grip, …)
-    firing_mode: (c, [name]) => hasNamed(c.configs ?? c.firingModes, name),
-    // alias of configuration()
-    // structured-Condition variable accessors (when conditions[] carry objects)
-    condition_severity: (c, [name, dflt]) => findNamed(c.statuses ?? c.actor?.statuses, name)?.severity ?? num(dflt),
-    condition_duration: (c, [name, dflt]) => findNamed(c.statuses ?? c.actor?.statuses, name)?.duration ?? num(dflt),
-    condition_location: (c, [name]) => findNamed(c.statuses ?? c.actor?.statuses, name)?.location ?? "",
-    is_action: (c, [name]) => isAction(c.action, name),
-    is_reaction: (c) => isReaction(c.action),
-    action_subtype: (c, [name]) => actionHasSubtype(c.action, name),
-    // the action carries a named subtype
-    quality_level: (c, [name, dflt]) => qualityLevel(c.qualities, String(name), dflt),
-    trait_level: (c, [name, dflt]) => qualityLevel(c.traits, String(name), dflt),
-    tens: (c, [n]) => Math.floor(num(n) / 10),
-    is_natural: (c, [n]) => (c.test?.roll ?? c.roll) === n
+  var FUNCTION_DEFS = [
+    { name: "has_quality", signature: 'has_quality("Name")', returns: "bool", summary: 'Weapon has the named quality. Prefix match \u2014 "Proven (3)" matches has_quality("Proven"). Scopes: attacker/weapon (default) or opposing_weapon (the parried weapon).', scopes: {
+      attacker: (c, [n]) => hasQuality(c.qualities, String(n)),
+      weapon: (c, [n]) => hasQuality(c.qualities, String(n)),
+      opposing_weapon: (c, [n]) => hasQuality(c.opposingQualities, String(n))
+    } },
+    { name: "quality_level", signature: 'quality_level("Name", default)', returns: "number", summary: 'Numeric level parsed from a quality like "Proven (3)" \u2192 3; returns default if absent/unnumbered.', scopes: {
+      attacker: (c, [n, d2]) => qualityLevel(c.qualities, String(n), d2),
+      weapon: (c, [n, d2]) => qualityLevel(c.qualities, String(n), d2),
+      opposing_weapon: (c, [n, d2]) => qualityLevel(c.opposingQualities, String(n), d2)
+    } },
+    { name: "has_talent", signature: 'has_talent("Name")', returns: "bool", summary: "Character has the named talent (from the attack's talents[] list). Prefix match.", scopes: {
+      attacker: (c, [n]) => hasNamed(c.talents ?? c.actor?.talents, n)
+    } },
+    { name: "has_trait", signature: 'has_trait("Name")', returns: "bool", summary: 'Character/creature has the named DH2.0 trait (from traits[]). Prefix match \u2014 "Brutal Charge (3)" matches has_trait("Brutal Charge"). Scopes: attacker (default) or target (e.g. target.has_trait("Daemonic") \u2014 Sanctified).', scopes: {
+      attacker: (c, [n]) => hasNamed(c.traits ?? c.actor?.traits, n),
+      target: (c, [n]) => hasNamed(c.target?.traits, n)
+    } },
+    { name: "trait_level", signature: 'trait_level("Name", default)', returns: "number", summary: 'Numeric level parsed from a trait like "Brutal Charge (3)" \u2192 3; returns default if absent/unnumbered. Scopes: attacker (default) or target.', scopes: {
+      attacker: (c, [n, d2]) => qualityLevel(c.traits, String(n), d2),
+      target: (c, [n, d2]) => qualityLevel(c.target?.traits, String(n), d2)
+    } },
+    { name: "has_status", signature: 'has_status("Name")', returns: "bool", summary: "Alias of has_condition() (back-compat). A named Condition is active on the character.", scopes: {
+      attacker: (c, [n]) => hasNamed(c.statuses ?? c.actor?.statuses, n)
+    } },
+    { name: "has_condition", signature: 'has_condition("Name")', returns: "bool", summary: 'A named Condition is active on the character (from conditions[] / statuses[]), e.g. "On Fire", "Full Aim", "Stunned".', scopes: {
+      attacker: (c, [n]) => hasNamed(c.statuses ?? c.actor?.statuses, n)
+    } },
+    { name: "has_circumstance", signature: 'has_circumstance("Name")', returns: "bool", summary: "A named environmental Circumstance is in effect (from circumstances[]).", scopes: {
+      attacker: (c, [n]) => hasNamed(c.circumstances ?? c.actor?.circumstances, n)
+    } },
+    { name: "circumstance_severity", signature: 'circumstance_severity("Name", default)', returns: "number", summary: "Severity of a structured Circumstance in circumstances[] (e.g. the Haywire Field strength 1\u20135), or default.", scopes: {
+      attacker: (c, [n, d2]) => findNamed(c.circumstances ?? c.actor?.circumstances, n)?.severity ?? num(d2)
+    } },
+    { name: "configuration", signature: 'configuration("Name")', returns: "bool", summary: 'A per-character Configuration toggle is on (from configs[] / firingModes[]), e.g. configuration("Maximal").', scopes: {
+      attacker: (c, [n]) => hasNamed(c.configs ?? c.firingModes, n)
+    } },
+    { name: "firing_mode", signature: 'firing_mode("Name")', returns: "bool", summary: 'Alias of configuration() \u2014 reads the same toggle list (configs[] / firingModes[]), e.g. firing_mode("Maximal").', scopes: {
+      attacker: (c, [n]) => hasNamed(c.configs ?? c.firingModes, n)
+    } },
+    { name: "is_action", signature: 'is_action("Name")', returns: "bool", summary: 'The current action is the named one (case-insensitive), e.g. is_action("Parry"). Works in every flow including reactions.', scopes: {
+      attacker: (c, [n]) => isAction(c.action, n)
+    } },
+    { name: "is_reaction", signature: "is_reaction()", returns: "bool", summary: "The current action is a Reaction (Parry, Dodge, \u2026).", scopes: {
+      attacker: (c) => isReaction(c.action)
+    } },
+    { name: "action_subtype", signature: 'action_subtype("Name")', returns: "bool", summary: 'The current action carries the named subtype (declared via `subtype`/`attack` on the action). `is_attack` is shorthand for action_subtype("attack").', scopes: {
+      attacker: (c, [n]) => actionHasSubtype(c.action, n)
+    } },
+    { name: "condition_severity", signature: 'condition_severity("Name", default)', returns: "number", summary: "Severity of a structured Condition in conditions[] (e.g. Crippled severity), or default.", scopes: {
+      attacker: (c, [n, d2]) => findNamed(c.statuses ?? c.actor?.statuses, n)?.severity ?? num(d2)
+    } },
+    { name: "condition_duration", signature: 'condition_duration("Name", default)', returns: "number", summary: "Remaining duration (rounds) of a structured Condition in conditions[], or default.", scopes: {
+      attacker: (c, [n, d2]) => findNamed(c.statuses ?? c.actor?.statuses, n)?.duration ?? num(d2)
+    } },
+    { name: "condition_location", signature: 'condition_location("Name")', returns: "string", summary: 'Hit location a structured Condition in conditions[] is bound to, or "".', scopes: {
+      attacker: (c, [n]) => findNamed(c.statuses ?? c.actor?.statuses, n)?.location ?? ""
+    } },
+    { name: "tens", signature: "tens(n)", returns: "number", summary: "The tens digit of n, i.e. floor(n / 10).", scopes: {
+      attacker: (c, [n]) => Math.floor(num(n) / 10)
+    } },
+    { name: "is_natural", signature: "is_natural(n)", returns: "bool", summary: "True if the d100 roll equals n exactly.", scopes: {
+      attacker: (c, [n]) => (c.test?.roll ?? c.roll) === n
+    } },
+    // --- arithmetic helpers (Stage 3 — DH2 p.18: fractions round UP by default) ---
+    { name: "ceil", signature: "ceil(n)", returns: "number", summary: "Round n up to the nearest integer.", scopes: {
+      attacker: (c, [n]) => Math.ceil(Number(n) || 0)
+    } },
+    { name: "floor", signature: "floor(n)", returns: "number", summary: "Round n down to the nearest integer.", scopes: {
+      attacker: (c, [n]) => Math.floor(Number(n) || 0)
+    } },
+    { name: "half", signature: "half(n)", returns: "number", summary: "Half of n, rounded UP \u2014 the DH2 default rounding (p.18), e.g. half(3) = 2.", scopes: {
+      attacker: (c, [n]) => Math.ceil((Number(n) || 0) / 2)
+    } }
+  ];
+  var FUNCTION_ALIASES = {
+    target_has_trait: ["target", "has_trait"],
+    opposing_has_quality: ["opposing_weapon", "has_quality"]
+  };
+  var SLOT_DEFS = {
+    pen: {
+      modes: ["=", "+="],
+      at: "PENETRATION",
+      summary: 'Armour penetration. `+=` accumulates under the rule\'s named modifier slot ("+= pen" doubles it); `=` overwrites the base.',
+      apply: (ctx, op, v, meta) => {
+        if (op === "+=") {
+          const key = meta?.penKey ?? "penetration";
+          ctx.penModifiers[key] = (ctx.penModifiers[key] || 0) + v;
+        } else ctx.pen = v;
+      }
+    },
+    rf_threshold: {
+      modes: ["="],
+      at: "DIE_ADJUST",
+      summary: "The natural die value that triggers Righteous Fury (default 10; e.g. Vengeful lowers it).",
+      apply: (ctx, op, v) => {
+        ctx.rfThreshold = v;
+      }
+    },
+    jam_threshold: {
+      modes: ["="],
+      at: "POST_ROLL",
+      summary: "A ranged weapon jams on a roll greater than this (default 96). Reliable/Unreliable & craftsmanship set it.",
+      apply: (ctx, op, v) => {
+        ctx.jamThreshold = v;
+      }
+    },
+    scatter: {
+      modes: ["=", "+="],
+      at: "ON_MISS",
+      summary: "Scatter distance: `=` sets the base and activates scatter; `+=` adds a rule-named distance modifier. Final distance = max(0, base + modifiers).",
+      apply: (ctx, op, v, meta) => {
+        if (op === "+=") {
+          const key = meta?.penKey ?? "scatter";
+          ctx.scatterModifiers[key] = (ctx.scatterModifiers[key] || 0) + v;
+        } else ctx.scatter = { active: true, base: v };
+      }
+    },
+    damage_type: {
+      modes: ["="],
+      at: "DAMAGE_POOL, DIE_ADJUST",
+      summary: `Override this hit's damage type (e.g. Sanctified \u2192 "Holy"); surfaced on the damage result.`,
+      apply: (ctx, op, v) => {
+        ctx.damageType = v;
+      }
+    },
+    extra_dice: {
+      modes: ["+="],
+      at: "DAMAGE_POOL",
+      summary: "Extra dice added to the damage pool (same size as the weapon die). `add_die N` is sugar for `set extra_dice += N`.",
+      apply: (ctx, op, v) => {
+        ctx.extraDice = (ctx.extraDice || 0) + v;
+      }
+    },
+    extra_hits: {
+      modes: ["+="],
+      at: "HIT_COUNT_BONUS",
+      summary: "Additional hits. `add_hits N` is sugar for `set extra_hits += N`.",
+      apply: (ctx, op, v) => {
+        ctx.additionalHits = (ctx.additionalHits || 0) + v;
+      }
+    },
+    unnatural_toughness_reduction: {
+      modes: ["+="],
+      at: "PENETRATION",
+      summary: "Reduce the target's Unnatural Toughness for this damage calc (Felling; Sanctified vs Daemonic). `reduce_unnatural_toughness N` is sugar.",
+      apply: (ctx, op, v) => {
+        ctx.unnaturalToughnessReduction = (ctx.unnaturalToughnessReduction || 0) + v;
+      }
+    }
+  };
+  var FLAG_DEFS = {
+    no_parry: {
+      at: "POST_ROLL",
+      summary: "The attack cannot be Parried (Flexible); the engagement refuses a Parry reaction and notes it. `prevent_parry` is sugar.",
+      apply: (ctx) => {
+        ctx.preventParry = true;
+      }
+    },
+    cannot_parry: {
+      at: "PARRY",
+      summary: "THIS weapon cannot be used to Parry (Unwieldy); resolveParry refuses the reaction. `cannot_parry` (verb) is sugar.",
+      apply: (ctx) => {
+        ctx.cannotParry = true;
+      }
+    },
+    detonate: {
+      at: "ON_MISS",
+      summary: "Resolve the weapon's damage at the scatter point even on a miss (Blast). `detonate` (verb) is sugar.",
+      apply: (ctx) => {
+        ctx.detonate = true;
+      }
+    },
+    attack_failed: {
+      at: "POST_ROLL",
+      summary: "Cancel the attack's success (a jam). `fail` is sugar.",
+      apply: (ctx) => {
+        ctx.success = false;
+      }
+    },
+    keep_highest: {
+      at: "DAMAGE_POOL",
+      summary: "Keep only the original number of damage dice, highest values (pairs with extra dice \u2014 Tearing). `keep_highest` (verb) is sugar.",
+      apply: (ctx) => {
+        ctx.keepHighest = ctx.parsed.count;
+        ctx.tearing = true;
+      }
+    }
+  };
+  var SLOT_DOCS = Object.entries(SLOT_DEFS).map(([name, s]) => ({
+    name,
+    modes: s.modes,
+    at: s.at,
+    summary: s.summary
+  }));
+  var FLAG_DOCS = Object.entries(FLAG_DEFS).map(([name, f]) => ({
+    name,
+    at: f.at,
+    summary: f.summary
+  }));
+  var buildFlat = (defs, aliases) => {
+    const flat = {};
+    for (const d2 of defs) if (d2.scopes.attacker) flat[d2.name] = d2.scopes.attacker;
+    for (const [alias, [scope, base]] of Object.entries(aliases)) {
+      const def = defs.find((x) => x.name === base);
+      if (def?.scopes[scope]) flat[alias] = def.scopes[scope];
+    }
+    return flat;
+  };
+  var buildScoped = (defs) => {
+    const out = {};
+    for (const s of SCOPE_NAMES) out[s] = {};
+    for (const d2 of defs) for (const [s, get] of Object.entries(d2.scopes)) out[s][d2.name] = get;
+    return out;
+  };
+  var FLAT_FACTS = buildFlat(FACT_DEFS, FACT_ALIASES);
+  var FLAT_FUNCTIONS = buildFlat(FUNCTION_DEFS, FUNCTION_ALIASES);
+  var SCOPED_FACTS = buildScoped(FACT_DEFS);
+  var SCOPED_FUNCTIONS = buildScoped(FUNCTION_DEFS);
+  var FACT_DOCS = [
+    ...FACT_DEFS.filter((d2) => d2.scopes.attacker).map((d2) => ({
+      name: d2.name,
+      type: d2.type,
+      summary: d2.summary,
+      scopes: Object.keys(d2.scopes)
+    })),
+    ...Object.entries(FACT_ALIASES).map(([alias, [scope, base]]) => ({
+      name: alias,
+      type: FACT_DEFS.find((d2) => d2.name === base)?.type ?? "unknown",
+      summary: `Alias of ${scope}.${base} (legacy prefixed name).`,
+      scopes: [scope]
+    }))
+  ];
+  var FUNCTION_DOCS = [
+    ...FUNCTION_DEFS.filter((d2) => d2.scopes.attacker).map((d2) => ({
+      name: d2.name,
+      signature: d2.signature,
+      returns: d2.returns,
+      summary: d2.summary,
+      scopes: Object.keys(d2.scopes)
+    })),
+    ...Object.entries(FUNCTION_ALIASES).map(([alias, [scope, base]]) => {
+      const def = FUNCTION_DEFS.find((d2) => d2.name === base);
+      return {
+        name: alias,
+        signature: def ? def.signature.replace(def.name, alias) : `${alias}(\u2026)`,
+        returns: def?.returns ?? "unknown",
+        summary: `Alias of ${scope}.${base}(\u2026) (legacy prefixed name).`,
+        scopes: [scope]
+      };
+    })
+  ];
+  var SCOPED_ONLY_DOCS = FACT_DEFS.filter((d2) => !d2.scopes.attacker).map((d2) => ({
+    name: d2.name,
+    type: d2.type,
+    summary: d2.summary,
+    scopes: Object.keys(d2.scopes)
+  }));
+
+  // api/lib/dsl/interpreter.mjs
+  var FACTS = FLAT_FACTS;
+  var FUNCTIONS = FLAT_FUNCTIONS;
+  var factGetter = (scope, name) => {
+    const get = scope ? SCOPED_FACTS[scope]?.[name] : FACTS[name];
+    if (!get) {
+      throw new DslError(scope ? `Unknown fact '${scope}.${name}'${SCOPE_NAMES.includes(scope) ? "" : ` (unknown scope '${scope}')`}` : `Unknown fact '${name}'`, 0, 0);
+    }
+    return get;
+  };
+  var fnGetter = (scope, name) => {
+    const fn = scope ? SCOPED_FUNCTIONS[scope]?.[name] : FUNCTIONS[name];
+    if (!fn) {
+      throw new DslError(scope ? `Unknown function '${scope}.${name}()'${SCOPE_NAMES.includes(scope) ? "" : ` (unknown scope '${scope}')`}` : `Unknown function '${name}()'`, 0, 0);
+    }
+    return fn;
   };
   function evalNode(node, ctx) {
     switch (node.type) {
@@ -1189,16 +1597,10 @@
         for (let k = 0; k < node.count; k++) sum += d(node.sides, ctx.rng, ctx.rollLabel ?? "dsl");
         return sum;
       }
-      case "Identifier": {
-        const fact = FACTS[node.name];
-        if (!fact) throw new DslError(`Unknown fact '${node.name}'`, 0, 0);
-        return fact(ctx);
-      }
-      case "Call": {
-        const fn = FUNCTIONS[node.name];
-        if (!fn) throw new DslError(`Unknown function '${node.name}'`, 0, 0);
-        return fn(ctx, node.args.map((a) => evalNode(a, ctx)));
-      }
+      case "Identifier":
+        return factGetter(node.scope ?? null, node.name)(ctx);
+      case "Call":
+        return fnGetter(node.scope ?? null, node.name)(ctx, node.args.map((a) => evalNode(a, ctx)));
       case "Unary":
         return node.op === "neg" ? -evalNode(node.operand, ctx) : !evalNode(node.operand, ctx);
       case "Logical":
@@ -1232,8 +1634,11 @@
             return l - r;
           case "*":
             return l * r;
+          // Integer semantics (Stage 3): division rounds UP — the DH2
+          // global rounding rule (p.18). Use floor(a / b) for the rare
+          // round-down case; half(n) is ceil(n/2).
           case "/":
-            return l / r;
+            return Math.ceil(l / r);
         }
         break;
       }
@@ -1251,43 +1656,20 @@
       case "cancel_modifier":
         delete ctx.modifiers[action.name];
         break;
-      case "add_die":
-        ctx.extraDice = (ctx.extraDice || 0) + evalNode(action.value, ctx);
+      case "set_slot": {
+        const slot = SLOT_DEFS[action.slot];
+        if (!slot) throw new DslError(`Unknown slot '${action.slot}'`, 0, 0);
+        slot.apply(ctx, action.op ?? "=", evalNode(action.value, ctx), meta);
         break;
-      case "keep_highest":
-        ctx.keepHighest = ctx.parsed.count;
-        ctx.tearing = true;
+      }
+      case "set_flag": {
+        const flag = FLAG_DEFS[action.flag];
+        if (!flag) throw new DslError(`Unknown flag '${action.flag}'`, 0, 0);
+        flag.apply(ctx);
         break;
-      case "add_hits":
-        ctx.additionalHits = (ctx.additionalHits || 0) + evalNode(action.value, ctx);
-        break;
+      }
       case "multiply_hits":
         ctx.additionalHits = (ctx.additionalHits || 0) * evalNode(action.value, ctx);
-        break;
-      case "set_pen":
-        if (action.op === "+=") {
-          const key = meta.penKey ?? "penetration";
-          ctx.penModifiers[key] = (ctx.penModifiers[key] || 0) + evalNode(action.value, ctx);
-        } else {
-          ctx.pen = evalNode(action.value, ctx);
-        }
-        break;
-      case "set_rf_threshold":
-        ctx.rfThreshold = evalNode(action.value, ctx);
-        break;
-      case "set_jam_threshold":
-        ctx.jamThreshold = evalNode(action.value, ctx);
-        break;
-      case "set_damage_type":
-        ctx.damageType = evalNode(action.value, ctx);
-        break;
-      case "set_scatter":
-        if (action.op === "+=") {
-          const key = meta.penKey ?? "scatter";
-          ctx.scatterModifiers[key] = (ctx.scatterModifiers[key] || 0) + evalNode(action.value, ctx);
-        } else {
-          ctx.scatter = { active: true, base: evalNode(action.value, ctx) };
-        }
         break;
       case "floor_die": {
         const n = evalNode(action.value, ctx);
@@ -1304,42 +1686,27 @@
       case "emit":
         ctx.effects.push({ name: action.name, effect: action.text ?? "" });
         break;
-      case "fail":
-        ctx.success = false;
-        break;
       case "suppress":
         (ctx.suppressed ?? (ctx.suppressed = /* @__PURE__ */ new Set())).add(action.name);
-        break;
-      case "prevent_parry":
-        ctx.preventParry = true;
-        break;
-      case "cannot_parry":
-        ctx.cannotParry = true;
-        break;
-      case "detonate":
-        ctx.detonate = true;
         break;
       case "bump_quality": {
         const by = evalNode(action.value, ctx);
         const list = ctx.qualities ?? [];
-        const idx = list.findIndex((q) => String(q).toLowerCase().startsWith(String(action.name).toLowerCase()));
+        const idx = list.findIndex((q) => nameOf(q).toLowerCase().startsWith(String(action.name).toLowerCase()));
         if (idx >= 0) {
           const cur = qualityLevel([list[idx]], action.name, 0);
-          ctx.qualities = list.map((q, i) => i === idx ? `${action.name} (${cur + by})` : q);
+          ctx.qualities = list.map((q, i) => i === idx ? { name: action.name, level: cur + by } : q);
           (ctx.effects ?? (ctx.effects = [])).push({ name: `${action.name} \u2191`, effect: `${action.name} (${cur}) \u2192 (${cur + by})` });
         }
         break;
       }
       case "add_quality": {
         const list = ctx.qualities ?? [];
-        if (!list.some((q) => String(q).toLowerCase().startsWith(String(action.name).toLowerCase()))) {
-          ctx.qualities = [...list, action.name];
+        if (!list.some((q) => nameOf(q).toLowerCase().startsWith(String(action.name).toLowerCase()))) {
+          ctx.qualities = [...list, { name: action.name, level: null }];
         }
         break;
       }
-      case "reduce_unnatural_toughness":
-        ctx.unnaturalToughnessReduction = (ctx.unnaturalToughnessReduction || 0) + evalNode(action.value, ctx);
-        break;
       case "require_test":
         ctx.targetEffects.tests.push({
           source: meta.ruleName ?? meta.penKey,
@@ -1382,14 +1749,16 @@
         throw new DslError(`Unknown action '${action.action}'`, 0, 0);
     }
   }
-  function collectNames(node, acc = { facts: /* @__PURE__ */ new Set(), calls: /* @__PURE__ */ new Set() }) {
+  function collectNames(node, acc = { facts: /* @__PURE__ */ new Set(), calls: /* @__PURE__ */ new Set(), scopedFacts: /* @__PURE__ */ new Set(), scopedCalls: /* @__PURE__ */ new Set() }) {
     if (!node || typeof node !== "object") return acc;
     switch (node.type) {
       case "Identifier":
-        acc.facts.add(node.name);
+        if (node.scope) acc.scopedFacts.add(`${node.scope}.${node.name}`);
+        else acc.facts.add(node.name);
         break;
       case "Call":
-        acc.calls.add(node.name);
+        if (node.scope) acc.scopedCalls.add(`${node.scope}.${node.name}`);
+        else acc.calls.add(node.name);
         node.args.forEach((a) => collectNames(a, acc));
         break;
       case "Logical":
@@ -1408,11 +1777,11 @@
   // api/lib/dsl/compiler.mjs
   var KNOWN_CHECKPOINTS = new Set(Object.values(CHECKPOINTS));
   var slug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-  function compileRule(rule) {
+  function compileRule(rule, pkg = null) {
     if (!KNOWN_CHECKPOINTS.has(rule.on)) {
       throw new DslError(`Unknown checkpoint '${rule.on}' in rule "${rule.name}"`, rule.line, rule.col);
     }
-    const names = { facts: /* @__PURE__ */ new Set(), calls: /* @__PURE__ */ new Set() };
+    const names = { facts: /* @__PURE__ */ new Set(), calls: /* @__PURE__ */ new Set(), scopedFacts: /* @__PURE__ */ new Set(), scopedCalls: /* @__PURE__ */ new Set() };
     for (const br of rule.branches) {
       if (br.when) collectNames(br.when, names);
       for (const a of br.actions) if (a.value) collectNames(a.value, names);
@@ -1423,18 +1792,48 @@
     for (const c of names.calls) {
       if (!(c in FUNCTIONS)) throw new DslError(`Unknown function '${c}()' in rule "${rule.name}"`, rule.line, rule.col);
     }
+    for (const sf of names.scopedFacts) {
+      const [scope, f] = sf.split(".");
+      if (!SCOPE_NAMES.includes(scope)) throw new DslError(`Unknown scope '${scope}' in rule "${rule.name}" (scopes: ${SCOPE_NAMES.join(", ")})`, rule.line, rule.col);
+      if (!(f in SCOPED_FACTS[scope])) throw new DslError(`Fact '${f}' is not available in scope '${scope}' in rule "${rule.name}"`, rule.line, rule.col);
+    }
+    for (const sc of names.scopedCalls) {
+      const [scope, c] = sc.split(".");
+      if (!SCOPE_NAMES.includes(scope)) throw new DslError(`Unknown scope '${scope}' in rule "${rule.name}" (scopes: ${SCOPE_NAMES.join(", ")})`, rule.line, rule.col);
+      if (!(c in SCOPED_FUNCTIONS[scope])) throw new DslError(`Function '${c}()' is not available in scope '${scope}' in rule "${rule.name}"`, rule.line, rule.col);
+    }
+    for (const br of rule.branches) {
+      for (const a of br.actions) {
+        if (a.action === "set_slot") {
+          const slot = SLOT_DEFS[a.slot];
+          if (!slot) throw new DslError(`Unknown slot '${a.slot}' in rule "${rule.name}" (slots: ${Object.keys(SLOT_DEFS).join(", ")})`, rule.line, rule.col);
+          if (!slot.modes.includes(a.op ?? "=")) throw new DslError(`Slot '${a.slot}' does not support '${a.op}' in rule "${rule.name}" (modes: ${slot.modes.join(", ")})`, rule.line, rule.col);
+        } else if (a.action === "set_flag" && !FLAG_DEFS[a.flag]) {
+          throw new DslError(`Unknown flag '${a.flag}' in rule "${rule.name}" (flags: ${Object.keys(FLAG_DEFS).join(", ")})`, rule.line, rule.col);
+        }
+      }
+    }
     const ruleId = slug(rule.name);
     const meta = { penKey: ruleId.replace(/-/g, " "), ruleName: rule.name };
     const multi = rule.branches.length > 1;
     return rule.branches.map((br, i) => ({
       id: multi ? `${ruleId}#${i + 1}` : ruleId,
       ruleId,
+      // Stable qualified id — unique across packages (Stage 5 layering keys on
+      // this; ruleId stays the toggle key for back-compat).
+      qualifiedId: pkg?.name ? `${pkg.name}/${ruleId}` : ruleId,
       name: rule.name,
       tier: rule.tier ?? null,
       source: rule.kind,
       checkpoint: rule.on,
       priority: rule.priority ?? 0,
       // branch order preserved by insertion order
+      // Provenance (Stage 0): rule meta + the file's package header.
+      page: rule.meta?.page ?? null,
+      ref: rule.meta?.ref ?? null,
+      package: pkg?.name ?? null,
+      system: pkg?.system ?? null,
+      sourceBook: rule.meta?.source ?? pkg?.source ?? null,
       when: br.when ? (ctx) => Boolean(evalNode(br.when, ctx)) : void 0,
       apply: (ctx) => {
         for (const a of br.actions) applyAction(a, ctx, meta);
@@ -1443,7 +1842,14 @@
   }
   function compile(src) {
     const program = typeof src === "string" ? parse(src) : src;
-    return program.rules.flatMap(compileRule);
+    return program.rules.flatMap((r) => compileRule(r, program.package ?? null));
+  }
+  function programInfo(src) {
+    const program = typeof src === "string" ? parse(src) : src;
+    return {
+      dslVersion: program.dslVersion ?? 1,
+      package: program.package ? { name: program.package.name, system: program.package.system, source: program.package.source, requires: program.package.requires ?? [] } : null
+    };
   }
   function compileTable(table) {
     const rows = [...table.rows].sort((a, b) => a.lo - b.lo);
@@ -1633,7 +2039,13 @@
   ];
 
   // .build/sources.browser.mjs
-  var ruleSources = { "weapon-qualities.dsl": '# DH2 weapon qualities \u2014 authored in the trait DSL.\n#\n# This file IS the interpretation of the DH2 weapon special qualities; it is\n# data, fully separated from the roll engine. It is compiled to checkpoint\n# effects at load time (see lib/rules/index.mjs) and was previously the native\n# module lib/rules/weapon-qualities.mjs \u2014 re-authoring it here dogfoods the DSL.\n#\n# Priorities mirror the original native ordering.\n\n# --- dice pool ---------------------------------------------------------------\nquality "Tearing" {\n  on DAMAGE_POOL\n  priority 10\n  when has_quality("Tearing")\n  then add_die 1; keep_highest          # roll one extra die, keep the original count highest\n}\n\n# --- per-die adjustment + Righteous Fury threshold ---------------------------\nquality "Vengeful" {\n  on DIE_ADJUST\n  priority 0\n  when has_quality("Vengeful")\n  then set rf_threshold = quality_level("Vengeful", 9)\n}\n\nquality "Proven" {\n  on DIE_ADJUST\n  priority 10\n  when has_quality("Proven")\n  then floor_die quality_level("Proven", 2)\n}\n\nquality "Primitive" {\n  on DIE_ADJUST\n  priority 20\n  when has_quality("Primitive")\n  then cap_die quality_level("Primitive", 7)\n}\n\n# --- Accurate (DH2 core p.150) ----------------------------------------------\n# Requires the Aim action. Two rules share the name "Accurate" so a single\n# toggle controls both halves of the quality:\n#   1) +10 to hit while aiming (on top of the aim bonus);\n#   2) +1d10 damage per two DoS (max +2d10) on an aimed single shot.\nquality "Accurate" {\n  on MODIFIERS\n  priority 50\n  when has_quality("Accurate") and (half_aim or full_aim)\n  then add modifier "accurate_aim" = 10\n}\n\nquality "Accurate" {\n  on DAMAGE_MODS\n  priority 10\n  when has_quality("Accurate") and (half_aim or full_aim) and (action == "Standard Attack" or action == "Called Shot") and dos >= 3\n    then add modifier "accurate" = 1d10\n  when has_quality("Accurate") and (half_aim or full_aim) and (action == "Standard Attack" or action == "Called Shot") and dos >= 5\n    then add modifier "accurate x 2" = 1d10\n}\n\n# --- Inaccurate (DH2 core p.146) --------------------------------------------\n# The opposite of Accurate: the character gains NO benefit from the Aim action\n# with this weapon. The aim bonus is injected by the combat-action `aim-modifier`\n# effect at MODIFIERS priority 10 (and Accurate adds "accurate_aim" at 50); this\n# runs at priority 100 (canceller convention) to strip the aim bonus afterwards.\n# Accurate + Inaccurate on the same weapon is a data conflict \u2014 see the\n# mutual-exclusion check in lib/rules/quality-conflicts.mjs, which surfaces it.\nquality "Inaccurate" {\n  on MODIFIERS\n  priority 100\n  when has_quality("Inaccurate")\n  then cancel modifier "aim"\n}\n\n# --- hit count ---------------------------------------------------------------\nquality "Storm" {\n  on HIT_COUNT_MULT\n  priority 10\n  when has_quality("Storm")\n  then multiply_hits 2\n}\n\nquality "Twin-Linked" {\n  on HIT_COUNT_BONUS\n  priority 10\n  when has_quality("Twin-Linked") and dos > 1\n  then add_hits 1\n}\n\n# --- penetration -------------------------------------------------------------\n# `set pen += pen` adds the base penetration again under the rule-named slot\n# ("razor sharp" / "melta"), doubling effective penetration.\n# Razor Sharp (DH2 core p.150): at 3+ DoS, double penetration \u2014 any attack\n# (melee OR ranged), so there is no is_melee gate.\nquality "Razor Sharp" {\n  on PENETRATION\n  priority 10\n  when dos > 2 and has_quality("Razor Sharp")\n  then set pen += pen\n}\n\nquality "Melta" {\n  on PENETRATION\n  priority 20\n  when is_ranged and has_quality("Melta") and (range == "Short Range" or range == "Point Blank")\n  then set pen += pen\n}\n\n# Lance (DH2 core p.147): variable penetration scaling with accuracy. Increase\n# penetration by the weapon\'s BASE value once per degree of success, e.g. base\n# pen 5 at 3 DoS adds 3\xD75=15 \u2192 total 20. `pen` reads the base penetration and\n# `dos` the to-hit degrees (both live on the context at PENETRATION).\nquality "Lance" {\n  on PENETRATION\n  priority 15\n  when has_quality("Lance") and dos > 0\n  then set pen += pen * dos\n}\n\n# --- malfunctions (ranged) ---------------------------------------------------\n# Overheats on 92+; Best-craftsmanship weapons never overheat (p.149). An Overheats\n# weapon OVERRIDES the baseline Jam mechanic \u2014 it overheats instead of jamming, so\n# the first branch suppresses "Jam" (priority 10, before the Jam mechanic at 50)\n# whenever the weapon has Overheats; the second branch emits the overheat on 92+.\nquality "Overheats" {\n  on POST_ROLL\n  priority 10\n  when is_ranged and has_quality("Overheats")\n    then suppress "Jam"\n  when is_ranged and roll > 91 and has_quality("Overheats") and craftsmanship != "Best"\n    then emit "Overheats", "The weapon overheats forcing it to be dropped on the ground!"\n}\n\n# Flexible (DH2 core p.145): linked/non-rigid weapons (whips, flails) deny defensive\n# counters \u2014 an attack from a Flexible weapon CANNOT be Parried (the engine refuses a\n# Parry reaction against it and notes it). A Flexible weapon can still itself Parry.\nquality "Flexible" {\n  on POST_ROLL\n  when has_quality("Flexible")\n  then prevent_parry\n}\n\n# Graviton (DH2 core p.146): on a hit, inflicts additional damage equal to the\n# target\'s Armour points on the struck location (effectively negating armour). The\n# vehicle interaction (facing armour + always rolling Motive Systems Critical\n# Effects) is deferred \u2014 see POTENTIAL_FEATURES.md.\nquality "Graviton" {\n  on DAMAGE_MODS\n  when has_quality("Graviton")\n  then add modifier "graviton" = target_armour\n}\n\n# Jam is a base weapon MECHANIC (see mechanics.dsl), not a quality. These two\n# qualities adjust the jam threshold (default 96 \u2192 jams on 97+):\n#   Reliable \u2192 jams only on 100; Unreliable \u2192 jams on 91+.\nquality "Reliable" {\n  on POST_ROLL\n  priority 10\n  when is_ranged and has_quality("Reliable")\n  then set jam_threshold = 99\n}\n\nquality "Unreliable" {\n  on POST_ROLL\n  priority 10\n  when is_ranged and has_quality("Unreliable")\n  then set jam_threshold = 90\n}\n\n# --- Scatter (DH2 core p.148) \u2014 the weapon QUALITY (distinct from the scatter\n# game mechanic / Scatter Diagram used by Blast on a miss). Spreading shot: deadly\n# up close, weak at range. Point Blank: +10 to hit and +3 damage; Short Range:\n# +10 to hit; any longer range (Normal/Long/Extreme): \u22123 damage.\nquality "Scatter" {\n  on MODIFIERS\n  priority 50\n  when has_quality("Scatter") and (range == "Point Blank" or range == "Short Range")\n  then add modifier "scatter (close)" = 10\n}\nquality "Scatter" {\n  on DAMAGE_MODS\n  priority 50\n  when has_quality("Scatter") and range == "Point Blank"\n    then add modifier "scatter" = 3\n  when has_quality("Scatter") and (range == "Normal Range" or range == "Long Range" or range == "Extreme Range")\n    then add modifier "scatter" = -3\n}\n\n# (Maximal \u2014 the high-power firing mode \u2014 moved to configurations.dsl, the\n#  Configurations category.)\n\n# --- on-hit target effects (DH2 core p.150) ---------------------------------\n# Concussive (X): the target makes a Toughness test at -10*X; on a fail it is\n# Stunned (1 round per DoF). If damage dealt exceeds the target\'s SB, Prone.\nquality "Concussive" {\n  on ON_HIT\n  when has_quality("Concussive")\n    then require_test "Toughness" (-10 * quality_level("Concussive", 0)) "Stunned for 1 round per degree of failure"\n  when has_quality("Concussive") and damage_dealt > target_sb\n    then apply_status "Prone", "damage dealt exceeds the target\'s Strength Bonus"\n}\n\n# Crippling (X): if the target takes at least one wound, it is Crippled for the\n# encounter. This is automatic on a wound \u2014 there is no defender test to resist\n# it (DH2 RAW). The status carries a severity value of X \u2014 the Rending damage the\n# Crippled target suffers to that location each time it takes more than a Half\n# Action (default 1 if the quality has no rating).\nquality "Crippling" {\n  on ON_HIT\n  when has_quality("Crippling") and wounds > 0\n  then apply_status "Crippled" value quality_level("Crippling", 1) location location, "the hit inflicted at least one wound (automatic, no test)"\n}\n\n# Corrosive (DH2 core p.145): the caustic hit corrodes the struck location\'s\n# armour by 1d10 Armour Points (permanent until repaired, cumulative across\n# hits). Any amount beyond the current AP \u2014 or the whole amount if the target is\n# unarmoured there \u2014 is dealt to the target as wounds, ignoring Toughness. The\n# engine resolves the AP loss and overflow (see resolveCorrosion); the report\n# shows the new AP so it can be carried to the next encounter.\nquality "Corrosive" {\n  on ON_HIT\n  when has_quality("Corrosive")\n  then corrode 1d10\n}\n\n# Haywire (X) (DH2 core p.146): on a hit, roll 1d10 on the Haywire Field Effects\n# table to determine the strength of the disruptive field.\nquality "Haywire" {\n  on ON_HIT\n  when has_quality("Haywire")\n  then roll_on "Haywire Field Effects" area quality_level("Haywire", 1)\n}\n\n# Hallucinogenic (X) (DH2 core p.145): the target makes a Toughness test at -10*X;\n# on a failure it suffers a delusion \u2014 roll 1d10 on the Hallucinogenic Effects\n# table (some results impose conditions on the target).\nquality "Hallucinogenic" {\n  on ON_HIT\n  when has_quality("Hallucinogenic")\n  then require_test "Toughness" (-10 * quality_level("Hallucinogenic", 1)) "delusion (roll on Hallucinogenic Effects)" => roll_on "Hallucinogenic Effects"\n}\n\n# Recharge (DH2 core p.146): the weapon must spend a turn recharging before it can\n# fire again. No turn loop in this single-attack tool, so it is surfaced as a note;\n# it is also added dynamically by firing on Maximal (see configurations.dsl).\nquality "Recharge" {\n  on POST_ROLL\n  when has_quality("Recharge")\n  then emit "Recharge", "must spend a turn recharging before it can fire again"\n}\n\n# Felling (X) (DH2 core p.145): when calculating damage, reduce the target\'s\n# Unnatural Toughness BONUS by X \u2014 only Unnatural Toughness, never the base\n# Toughness Bonus, and only for this damage calculation. Runs at PENETRATION (the\n# defence-reduction seam) so the soak step applies the reduced Unnatural Toughness.\nquality "Felling" {\n  on PENETRATION\n  when has_quality("Felling")\n  then reduce_unnatural_toughness quality_level("Felling", 1)\n}\n\n# Flame (DH2 core p.145): whenever a target is struck by a Flame attack (even if it\n# suffers no damage), it must make an Agility test or be set On Fire (p.243).\n# Modelled as a per-hit Agility test that applies the On Fire condition on failure.\n# (RAW Flame is an area attack that doesn\'t use BS \u2014 that targeting is out of scope;\n# the test and its effect are modelled.)\nquality "Flame" {\n  on ON_HIT\n  when has_quality("Flame")\n  then require_test "Agility" 0 "set on fire (gains the On Fire condition)" => apply_status "On Fire" duration "until extinguished"\n}\n\n# Shocking (DH2 core p.148): a target that takes at least 1 wound (after Armour\n# and Toughness) must pass a Challenging (+0) Toughness test or suffer 1 level of\n# Fatigue and be Stunned for rounds equal to half its DoF (rounding up). Modelled\n# as a Toughness test gated on wounds > 0; the Stunned condition lands on a fail\n# (the Fatigue level is descriptive \u2014 no fatigue track in this single-attack tool).\nquality "Shocking" {\n  on ON_HIT\n  when has_quality("Shocking") and wounds > 0\n  then require_test "Toughness" 0 "1 level of Fatigue and Stunned for rounds equal to half the degrees of failure" => apply_status "Stunned"\n}\n\n# Snare (X) (DH2 core p.148): on a hit, the target makes an Agility test at \u221210\xD7X\n# or is Immobilised (and counts as Helpless until it escapes \u2014 a Full Action\n# Challenging Strength/Agility test at \u221210\xD7X). The Immobilised condition lands on\n# a failed Agility test; escaping is descriptive (no turn loop here).\nquality "Snare" {\n  on ON_HIT\n  when has_quality("Snare")\n  then require_test "Agility" (-10 * quality_level("Snare", 0)) "Immobilised (Helpless until it escapes)" => apply_status "Immobilised"\n}\n\n# Toxic (X) (DH2 core p.150): a target that suffers damage (after Armour and\n# Toughness) from a Toxic weapon is poisoned \u2014 it gains the Toxified condition,\n# which (at the end of each of its turns it took damage that round) forces a\n# Toughness test at \u221210\xD7X or 1d10 extra damage. The recurring test needs a turn\n# loop this tool lacks, so it is carried as the Toxified condition (value X) and\n# documented there (conditions.dsl); here we just inflict it on a wounding hit.\nquality "Toxic" {\n  on ON_HIT\n  when has_quality("Toxic") and wounds > 0\n  then apply_status "Toxified" value quality_level("Toxic", 0), "took damage from a Toxic weapon (end-of-turn Toughness test or 1d10 additional damage)"\n}\n\n# Sanctified (DH2 core p.148): the weapon is blessed \u2014 its damage counts as Holy,\n# which has unique effects against denizens of the Warp. The concrete interaction\n# in this engine: a Daemonic creature\'s Toughness-bonus increase (its Unnatural\n# Toughness) "is negated by damage inflicted from \u2026 holy attacks" (p.135), so vs a\n# Daemonic target Sanctified strips the target\'s Unnatural Toughness for this hit\n# (reusing Felling\'s reduction). The Holy damage type is surfaced on the result.\n# (Daemonic / From Beyond traits themselves are planned \u2014 see POTENTIAL_FEATURES.md.)\nquality "Sanctified" {\n  on DAMAGE_POOL\n  priority 0\n  when has_quality("Sanctified")\n  then set damage_type = "Holy"\n}\nquality "Sanctified" {\n  on PENETRATION\n  priority 30\n  when has_quality("Sanctified") and target_has_trait("Daemonic")\n  then reduce_unnatural_toughness target_unnatural_toughness\n}\n\n# --- defensive / parry qualities (DH2 core p.150) ---------------------------\n# Balanced grants +10 to Weapon Skill tests made to Parry (only once even with\n# two Balanced weapons \u2014 it is keyed by the modifier name, so it can\'t stack).\nquality "Balanced" {\n  on PARRY\n  when has_quality("Balanced")\n  then add modifier "balanced" = 10\n}\n\n# Defensive (e.g. a shield): +15 to Parry, but -10 to attacks made with it.\nquality "Defensive" {\n  on PARRY\n  when has_quality("Defensive")\n  then add modifier "defensive" = 15\n}\nquality "Defensive" {\n  on MODIFIERS\n  when has_quality("Defensive") and is_attack\n  then add modifier "defensive" = -10\n}\n\n# Unbalanced (DH2 core p.150): cumbersome offensively-strong weapons. \u221210 to Parry\n# tests, and they cannot be used to make Lightning Attack actions (surfaced as a\n# note \u2014 the tool does not hard-block action choice).\nquality "Unbalanced" {\n  on PARRY\n  when has_quality("Unbalanced")\n  then add modifier "unbalanced" = -10\n}\nquality "Unbalanced" {\n  on POST_ROLL\n  when has_quality("Unbalanced") and is_action("Lightning Attack")\n  then emit "Unbalanced", "cannot be used to make Lightning Attack actions"\n}\n\n# Unwieldy (DH2 core p.150): huge, top-heavy weapons. They CANNOT be used to Parry\n# (the parry flow refuses the reaction \u2014 see resolveParry) and cannot make\n# Lightning Attack actions.\nquality "Unwieldy" {\n  on PARRY\n  when has_quality("Unwieldy")\n  then cannot_parry\n}\nquality "Unwieldy" {\n  on POST_ROLL\n  when has_quality("Unwieldy") and is_action("Lightning Attack")\n  then emit "Unwieldy", "cannot be used to make Lightning Attack actions"\n}\n\n# Power Field (DH2 core p.148): a disruptive energy field. When this weapon\n# SUCCESSFULLY Parries an attack made with a weapon that lacks Power Field, roll\n# 1d100 on Power Field Destruction; on 26+ the attacker\'s weapon is destroyed.\n# Weapons with the Force or Warp Weapon quality, and Natural Weapons, are immune.\n# Runs at POST_PARRY (success known); `opposing_has_quality` reads the parried\n# (attacking) weapon, `opposing_present` guards the bare /api/parry test.\nquality "Power Field" {\n  on POST_PARRY\n  when has_quality("Power Field") and success and opposing_present\n    and not opposing_has_quality("Power Field") and not opposing_has_quality("Force")\n    and not opposing_has_quality("Warp Weapon") and not opposing_has_quality("Natural Weapon")\n  then roll_on "Power Field Destruction"\n}\n\n# --- Blast (X) scatter on a miss (DH2 core p.150 / scatter p.230) ------------\n# A Blast weapon scatters when the firer misses. The scatter distance defaults\n# to 1d5 metres (p.230); the engine rolls the 1d10 direction on the Scatter\n# Diagram. This runs at priority 0 so the 1d5 base is established BEFORE any\n# other rules \u2014 which may increase or decrease it via `set scatter += \u2026`\n# (modifiers accumulate separately and are summed onto the base at the end).\n#\n# `detonate` makes the weapon still resolve its damage at the scatter point even\n# though the shot missed \u2014 a blast goes off wherever it lands and may catch other\n# targets in the area. The `roll <= jam_threshold` gate means a *jam* (which also\n# fails the to-hit) does NOT detonate: a jammed weapon never fired.\nquality "Blast" {\n  on ON_MISS\n  priority 0\n  when is_ranged and has_quality("Blast") and not success and roll <= jam_threshold\n  then set scatter = 1d5; detonate; roll_on "Scatter Diagram"\n}\n', "talents.dsl": '# DH2 TALENTS (XP-bought abilities) that gate on combat state \u2014 authored in the DSL.\n# This file holds talents ONLY (kind `talent`, gated on has_talent(...)); innate\n# DH2.0 traits live separately in traits.dsl (kind `trait`, has_trait(...)). The two\n# are distinct categories in the rule taxonomy and the UI.\n#\n# Talent rules are always present in the registry but only fire when the\n# character actually HAS the talent (has_talent(...)) AND the situation is\n# right (the activation predicate). This is the activation/effect split that\n# lets e.g. Ambidextrous check "am I dual-wielding?" before touching a penalty.\n#\n# Priorities: penalty injectors at 10, cancellers/reducers at 100 (so they run\n# after the penalties they modify are in place).\n\n# (The base off-hand -20 circumstance moved to circumstances.dsl.)\n\n# --- Two-Weapon Wielder ------------------------------------------------------\n# Lets a character attack with two weapons; each attack suffers -20.\ntalent "Two-Weapon Wielder" {\n  on MODIFIERS\n  priority 10\n  when has_talent("Two-Weapon Wielder") and dual_wielding\n  then add modifier "two_weapon" = -20\n}\n\n# --- Ambidextrous (tier 1) ---------------------------------------------------\n# Two branches, each with its own activation:\n#  - firing a single off-hand weapon: negate the off-hand penalty;\n#  - combined with Two-Weapon Wielder while dual-wielding: reduce the\n#    two-weapon penalty -20 -> -10.\ntalent "Ambidextrous" tier 1 {\n  on MODIFIERS\n  priority 100\n  when has_talent("Ambidextrous") and firing_offhand and not dual_wielding\n    then cancel modifier "off_hand"\n  when has_talent("Ambidextrous") and has_talent("Two-Weapon Wielder") and dual_wielding\n    then set modifier "two_weapon" = -10\n}\n', "traits.dsl": '# DH2.0 traits \u2014 innate abilities (like talents, but NOT bought with XP).\n# Gated on has_trait("\u2026"). A character/creature\'s traits are supplied per\n# attack via traits: ["Brutal Charge (3)", \u2026].\n# Levelled traits read their value with trait_level("Name", default).\n\n# Brutal Charge (X): on a melee Charge, add X to the damage inflicted.\ntrait "Brutal Charge" {\n  on DAMAGE_MODS\n  priority 50\n  when has_trait("Brutal Charge") and is_melee and action == "Charge"\n  then add modifier "brutal charge" = trait_level("Brutal Charge", 0)\n}\n\n# Unnatural Characteristic (X) (DH2 core p.139) is NOT a trait rule \u2014 it is a\n# property of a characteristic, handled by the engine: +X to that characteristic\'s\n# bonus (Unnatural Strength \u2192 melee Strength Bonus; Unnatural Toughness \u2192 soak TB)\n# and \u2308X/2\u2309 bonus degrees of success on a successful test with it (WS/BS to-hit,\n# WS Parry, Ag Dodge). Supply it via the `unnatural:{ws,bs,s,ag}` object on the\n# attacker/defender (and `unnaturalToughness` for soak), exposed in the Roll UI as\n# the per-characteristic "Unnatural" inputs \u2014 see rollTest()/runToHit() in\n# lib/engine.mjs. (Previously a simplified flat-damage trait lived here; it was\n# superseded by the characteristic-based implementation.)\n', "conditions.dsl": `# Conditions currently applied to the character \u2014 transient states such as
+  var ruleSources = { "weapon-qualities.dsl": 'dsl 2\npackage "dh2.core.weapon-qualities" {\n  system "dh2"\n  source "Dark Heresy 2e Core Rulebook"\n}\n\n# DH2 weapon qualities \u2014 authored in the trait DSL.\n#\n# This file IS the interpretation of the DH2 weapon special qualities; it is\n# data, fully separated from the roll engine. It is compiled to checkpoint\n# effects at load time (see lib/rules/index.mjs) and was previously the native\n# module lib/rules/weapon-qualities.mjs \u2014 re-authoring it here dogfoods the DSL.\n#\n# Priorities mirror the original native ordering.\n\n# --- dice pool ---------------------------------------------------------------\nquality "Tearing" {\n  meta { page 150 }\n  on DAMAGE_POOL\n  priority 10\n  when has_quality("Tearing")\n  then add_die 1; keep_highest          # roll one extra die, keep the original count highest\n}\n\n# --- per-die adjustment + Righteous Fury threshold ---------------------------\nquality "Vengeful" {\n  meta { page 150 }\n  on DIE_ADJUST\n  priority 0\n  when has_quality("Vengeful")\n  then set rf_threshold = quality_level("Vengeful", 9)\n}\n\nquality "Proven" {\n  meta { page 148 }\n  on DIE_ADJUST\n  priority 10\n  when has_quality("Proven")\n  then floor_die quality_level("Proven", 2)\n}\n\nquality "Primitive" {\n  meta { page 148 }\n  on DIE_ADJUST\n  priority 20\n  when has_quality("Primitive")\n  then cap_die quality_level("Primitive", 7)\n}\n\n# --- Accurate (DH2 core p.150) ----------------------------------------------\n# Requires the Aim action. Two rules share the name "Accurate" so a single\n# toggle controls both halves of the quality:\n#   1) +10 to hit while aiming (on top of the aim bonus);\n#   2) +1d10 damage per two DoS (max +2d10) on an aimed single shot.\nquality "Accurate" {\n  meta { page 145 }\n  on MODIFIERS\n  priority 50\n  when has_quality("Accurate") and (half_aim or full_aim)\n  then add modifier "accurate_aim" = 10\n}\n\nquality "Accurate" {\n  meta { page 145 }\n  on DAMAGE_MODS\n  priority 10\n  when has_quality("Accurate") and (half_aim or full_aim) and (action == "Standard Attack" or action == "Called Shot") and dos >= 3\n    then add modifier "accurate" = 1d10\n  when has_quality("Accurate") and (half_aim or full_aim) and (action == "Standard Attack" or action == "Called Shot") and dos >= 5\n    then add modifier "accurate x 2" = 1d10\n}\n\n# --- Inaccurate (DH2 core p.146) --------------------------------------------\n# The opposite of Accurate: the character gains NO benefit from the Aim action\n# with this weapon. The aim bonus is injected by the combat-action `aim-modifier`\n# effect at MODIFIERS priority 10 (and Accurate adds "accurate_aim" at 50); this\n# runs at priority 100 (canceller convention) to strip the aim bonus afterwards.\n# Accurate + Inaccurate on the same weapon is a data conflict \u2014 see the\n# mutual-exclusion check in lib/rules/quality-conflicts.mjs, which surfaces it.\nquality "Inaccurate" {\n  meta { page 147 }\n  on MODIFIERS\n  priority 100\n  when has_quality("Inaccurate")\n  then cancel modifier "aim"\n}\n\n# --- hit count ---------------------------------------------------------------\nquality "Storm" {\n  meta { page 149 }\n  on HIT_COUNT_MULT\n  priority 10\n  when has_quality("Storm")\n  then multiply_hits 2\n}\n\nquality "Twin-Linked" {\n  meta { page 150 }\n  on HIT_COUNT_BONUS\n  priority 10\n  when has_quality("Twin-Linked") and dos > 1\n  then add_hits 1\n}\n\n# --- penetration -------------------------------------------------------------\n# `set pen += pen` adds the base penetration again under the rule-named slot\n# ("razor sharp" / "melta"), doubling effective penetration.\n# Razor Sharp (DH2 core p.150): at 3+ DoS, double penetration \u2014 any attack\n# (melee OR ranged), so there is no is_melee gate.\nquality "Razor Sharp" {\n  meta { page 148 }\n  on PENETRATION\n  priority 10\n  when dos > 2 and has_quality("Razor Sharp")\n  then set pen += pen\n}\n\nquality "Melta" {\n  meta { page 148 }\n  on PENETRATION\n  priority 20\n  when is_ranged and has_quality("Melta") and (range == "Short Range" or range == "Point Blank")\n  then set pen += pen\n}\n\n# Lance (DH2 core p.147): variable penetration scaling with accuracy. Increase\n# penetration by the weapon\'s BASE value once per degree of success, e.g. base\n# pen 5 at 3 DoS adds 3\xD75=15 \u2192 total 20. `pen` reads the base penetration and\n# `dos` the to-hit degrees (both live on the context at PENETRATION).\nquality "Lance" {\n  meta { page 147 }\n  on PENETRATION\n  priority 15\n  when has_quality("Lance") and dos > 0\n  then set pen += pen * dos\n}\n\n# --- malfunctions (ranged) ---------------------------------------------------\n# Overheats on 92+; Best-craftsmanship weapons never overheat (p.149). An Overheats\n# weapon OVERRIDES the baseline Jam mechanic \u2014 it overheats instead of jamming, so\n# the first branch suppresses "Jam" (priority 10, before the Jam mechanic at 50)\n# whenever the weapon has Overheats; the second branch emits the overheat on 92+.\nquality "Overheats" {\n  meta { page 148 }\n  on POST_ROLL\n  priority 10\n  when is_ranged and has_quality("Overheats")\n    then suppress "Jam"\n  when is_ranged and roll > 91 and has_quality("Overheats") and craftsmanship != "Best"\n    then emit "Overheats", "The weapon overheats forcing it to be dropped on the ground!"\n}\n\n# Flexible (DH2 core p.145): linked/non-rigid weapons (whips, flails) deny defensive\n# counters \u2014 an attack from a Flexible weapon CANNOT be Parried (the engine refuses a\n# Parry reaction against it and notes it). A Flexible weapon can still itself Parry.\nquality "Flexible" {\n  meta { page 145 }\n  on POST_ROLL\n  when has_quality("Flexible")\n  then prevent_parry\n}\n\n# Graviton (DH2 core p.146): on a hit, inflicts additional damage equal to the\n# target\'s Armour points on the struck location (effectively negating armour). The\n# vehicle interaction (facing armour + always rolling Motive Systems Critical\n# Effects) is deferred \u2014 see POTENTIAL_FEATURES.md.\nquality "Graviton" {\n  meta { page 146 }\n  on DAMAGE_MODS\n  when has_quality("Graviton")\n  then add modifier "graviton" = target_armour\n}\n\n# Jam is a base weapon MECHANIC (see mechanics.dsl), not a quality. These two\n# qualities adjust the jam threshold (default 96 \u2192 jams on 97+):\n#   Reliable \u2192 jams only on 100; Unreliable \u2192 jams on 91+.\nquality "Reliable" {\n  meta { page 148 }\n  on POST_ROLL\n  priority 10\n  when is_ranged and has_quality("Reliable")\n  then set jam_threshold = 99\n}\n\nquality "Unreliable" {\n  meta { page 150 }\n  on POST_ROLL\n  priority 10\n  when is_ranged and has_quality("Unreliable")\n  then set jam_threshold = 90\n}\n\n# --- Scatter (DH2 core p.148) \u2014 the weapon QUALITY (distinct from the scatter\n# game mechanic / Scatter Diagram used by Blast on a miss). Spreading shot: deadly\n# up close, weak at range. Point Blank: +10 to hit and +3 damage; Short Range:\n# +10 to hit; any longer range (Normal/Long/Extreme): \u22123 damage.\nquality "Scatter" {\n  meta { page 148 }\n  on MODIFIERS\n  priority 50\n  when has_quality("Scatter") and (range == "Point Blank" or range == "Short Range")\n  then add modifier "scatter (close)" = 10\n}\nquality "Scatter" {\n  meta { page 148 }\n  on DAMAGE_MODS\n  priority 50\n  when has_quality("Scatter") and range == "Point Blank"\n    then add modifier "scatter" = 3\n  when has_quality("Scatter") and (range == "Normal Range" or range == "Long Range" or range == "Extreme Range")\n    then add modifier "scatter" = -3\n}\n\n# (Maximal \u2014 the high-power firing mode \u2014 moved to configurations.dsl, the\n#  Configurations category.)\n\n# --- on-hit target effects (DH2 core p.150) ---------------------------------\n# Concussive (X): the target makes a Toughness test at -10*X; on a fail it is\n# Stunned (1 round per DoF). If damage dealt exceeds the target\'s SB, Prone.\nquality "Concussive" {\n  meta { page 145 }\n  on ON_HIT\n  when has_quality("Concussive")\n    then require_test "Toughness" (-10 * quality_level("Concussive", 0)) "Stunned for 1 round per degree of failure"\n  when has_quality("Concussive") and damage_dealt > target_sb\n    then apply_status "Prone", "damage dealt exceeds the target\'s Strength Bonus"\n}\n\n# Crippling (X): if the target takes at least one wound, it is Crippled for the\n# encounter. This is automatic on a wound \u2014 there is no defender test to resist\n# it (DH2 RAW). The status carries a severity value of X \u2014 the Rending damage the\n# Crippled target suffers to that location each time it takes more than a Half\n# Action (default 1 if the quality has no rating).\nquality "Crippling" {\n  meta { page 145 }\n  on ON_HIT\n  when has_quality("Crippling") and wounds > 0\n  then apply_status "Crippled" value quality_level("Crippling", 1) location location, "the hit inflicted at least one wound (automatic, no test)"\n}\n\n# Corrosive (DH2 core p.145): the caustic hit corrodes the struck location\'s\n# armour by 1d10 Armour Points (permanent until repaired, cumulative across\n# hits). Any amount beyond the current AP \u2014 or the whole amount if the target is\n# unarmoured there \u2014 is dealt to the target as wounds, ignoring Toughness. The\n# engine resolves the AP loss and overflow (see resolveCorrosion); the report\n# shows the new AP so it can be carried to the next encounter.\nquality "Corrosive" {\n  meta { page 145 }\n  on ON_HIT\n  when has_quality("Corrosive")\n  then corrode 1d10\n}\n\n# Haywire (X) (DH2 core p.146): on a hit, roll 1d10 on the Haywire Field Effects\n# table to determine the strength of the disruptive field.\nquality "Haywire" {\n  meta { page 147 }\n  on ON_HIT\n  when has_quality("Haywire")\n  then roll_on "Haywire Field Effects" area quality_level("Haywire", 1)\n}\n\n# Hallucinogenic (X) (DH2 core p.145): the target makes a Toughness test at -10*X;\n# on a failure it suffers a delusion \u2014 roll 1d10 on the Hallucinogenic Effects\n# table (some results impose conditions on the target).\nquality "Hallucinogenic" {\n  meta { page 146 }\n  on ON_HIT\n  when has_quality("Hallucinogenic")\n  then require_test "Toughness" (-10 * quality_level("Hallucinogenic", 1)) "delusion (roll on Hallucinogenic Effects)" => roll_on "Hallucinogenic Effects"\n}\n\n# Recharge (DH2 core p.146): the weapon must spend a turn recharging before it can\n# fire again. No turn loop in this single-attack tool, so it is surfaced as a note;\n# it is also added dynamically by firing on Maximal (see configurations.dsl).\nquality "Recharge" {\n  meta { page 148 }\n  on POST_ROLL\n  when has_quality("Recharge")\n  then emit "Recharge", "must spend a turn recharging before it can fire again"\n}\n\n# Felling (X) (DH2 core p.145): when calculating damage, reduce the target\'s\n# Unnatural Toughness BONUS by X \u2014 only Unnatural Toughness, never the base\n# Toughness Bonus, and only for this damage calculation. Runs at PENETRATION (the\n# defence-reduction seam) so the soak step applies the reduced Unnatural Toughness.\nquality "Felling" {\n  meta { page 145 }\n  on PENETRATION\n  when has_quality("Felling")\n  then reduce_unnatural_toughness quality_level("Felling", 1)\n}\n\n# Flame (DH2 core p.145): whenever a target is struck by a Flame attack (even if it\n# suffers no damage), it must make an Agility test or be set On Fire (p.243).\n# Modelled as a per-hit Agility test that applies the On Fire condition on failure.\n# (RAW Flame is an area attack that doesn\'t use BS \u2014 that targeting is out of scope;\n# the test and its effect are modelled.)\nquality "Flame" {\n  meta { page 145 }\n  on ON_HIT\n  when has_quality("Flame")\n  then require_test "Agility" 0 "set on fire (gains the On Fire condition)" => apply_status "On Fire" duration "until extinguished"\n}\n\n# Shocking (DH2 core p.148): a target that takes at least 1 wound (after Armour\n# and Toughness) must pass a Challenging (+0) Toughness test or suffer 1 level of\n# Fatigue and be Stunned for rounds equal to half its DoF (rounding up). Modelled\n# as a Toughness test gated on wounds > 0; the Stunned condition lands on a fail\n# (the Fatigue level is descriptive \u2014 no fatigue track in this single-attack tool).\nquality "Shocking" {\n  meta { page 149 }\n  on ON_HIT\n  when has_quality("Shocking") and wounds > 0\n  then require_test "Toughness" 0 "1 level of Fatigue and Stunned for rounds equal to half the degrees of failure" => apply_status "Stunned"\n}\n\n# Snare (X) (DH2 core p.148): on a hit, the target makes an Agility test at \u221210\xD7X\n# or is Immobilised (and counts as Helpless until it escapes \u2014 a Full Action\n# Challenging Strength/Agility test at \u221210\xD7X). The Immobilised condition lands on\n# a failed Agility test; escaping is descriptive (no turn loop here).\nquality "Snare" {\n  meta { page 149 }\n  on ON_HIT\n  when has_quality("Snare")\n  then require_test "Agility" (-10 * quality_level("Snare", 0)) "Immobilised (Helpless until it escapes)" => apply_status "Immobilised"\n}\n\n# Toxic (X) (DH2 core p.150): a target that suffers damage (after Armour and\n# Toughness) from a Toxic weapon is poisoned \u2014 it gains the Toxified condition,\n# which (at the end of each of its turns it took damage that round) forces a\n# Toughness test at \u221210\xD7X or 1d10 extra damage. The recurring test needs a turn\n# loop this tool lacks, so it is carried as the Toxified condition (value X) and\n# documented there (conditions.dsl); here we just inflict it on a wounding hit.\nquality "Toxic" {\n  meta { page 150 }\n  on ON_HIT\n  when has_quality("Toxic") and wounds > 0\n  then apply_status "Toxified" value quality_level("Toxic", 0), "took damage from a Toxic weapon (end-of-turn Toughness test or 1d10 additional damage)"\n}\n\n# Sanctified (DH2 core p.148): the weapon is blessed \u2014 its damage counts as Holy,\n# which has unique effects against denizens of the Warp. The concrete interaction\n# in this engine: a Daemonic creature\'s Toughness-bonus increase (its Unnatural\n# Toughness) "is negated by damage inflicted from \u2026 holy attacks" (p.135), so vs a\n# Daemonic target Sanctified strips the target\'s Unnatural Toughness for this hit\n# (reusing Felling\'s reduction). The Holy damage type is surfaced on the result.\n# (Daemonic / From Beyond traits themselves are planned \u2014 see POTENTIAL_FEATURES.md.)\nquality "Sanctified" {\n  meta { page 148 }\n  on DAMAGE_POOL\n  priority 0\n  when has_quality("Sanctified")\n  then set damage_type = "Holy"\n}\nquality "Sanctified" {\n  meta { page 148 }\n  on PENETRATION\n  priority 30\n  when has_quality("Sanctified") and target_has_trait("Daemonic")\n  then reduce_unnatural_toughness target_unnatural_toughness\n}\n\n# --- defensive / parry qualities (DH2 core p.150) ---------------------------\n# Balanced grants +10 to Weapon Skill tests made to Parry (only once even with\n# two Balanced weapons \u2014 it is keyed by the modifier name, so it can\'t stack).\nquality "Balanced" {\n  meta { page 145 }\n  on PARRY\n  when has_quality("Balanced")\n  then add modifier "balanced" = 10\n}\n\n# Defensive (e.g. a shield): +15 to Parry, but -10 to attacks made with it.\nquality "Defensive" {\n  meta { page 145 }\n  on PARRY\n  when has_quality("Defensive")\n  then add modifier "defensive" = 15\n}\nquality "Defensive" {\n  meta { page 145 }\n  on MODIFIERS\n  when has_quality("Defensive") and is_attack\n  then add modifier "defensive" = -10\n}\n\n# Unbalanced (DH2 core p.150): cumbersome offensively-strong weapons. \u221210 to Parry\n# tests, and they cannot be used to make Lightning Attack actions (surfaced as a\n# note \u2014 the tool does not hard-block action choice).\nquality "Unbalanced" {\n  meta { page 150 }\n  on PARRY\n  when has_quality("Unbalanced")\n  then add modifier "unbalanced" = -10\n}\nquality "Unbalanced" {\n  meta { page 150 }\n  on POST_ROLL\n  when has_quality("Unbalanced") and is_action("Lightning Attack")\n  then emit "Unbalanced", "cannot be used to make Lightning Attack actions"\n}\n\n# Unwieldy (DH2 core p.150): huge, top-heavy weapons. They CANNOT be used to Parry\n# (the parry flow refuses the reaction \u2014 see resolveParry) and cannot make\n# Lightning Attack actions.\nquality "Unwieldy" {\n  meta { page 150 }\n  on PARRY\n  when has_quality("Unwieldy")\n  then cannot_parry\n}\nquality "Unwieldy" {\n  meta { page 150 }\n  on POST_ROLL\n  when has_quality("Unwieldy") and is_action("Lightning Attack")\n  then emit "Unwieldy", "cannot be used to make Lightning Attack actions"\n}\n\n# Power Field (DH2 core p.148): a disruptive energy field. When this weapon\n# SUCCESSFULLY Parries an attack made with a weapon that lacks Power Field, roll\n# 1d100 on Power Field Destruction; on 26+ the attacker\'s weapon is destroyed.\n# Weapons with the Force or Warp Weapon quality, and Natural Weapons, are immune.\n# Runs at POST_PARRY (success known); `opposing_has_quality` reads the parried\n# (attacking) weapon, `opposing_present` guards the bare /api/parry test.\nquality "Power Field" {\n  meta { page 148 }\n  on POST_PARRY\n  when has_quality("Power Field") and success and opposing_present\n    and not opposing_has_quality("Power Field") and not opposing_has_quality("Force")\n    and not opposing_has_quality("Warp Weapon") and not opposing_has_quality("Natural Weapon")\n  then roll_on "Power Field Destruction"\n}\n\n# --- Blast (X) scatter on a miss (DH2 core p.150 / scatter p.230) ------------\n# A Blast weapon scatters when the firer misses. The scatter distance defaults\n# to 1d5 metres (p.230); the engine rolls the 1d10 direction on the Scatter\n# Diagram. This runs at priority 0 so the 1d5 base is established BEFORE any\n# other rules \u2014 which may increase or decrease it via `set scatter += \u2026`\n# (modifiers accumulate separately and are summed onto the base at the end).\n#\n# `detonate` makes the weapon still resolve its damage at the scatter point even\n# though the shot missed \u2014 a blast goes off wherever it lands and may catch other\n# targets in the area. The `roll <= jam_threshold` gate means a *jam* (which also\n# fails the to-hit) does NOT detonate: a jammed weapon never fired.\nquality "Blast" {\n  meta { page 145 }\n  on ON_MISS\n  priority 0\n  when is_ranged and has_quality("Blast") and not success and roll <= jam_threshold\n  then set scatter = 1d5; detonate; roll_on "Scatter Diagram"\n}\n', "talents.dsl": 'dsl 2\npackage "dh2.core.talents" {\n  system "dh2"\n  source "Dark Heresy 2e Core Rulebook"\n}\n\n# DH2 TALENTS (XP-bought abilities) that gate on combat state \u2014 authored in the DSL.\n# This file holds talents ONLY (kind `talent`, gated on has_talent(...)); innate\n# DH2.0 traits live separately in traits.dsl (kind `trait`, has_trait(...)). The two\n# are distinct categories in the rule taxonomy and the UI.\n#\n# Talent rules are always present in the registry but only fire when the\n# character actually HAS the talent (has_talent(...)) AND the situation is\n# right (the activation predicate). This is the activation/effect split that\n# lets e.g. Ambidextrous check "am I dual-wielding?" before touching a penalty.\n#\n# Priorities: penalty injectors at 10, cancellers/reducers at 100 (so they run\n# after the penalties they modify are in place).\n\n# (The base off-hand -20 circumstance moved to circumstances.dsl.)\n\n# --- Two-Weapon Wielder ------------------------------------------------------\n# Lets a character attack with two weapons; each attack suffers -20.\ntalent "Two-Weapon Wielder" {\n  on MODIFIERS\n  priority 10\n  when has_talent("Two-Weapon Wielder") and dual_wielding\n  then add modifier "two_weapon" = -20\n}\n\n# --- Ambidextrous (tier 1) ---------------------------------------------------\n# Two branches, each with its own activation:\n#  - firing a single off-hand weapon: negate the off-hand penalty;\n#  - combined with Two-Weapon Wielder while dual-wielding: reduce the\n#    two-weapon penalty -20 -> -10.\ntalent "Ambidextrous" tier 1 {\n  on MODIFIERS\n  priority 100\n  when has_talent("Ambidextrous") and firing_offhand and not dual_wielding\n    then cancel modifier "off_hand"\n  when has_talent("Ambidextrous") and has_talent("Two-Weapon Wielder") and dual_wielding\n    then set modifier "two_weapon" = -10\n}\n', "traits.dsl": 'dsl 2\npackage "dh2.core.traits" {\n  system "dh2"\n  source "Dark Heresy 2e Core Rulebook"\n}\n\n# DH2.0 traits \u2014 innate abilities (like talents, but NOT bought with XP).\n# Gated on has_trait("\u2026"). A character/creature\'s traits are supplied per\n# attack via traits: ["Brutal Charge (3)", \u2026].\n# Levelled traits read their value with trait_level("Name", default).\n\n# Brutal Charge (X): on a melee Charge, add X to the damage inflicted.\ntrait "Brutal Charge" {\n  on DAMAGE_MODS\n  priority 50\n  when has_trait("Brutal Charge") and is_melee and action == "Charge"\n  then add modifier "brutal charge" = trait_level("Brutal Charge", 0)\n}\n\n# Unnatural Characteristic (X) (DH2 core p.139) is NOT a trait rule \u2014 it is a\n# property of a characteristic, handled by the engine: +X to that characteristic\'s\n# bonus (Unnatural Strength \u2192 melee Strength Bonus; Unnatural Toughness \u2192 soak TB)\n# and \u2308X/2\u2309 bonus degrees of success on a successful test with it (WS/BS to-hit,\n# WS Parry, Ag Dodge). Supply it via the `unnatural:{ws,bs,s,ag}` object on the\n# attacker/defender (and `unnaturalToughness` for soak), exposed in the Roll UI as\n# the per-characteristic "Unnatural" inputs \u2014 see rollTest()/runToHit() in\n# lib/engine.mjs. (Previously a simplified flat-damage trait lived here; it was\n# superseded by the characteristic-based implementation.)\n', "conditions.dsl": `dsl 2
+package "dh2.core.conditions" {
+  system "dh2"
+  source "Dark Heresy 2e Core Rulebook"
+}
+
+# Conditions currently applied to the character \u2014 transient states such as
 # aiming or being on fire (most are listed on DH2 core p.242; others come from
 # weapon qualities, e.g. Crippled, Stunned). Gated on has_condition("\u2026") and
 # supplied per attack via conditions: ["On Fire", "Full Aim", \u2026]. The old key
@@ -1661,6 +2073,7 @@ condition "Full Aim" {
 # attack-time effect modelled here is the -10 a burning attacker suffers (distracted
 # by the flames \u2014 an approximation of failing the Willpower test to act).
 condition "On Fire" {
+  meta { page 243 }
   on MODIFIERS
   when has_condition("On Fire")
   then add modifier "on_fire" = -10
@@ -1677,12 +2090,19 @@ condition "On Fire" {
 # it in the report if a Toxified character later acts. Full implementation (the
 # end-of-turn resolution) is planned in POTENTIAL_FEATURES.md.
 condition "Toxified" {
+  meta { page 150 }
   on POST_ROLL
   priority 0
   when has_condition("Toxified")
   then emit "Toxified", "poisoned: at the end of each turn it took damage, a Toughness test (\u221210\xD7severity) or 1d10 additional damage (DH2 core p.150)"
 }
-`, "circumstances.dsl": '# Circumstances \u2014 situational modifiers derived from the environment or the\n# framing of an action (not purchasable talents, not active conditions, not\n# per-character configurations). Gated on has_circumstance("\u2026") (or a fact);\n# eventually hook into a map/scene-aware system (see FOUNDRY_MIGRATION.md).\n# Supplied per attack via circumstances: ["\u2026"] (entries may be structured objects\n# { name, severity } for circumstances that carry a strength, e.g. Haywire Field).\n\n# --- Darkness (DH2 core p.229) ----------------------------------------------\n# Fighting in darkness: Weapon Skill tests suffer -20, Ballistic Skill tests -30.\ncircumstance "Darkness" {\n  on MODIFIERS\n  when has_circumstance("Darkness") and is_melee  then add modifier "darkness" = -20\n  when has_circumstance("Darkness") and is_ranged then add modifier "darkness" = -30\n}\n\n# --- Haywire Field (DH2 core p.146, Table 5-4) ------------------------------\n# An ENVIRONMENTAL field left by a Haywire weapon (see weapon-qualities.dsl). It is\n# ONE circumstance carrying a severity (1-5 = Insignificant / Minor Disruption /\n# Major Disruption / Dead Zone / Prolonged Dead Zone) rather than five separate\n# conditions \u2014 RAW the field "lessens one step in severity each round", so a single\n# severity that degrades models it cleanly. The Haywire roll establishes the field\n# strength; set it via circumstances: [{ name: "Haywire Field", severity: N }].\n# Powered ranged attacks (non-Primitive) suffer the field penalty, worsening by\n# severity threshold: 2 Minor = -10, 3 Major = -20, 4-5 Dead Zone = -60 (technology\n# ceases \u2014 powered weapons effectively cannot fire). Primitive weapons are exempt.\ncircumstance "Haywire Field" {\n  on MODIFIERS\n  when has_circumstance("Haywire Field") and is_ranged and not has_quality("Primitive") and circumstance_severity("Haywire Field", 0) == 2\n    then add modifier "haywire field" = -10\n  when has_circumstance("Haywire Field") and is_ranged and not has_quality("Primitive") and circumstance_severity("Haywire Field", 0) == 3\n    then add modifier "haywire field" = -20\n  when has_circumstance("Haywire Field") and is_ranged and not has_quality("Primitive") and circumstance_severity("Haywire Field", 0) >= 4\n    then add modifier "haywire field" = -60\n}\n', "configurations.dsl": `# Configurations \u2014 per-character toggles the player chooses for a shot/turn
+`, "circumstances.dsl": 'dsl 2\npackage "dh2.core.circumstances" {\n  system "dh2"\n  source "Dark Heresy 2e Core Rulebook"\n}\n\n# Circumstances \u2014 situational modifiers derived from the environment or the\n# framing of an action (not purchasable talents, not active conditions, not\n# per-character configurations). Gated on has_circumstance("\u2026") (or a fact);\n# eventually hook into a map/scene-aware system (see FOUNDRY_MIGRATION.md).\n# Supplied per attack via circumstances: ["\u2026"] (entries may be structured objects\n# { name, severity } for circumstances that carry a strength, e.g. Haywire Field).\n\n# --- Darkness (DH2 core p.229) ----------------------------------------------\n# Fighting in darkness: Weapon Skill tests suffer -20, Ballistic Skill tests -30.\ncircumstance "Darkness" {\n  meta { page 229 }\n  on MODIFIERS\n  when has_circumstance("Darkness") and is_melee  then add modifier "darkness" = -20\n  when has_circumstance("Darkness") and is_ranged then add modifier "darkness" = -30\n}\n\n# --- Haywire Field (DH2 core p.146, Table 5-4) ------------------------------\n# An ENVIRONMENTAL field left by a Haywire weapon (see weapon-qualities.dsl). It is\n# ONE circumstance carrying a severity (1-5 = Insignificant / Minor Disruption /\n# Major Disruption / Dead Zone / Prolonged Dead Zone) rather than five separate\n# conditions \u2014 RAW the field "lessens one step in severity each round", so a single\n# severity that degrades models it cleanly. The Haywire roll establishes the field\n# strength; set it via circumstances: [{ name: "Haywire Field", severity: N }].\n# Powered ranged attacks (non-Primitive) suffer the field penalty, worsening by\n# severity threshold: 2 Minor = -10, 3 Major = -20, 4-5 Dead Zone = -60 (technology\n# ceases \u2014 powered weapons effectively cannot fire). Primitive weapons are exempt.\ncircumstance "Haywire Field" {\n  meta { page 147 }\n  on MODIFIERS\n  when has_circumstance("Haywire Field") and is_ranged and not has_quality("Primitive") and circumstance_severity("Haywire Field", 0) == 2\n    then add modifier "haywire field" = -10\n  when has_circumstance("Haywire Field") and is_ranged and not has_quality("Primitive") and circumstance_severity("Haywire Field", 0) == 3\n    then add modifier "haywire field" = -20\n  when has_circumstance("Haywire Field") and is_ranged and not has_quality("Primitive") and circumstance_severity("Haywire Field", 0) >= 4\n    then add modifier "haywire field" = -60\n}\n', "configurations.dsl": `dsl 2
+package "dh2.core.configurations" {
+  system "dh2"
+  source "Dark Heresy 2e Core Rulebook"
+}
+
+# Configurations \u2014 per-character toggles the player chooses for a shot/turn
 # (grip, dual-wield, firing modes). Gated on configuration("\u2026") (firing_mode is
 # an alias) and supplied per attack via configs: ["\u2026"] (the old firingModes[] is
 # still accepted). Eventually set from the character sheet (FOUNDRY_MIGRATION.md).
@@ -1708,16 +2128,19 @@ configuration "Off-Hand" {
 # gains Recharge \u2014 the last three are surfaced as a note (range-in-metres and ammo
 # tracking are deferred \u2014 see POTENTIAL_FEATURES.md).
 configuration "Maximal" {
+  meta { page 147 }
   on DAMAGE_MODS
   when has_quality("Maximal") and configuration("Maximal")
   then add modifier "maximal" = 1d10
 }
 configuration "Maximal" {
+  meta { page 147 }
   on PENETRATION
   when has_quality("Maximal") and configuration("Maximal")
   then set pen += 2
 }
 configuration "Maximal" {
+  meta { page 147 }
   on PENETRATION
   priority 5
   when has_quality("Maximal") and configuration("Maximal")
@@ -1727,16 +2150,24 @@ configuration "Maximal" {
 # so the Recharge quality rule (POST_ROLL) sees it and fires. The note covers the
 # range/ammo costs (no range-in-metres or ammo model yet \u2014 see POTENTIAL_FEATURES.md).
 configuration "Maximal" {
+  meta { page 147 }
   on MODIFIERS
   when has_quality("Maximal") and configuration("Maximal")
   then add_quality "Recharge"
 }
 configuration "Maximal" {
+  meta { page 147 }
   on POST_ROLL
   when has_quality("Maximal") and configuration("Maximal")
   then emit "Maximal", "+10 m range and x3 ammunition this shot"
 }
-`, "mechanics.dsl": '# Weapon mechanics & craftsmanship \u2014 authored in the DSL.\n#\n# Jam is a base MECHANIC (not a weapon quality): a ranged weapon jams when the\n# attack roll exceeds the jam threshold (default 96 \u2192 jams on 97+). Qualities\n# (Reliable/Unreliable) and craftsmanship adjust `jam_threshold` BEFORE this\n# check runs (lower priority), so they compose. A threshold of 100 never jams.\n\nmechanic "Jam" {\n  on POST_ROLL\n  priority 50\n  when is_ranged and roll > jam_threshold\n  then emit "Jam", "The weapon jams!"; fail\n}\n\n# ===== Weapon craftsmanship (DH2 core p.149) =================================\n# craftsmanship fact is "Poor" | "Common" | "Good" | "Best" (weapon.craftsmanship).\n\n# --- melee: WS modifier applies to every WS test made with the weapon, i.e.\n#     both attacks (MODIFIERS) and parries (PARRY). Best also adds +1 damage. ---\nmechanic "Poor Craftsmanship (melee)" {\n  on MODIFIERS  when is_melee and craftsmanship == "Poor"  then add modifier "craftsmanship" = -10\n}\nmechanic "Poor Craftsmanship (melee)" {\n  on PARRY  when craftsmanship == "Poor"  then add modifier "craftsmanship" = -10\n}\nmechanic "Good Craftsmanship (melee)" {\n  on MODIFIERS  when is_melee and craftsmanship == "Good"  then add modifier "craftsmanship" = 5\n}\nmechanic "Good Craftsmanship (melee)" {\n  on PARRY  when craftsmanship == "Good"  then add modifier "craftsmanship" = 5\n}\nmechanic "Best Craftsmanship (melee)" {\n  on MODIFIERS  when is_melee and craftsmanship == "Best"  then add modifier "craftsmanship" = 10\n}\nmechanic "Best Craftsmanship (melee)" {\n  on PARRY  when craftsmanship == "Best"  then add modifier "craftsmanship" = 10\n}\nmechanic "Best Craftsmanship (melee)" {\n  on DAMAGE_MODS  when is_melee and craftsmanship == "Best"  then add modifier "craftsmanship" = 1\n}\n\n# --- ranged: craftsmanship adjusts the jam threshold (priority 5, before the\n#     Reliable/Unreliable qualities at 10 and the base Jam mechanic at 50). ---\nmechanic "Poor Craftsmanship (ranged)" {\n  on POST_ROLL  priority 5  when is_ranged and craftsmanship == "Poor"  then set jam_threshold = 90\n}\nmechanic "Good Craftsmanship (ranged)" {\n  on POST_ROLL  priority 5  when is_ranged and craftsmanship == "Good"  then set jam_threshold = 99\n}\nmechanic "Best Craftsmanship (ranged)" {\n  on POST_ROLL  priority 5  when is_ranged and craftsmanship == "Best"  then set jam_threshold = 100\n}\n', "roll-tables.dsl": `# DH2 roll tables \u2014 data for the \`roll_on\` action.
+`, "mechanics.dsl": 'dsl 2\npackage "dh2.core.mechanics" {\n  system "dh2"\n  source "Dark Heresy 2e Core Rulebook"\n}\n\n# Weapon mechanics & craftsmanship \u2014 authored in the DSL.\n#\n# Jam is a base MECHANIC (not a weapon quality): a ranged weapon jams when the\n# attack roll exceeds the jam threshold (default 96 \u2192 jams on 97+). Qualities\n# (Reliable/Unreliable) and craftsmanship adjust `jam_threshold` BEFORE this\n# check runs (lower priority), so they compose. A threshold of 100 never jams.\n\nmechanic "Jam" {\n  on POST_ROLL\n  priority 50\n  when is_ranged and roll > jam_threshold\n  then emit "Jam", "The weapon jams!"; fail\n}\n\n# ===== Weapon craftsmanship (DH2 core p.149) =================================\n# craftsmanship fact is "Poor" | "Common" | "Good" | "Best" (weapon.craftsmanship).\n\n# --- melee: WS modifier applies to every WS test made with the weapon, i.e.\n#     both attacks (MODIFIERS) and parries (PARRY). Best also adds +1 damage. ---\nmechanic "Poor Craftsmanship (melee)" {\n  on MODIFIERS  when is_melee and craftsmanship == "Poor"  then add modifier "craftsmanship" = -10\n}\nmechanic "Poor Craftsmanship (melee)" {\n  on PARRY  when craftsmanship == "Poor"  then add modifier "craftsmanship" = -10\n}\nmechanic "Good Craftsmanship (melee)" {\n  on MODIFIERS  when is_melee and craftsmanship == "Good"  then add modifier "craftsmanship" = 5\n}\nmechanic "Good Craftsmanship (melee)" {\n  on PARRY  when craftsmanship == "Good"  then add modifier "craftsmanship" = 5\n}\nmechanic "Best Craftsmanship (melee)" {\n  on MODIFIERS  when is_melee and craftsmanship == "Best"  then add modifier "craftsmanship" = 10\n}\nmechanic "Best Craftsmanship (melee)" {\n  on PARRY  when craftsmanship == "Best"  then add modifier "craftsmanship" = 10\n}\nmechanic "Best Craftsmanship (melee)" {\n  on DAMAGE_MODS  when is_melee and craftsmanship == "Best"  then add modifier "craftsmanship" = 1\n}\n\n# --- ranged: craftsmanship adjusts the jam threshold (priority 5, before the\n#     Reliable/Unreliable qualities at 10 and the base Jam mechanic at 50). ---\nmechanic "Poor Craftsmanship (ranged)" {\n  on POST_ROLL  priority 5  when is_ranged and craftsmanship == "Poor"  then set jam_threshold = 90\n}\nmechanic "Good Craftsmanship (ranged)" {\n  on POST_ROLL  priority 5  when is_ranged and craftsmanship == "Good"  then set jam_threshold = 99\n}\nmechanic "Best Craftsmanship (ranged)" {\n  on POST_ROLL  priority 5  when is_ranged and craftsmanship == "Best"  then set jam_threshold = 100\n}\n', "roll-tables.dsl": `dsl 2
+package "dh2.core.roll-tables" {
+  system "dh2"
+  source "Dark Heresy 2e Core Rulebook"
+}
+
+# DH2 roll tables \u2014 data for the \`roll_on\` action.
 #
 # A roll_table names a die and a set of <lo>[-<hi>]: "outcome" rows; an optional
 # \`=> "Status", \u2026\` applies those statuses to the target when that row comes up.
@@ -1799,7 +2230,7 @@ roll_table "Power Field Destruction" {
   1-25:   "The blow is turned aside; the attacker's weapon survives."
   26-100: "The power field shears clean through \u2014 the attacker's weapon is DESTROYED."
 }
-`, "actions.dsl": '# Actions \u2014 every action a character can take (DH2 core p.219+). Each declares a\n# `type` (Half | Full | Reaction | Free) and zero or more `subtype` designations;\n# `attack` is sugar for `subtype attack` \u2014 the KEY subtype many rules read (via\n# is_attack / action_subtype("\u2026")), e.g. Defensive\'s -10 to attacks. Compiled once\n# into the actions registry at load ("checked at server startup"); other rules\n# hook on the current action via is_action("\u2026"), action_type, is_reaction(),\n# is_attack and action_subtype("\u2026"). To-hit modifiers for the attack actions still\n# live in the engine (combat-actions); these declarations own the taxonomy.\n\naction "Standard Attack"  { type Half  attack }\naction "Semi-Auto Burst"  { type Half  attack }\naction "Full Auto Burst"  { type Half  attack }\naction "All Out Attack"   { type Full  attack }\naction "Charge"           { type Full  attack }\naction "Called Shot"      { type Full  attack }\naction "Swift Attack"     { type Full  attack }\naction "Lightning Attack" { type Full  attack }\naction "Defensive Stance" { type Full }\naction "Aim"              { type Half }\n\n# Reactions \u2014 gate talents/qualities with is_reaction() or is_action("Parry").\naction "Parry"            { type Reaction }\naction "Dodge"            { type Reaction }\n' };
+`, "actions.dsl": 'dsl 2\npackage "dh2.core.actions" {\n  system "dh2"\n  source "Dark Heresy 2e Core Rulebook"\n}\n\n# Actions \u2014 every action a character can take (DH2 core p.219+). Each declares a\n# `type` (Half | Full | Reaction | Free) and zero or more `subtype` designations;\n# `attack` is sugar for `subtype attack` \u2014 the KEY subtype many rules read (via\n# is_attack / action_subtype("\u2026")), e.g. Defensive\'s -10 to attacks. Compiled once\n# into the actions registry at load ("checked at server startup"); other rules\n# hook on the current action via is_action("\u2026"), action_type, is_reaction(),\n# is_attack and action_subtype("\u2026"). To-hit modifiers for the attack actions still\n# live in the engine (combat-actions); these declarations own the taxonomy.\n\naction "Standard Attack"  { type Half  attack }\naction "Semi-Auto Burst"  { type Half  attack }\naction "Full Auto Burst"  { type Half  attack }\naction "All Out Attack"   { type Full  attack }\naction "Charge"           { type Full  attack }\naction "Called Shot"      { type Full  attack }\naction "Swift Attack"     { type Full  attack }\naction "Lightning Attack" { type Full  attack }\naction "Defensive Stance" { type Full }\naction "Aim"              { type Half }\n\n# Reactions \u2014 gate talents/qualities with is_reaction() or is_action("Parry").\naction "Parry"            { type Reaction }\naction "Dodge"            { type Reaction }\n' };
   var weaponsJson = { "_source": "codified-systems/dark_heresy_2e/data/weapons.json", "count": 144, "weapons": [{ "id": "bolt_pistol", "name": "Bolt Pistol", "class": "Pistol", "group": "Bolt", "isMelee": false, "damage": "1d10+5", "sbMultiplier": 0, "damageType": "Explosive", "pen": 4, "rof": { "single": true, "burst": 2, "full": 0 }, "range_m": 30, "qualities": ["Tearing"], "source": "src_dh2_core_p151" }, { "id": "boltgun", "name": "Boltgun", "class": "Basic", "group": "Bolt", "isMelee": false, "damage": "1d10+5", "sbMultiplier": 0, "damageType": "Explosive", "pen": 4, "rof": { "single": true, "burst": 3, "full": 0 }, "range_m": 100, "qualities": ["Tearing"], "source": "src_dh2_core_p151" }, { "id": "heavy_bolter", "name": "Heavy Bolter", "class": "Heavy", "group": "Bolt", "isMelee": false, "damage": "1d10+8", "sbMultiplier": 0, "damageType": "Explosive", "pen": 5, "rof": { "single": false, "burst": 0, "full": 6 }, "range_m": 150, "qualities": ["Tearing"], "source": "src_dh2_core_p151" }, { "id": "storm_bolter", "name": "Storm Bolter", "class": "Basic", "group": "Bolt", "isMelee": false, "damage": "1d10+5", "sbMultiplier": 0, "damageType": "Explosive", "pen": 4, "rof": { "single": true, "burst": 2, "full": 4 }, "range_m": 90, "qualities": ["Storm", "Tearing"], "source": "src_dh2_core_p151" }, { "id": "hand_flamer", "name": "Hand Flamer", "class": "Pistol", "group": "Flame", "isMelee": false, "damage": "1d10+4", "sbMultiplier": 0, "damageType": "Energy", "pen": 2, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 10, "qualities": ["Flame", "Spray"], "source": "src_dh2_core_p151" }, { "id": "flamer", "name": "Flamer", "class": "Basic", "group": "Flame", "isMelee": false, "damage": "1d10+4", "sbMultiplier": 0, "damageType": "Energy", "pen": 2, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 20, "qualities": ["Flame", "Spray"], "source": "src_dh2_core_p151" }, { "id": "heavy_flamer", "name": "Heavy Flamer", "class": "Heavy", "group": "Flame", "isMelee": false, "damage": "1d10+5", "sbMultiplier": 0, "damageType": "Energy", "pen": 4, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 30, "qualities": ["Flame", "Spray"], "source": "src_dh2_core_p151" }, { "id": "laspistol", "name": "Laspistol", "class": "Pistol", "group": "Las", "isMelee": false, "damage": "1d10+2", "sbMultiplier": 0, "damageType": "Energy", "pen": 0, "rof": { "single": true, "burst": 2, "full": 0 }, "range_m": 30, "qualities": ["Reliable"], "source": "src_dh2_core_p151" }, { "id": "lasgun", "name": "Lasgun", "class": "Basic", "group": "Las", "isMelee": false, "damage": "1d10+3", "sbMultiplier": 0, "damageType": "Energy", "pen": 0, "rof": { "single": true, "burst": 3, "full": 0 }, "range_m": 100, "qualities": ["Reliable"], "source": "src_dh2_core_p151" }, { "id": "laslock", "name": "Laslock", "class": "Basic", "group": "Las", "isMelee": false, "damage": "1d10+4", "sbMultiplier": 0, "damageType": "Energy", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 70, "qualities": ["Unreliable"], "source": "src_dh2_core_p151" }, { "id": "long_las", "name": "Long Las", "class": "Basic", "group": "Las", "isMelee": false, "damage": "1d10+3", "sbMultiplier": 0, "damageType": "Energy", "pen": 1, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 150, "qualities": ["Accurate", "Felling (4)", "Reliable"], "source": "src_dh2_core_p151" }, { "id": "hot_shot_laspistol", "name": "Hot-shot Laspistol", "class": "Pistol", "group": "Las", "isMelee": false, "damage": "1d10+4", "sbMultiplier": 0, "damageType": "Energy", "pen": 7, "rof": { "single": true, "burst": 2, "full": 0 }, "range_m": 20, "qualities": [], "source": "src_dh2_core_p151" }, { "id": "hot_shot_lasgun", "name": "Hot-shot Lasgun", "class": "Basic", "group": "Las", "isMelee": false, "damage": "1d10+4", "sbMultiplier": 0, "damageType": "Energy", "pen": 7, "rof": { "single": true, "burst": 3, "full": 0 }, "range_m": 60, "qualities": [], "source": "src_dh2_core_p151" }, { "id": "bow", "name": "Bow", "class": "Basic", "group": "Low-Tech", "isMelee": false, "damage": "1d10", "sbMultiplier": 0, "damageType": "Rending", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 30, "qualities": ["Primitive (6)", "Reliable"], "source": "src_dh2_core_p151" }, { "id": "crossbow", "name": "Crossbow", "class": "Basic", "group": "Low-Tech", "isMelee": false, "damage": "1d10", "sbMultiplier": 0, "damageType": "Rending", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 30, "qualities": ["Primitive (7)"], "source": "src_dh2_core_p151" }, { "id": "inferno_pistol", "name": "Inferno Pistol", "class": "Pistol", "group": "Melta", "isMelee": false, "damage": "2d10+10", "sbMultiplier": 0, "damageType": "Energy", "pen": 12, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 10, "qualities": ["Melta"], "source": "src_dh2_core_p151" }, { "id": "meltagun", "name": "Meltagun", "class": "Basic", "group": "Melta", "isMelee": false, "damage": "2d10+10", "sbMultiplier": 0, "damageType": "Energy", "pen": 12, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 20, "qualities": ["Melta"], "source": "src_dh2_core_p151" }, { "id": "plasma_pistol", "name": "Plasma Pistol", "class": "Pistol", "group": "Plasma", "isMelee": false, "damage": "1d10+6", "sbMultiplier": 0, "damageType": "Energy", "pen": 6, "rof": { "single": true, "burst": 2, "full": 0 }, "range_m": 30, "qualities": ["Maximal", "Overheats"], "source": "src_dh2_core_p152" }, { "id": "plasma_gun", "name": "Plasma Gun", "class": "Basic", "group": "Plasma", "isMelee": false, "damage": "1d10+7", "sbMultiplier": 0, "damageType": "Energy", "pen": 6, "rof": { "single": true, "burst": 2, "full": 0 }, "range_m": 90, "qualities": ["Maximal", "Overheats"], "source": "src_dh2_core_p152" }, { "id": "autopistol", "name": "Autopistol", "class": "Pistol", "group": "SP", "isMelee": false, "damage": "1d10+2", "sbMultiplier": 0, "damageType": "Impact", "pen": 0, "rof": { "single": true, "burst": 0, "full": 6 }, "range_m": 30, "qualities": [], "source": "src_dh2_core_p152" }, { "id": "autogun", "name": "Autogun", "class": "Basic", "group": "SP", "isMelee": false, "damage": "1d10+3", "sbMultiplier": 0, "damageType": "Impact", "pen": 0, "rof": { "single": true, "burst": 3, "full": 10 }, "range_m": 100, "qualities": [], "source": "src_dh2_core_p152" }, { "id": "autocannon", "name": "Autocannon", "class": "Heavy", "group": "SP", "isMelee": false, "damage": "3d10+8", "sbMultiplier": 0, "damageType": "Impact", "pen": 6, "rof": { "single": true, "burst": 3, "full": 0 }, "range_m": 300, "qualities": ["Reliable"], "source": "src_dh2_core_p152" }, { "id": "hand_cannon", "name": "Hand Cannon", "class": "Pistol", "group": "SP", "isMelee": false, "damage": "1d10+4", "sbMultiplier": 0, "damageType": "Impact", "pen": 2, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 35, "qualities": [], "source": "src_dh2_core_p152" }, { "id": "heavy_stubber", "name": "Heavy Stubber", "class": "Heavy", "group": "SP", "isMelee": false, "damage": "1d10+4", "sbMultiplier": 0, "damageType": "Impact", "pen": 3, "rof": { "single": false, "burst": 0, "full": 8 }, "range_m": 100, "qualities": [], "source": "src_dh2_core_p152" }, { "id": "shotgun", "name": "Shotgun", "class": "Basic", "group": "SP", "isMelee": false, "damage": "1d10+4", "sbMultiplier": 0, "damageType": "Impact", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 30, "qualities": ["Scatter"], "source": "src_dh2_core_p152" }, { "id": "combat_shotgun", "name": "Shotgun (Combat)", "class": "Basic", "group": "SP", "isMelee": false, "damage": "1d10+4", "sbMultiplier": 0, "damageType": "Impact", "pen": 0, "rof": { "single": true, "burst": 3, "full": 0 }, "range_m": 30, "qualities": ["Scatter"], "source": "src_dh2_core_p152" }, { "id": "sniper_rifle", "name": "Sniper Rifle", "class": "Basic", "group": "SP", "isMelee": false, "damage": "1d10+4", "sbMultiplier": 0, "damageType": "Impact", "pen": 3, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 200, "qualities": ["Accurate", "Reliable"], "source": "src_dh2_core_p152" }, { "id": "stub_automatic", "name": "Stub Automatic", "class": "Pistol", "group": "SP", "isMelee": false, "damage": "1d10+3", "sbMultiplier": 0, "damageType": "Impact", "pen": 0, "rof": { "single": true, "burst": 3, "full": 0 }, "range_m": 30, "qualities": [], "source": "src_dh2_core_p152" }, { "id": "stub_revolver", "name": "Stub Revolver", "class": "Pistol", "group": "SP", "isMelee": false, "damage": "1d10+3", "sbMultiplier": 0, "damageType": "Impact", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 30, "qualities": ["Reliable"], "source": "src_dh2_core_p152" }, { "id": "grav_pistol", "name": "Grav Pistol", "class": "Pistol", "group": "Exotic", "isMelee": false, "damage": "1d10+3", "sbMultiplier": 0, "damageType": "Impact", "pen": 6, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 15, "qualities": ["Concussive (1)", "Graviton"], "source": "src_dh2_core_p152" }, { "id": "graviton_gun", "name": "Graviton Gun", "class": "Basic", "group": "Exotic", "isMelee": false, "damage": "1d10+6", "sbMultiplier": 0, "damageType": "Impact", "pen": 8, "rof": { "single": true, "burst": 3, "full": 0 }, "range_m": 30, "qualities": ["Concussive (2)", "Graviton"], "source": "src_dh2_core_p152" }, { "id": "needle_pistol", "name": "Needle Pistol", "class": "Pistol", "group": "Exotic", "isMelee": false, "damage": "1d10", "sbMultiplier": 0, "damageType": "Rending", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 30, "qualities": ["Accurate", "Felling (1)", "Toxic (5)"], "source": "src_dh2_core_p152" }, { "id": "needle_rifle", "name": "Needle Rifle", "class": "Basic", "group": "Exotic", "isMelee": false, "damage": "1d10", "sbMultiplier": 0, "damageType": "Rending", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 180, "qualities": ["Accurate", "Felling (1)", "Toxic (5)"], "source": "src_dh2_core_p152" }, { "id": "frag_grenade", "name": "Frag Grenade", "class": "Thrown", "group": "Grenade", "isMelee": false, "damage": "2d10", "sbMultiplier": 0, "damageType": "Explosive", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": "SBx3", "qualities": ["Blast (3)"], "source": "src_dh2_core_p157" }, { "id": "krak_grenade", "name": "Krak Grenade", "class": "Thrown", "group": "Grenade", "isMelee": false, "damage": "2d10+4", "sbMultiplier": 0, "damageType": "Explosive", "pen": 6, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": "SBx3", "qualities": ["Concussive (0)"], "source": "src_dh2_core_p157" }, { "id": "frag_missile", "name": "Frag Missile", "class": "Missile", "group": "Missile", "isMelee": false, "damage": "2d10+2", "sbMultiplier": 0, "damageType": "Explosive", "pen": 2, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Blast (5)"], "source": "src_dh2_core_p157" }, { "id": "krak_missile", "name": "Krak Missile", "class": "Missile", "group": "Missile", "isMelee": false, "damage": "3d10+8", "sbMultiplier": 0, "damageType": "Explosive", "pen": 8, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Concussive (3)", "Proven (2)"], "source": "src_dh2_core_p157" }, { "id": "fire_bomb", "name": "Fire Bomb", "class": "Thrown", "group": "Explosive", "isMelee": false, "damage": "1d10+2", "sbMultiplier": 0, "damageType": "Energy", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": "SBx3", "qualities": ["Blast (2)", "Flame"], "source": "src_dh2_core_p157" }, { "id": "melta_bomb", "name": "Melta Bomb", "class": "Placed", "group": "Explosive", "isMelee": false, "damage": "6d10", "sbMultiplier": 0, "damageType": "Energy", "pen": 12, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Blast (2)", "Flame", "Melta"], "source": "src_dh2_core_p157" }, { "id": "chainaxe", "name": "Chainaxe", "class": "Melee", "group": "Chain", "isMelee": true, "damage": "1d10+4", "sbMultiplier": 0, "damageType": "Rending", "pen": 2, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Tearing", "Two-Handed"], "source": "src_dh2_core_p159" }, { "id": "chainblade", "name": "Chainblade", "class": "Melee", "group": "Chain", "isMelee": true, "damage": "1d10+1", "sbMultiplier": 0, "damageType": "Rending", "pen": 1, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Tearing"], "source": "src_dh2_core_p159" }, { "id": "chainsword", "name": "Chainsword", "class": "Melee", "group": "Chain", "isMelee": true, "damage": "1d10+2", "sbMultiplier": 0, "damageType": "Rending", "pen": 2, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Balanced", "Tearing"], "source": "src_dh2_core_p159" }, { "id": "eviscerator", "name": "Eviscerator", "class": "Melee", "group": "Chain", "isMelee": true, "damage": "2d10", "sbMultiplier": 0, "damageType": "Rending", "pen": 9, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Razor Sharp", "Tearing", "Two-Handed", "Unwieldy"], "source": "src_dh2_core_p159" }, { "id": "force_sword", "name": "Force Sword", "class": "Melee", "group": "Force", "isMelee": true, "damage": "1d10+1", "sbMultiplier": 0, "damageType": "Rending", "pen": 2, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Balanced", "Force"], "source": "src_dh2_core_p159" }, { "id": "force_staff", "name": "Force Staff", "class": "Melee", "group": "Force", "isMelee": true, "damage": "1d10", "sbMultiplier": 0, "damageType": "Impact", "pen": 2, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Force", "Two-Handed"], "source": "src_dh2_core_p159" }, { "id": "great_weapon", "name": "Great Weapon", "class": "Melee", "group": "Low-Tech", "isMelee": true, "damage": "2d10", "sbMultiplier": 0, "damageType": "Rending", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Unbalanced", "Two-Handed"], "source": "src_dh2_core_p159" }, { "id": "hunting_lance", "name": "Hunting Lance", "class": "Melee", "group": "Low-Tech", "isMelee": true, "damage": "2d10+3", "sbMultiplier": 0, "damageType": "Explosive", "pen": 7, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Concussive (3)"], "source": "src_dh2_core_p159" }, { "id": "improvised", "name": "Improvised", "class": "Melee", "group": "Low-Tech", "isMelee": true, "damage": "1d10-2", "sbMultiplier": 0, "damageType": "Impact", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Primitive (7)", "Unbalanced"], "source": "src_dh2_core_p159" }, { "id": "knife", "name": "Knife", "class": "Melee/Thrown", "group": "Low-Tech", "isMelee": true, "damage": "1d5", "sbMultiplier": 0, "damageType": "Rending", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 5, "qualities": [], "source": "src_dh2_core_p159" }, { "id": "shield", "name": "Shield", "class": "Melee", "group": "Low-Tech", "isMelee": true, "damage": "1d5", "sbMultiplier": 0, "damageType": "Impact", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Defensive"], "source": "src_dh2_core_p159" }, { "id": "spear", "name": "Spear", "class": "Melee", "group": "Low-Tech", "isMelee": true, "damage": "1d10", "sbMultiplier": 0, "damageType": "Rending", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Primitive (8)", "Two-Handed"], "source": "src_dh2_core_p159" }, { "id": "staff", "name": "Staff", "class": "Melee", "group": "Low-Tech", "isMelee": true, "damage": "1d10", "sbMultiplier": 0, "damageType": "Impact", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Balanced", "Primitive (7)", "Two-Handed"], "source": "src_dh2_core_p159" }, { "id": "sword", "name": "Sword", "class": "Melee", "group": "Low-Tech", "isMelee": true, "damage": "1d10", "sbMultiplier": 0, "damageType": "Rending", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Balanced"], "source": "src_dh2_core_p159" }, { "id": "truncheon", "name": "Truncheon", "class": "Melee", "group": "Low-Tech", "isMelee": true, "damage": "1d10", "sbMultiplier": 0, "damageType": "Impact", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Primitive (7)"], "source": "src_dh2_core_p159" }, { "id": "warhammer", "name": "Warhammer", "class": "Melee", "group": "Low-Tech", "isMelee": true, "damage": "1d10+3", "sbMultiplier": 0, "damageType": "Impact", "pen": 1, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Concussive (1)", "Primitive (8)", "Two-Handed"], "source": "src_dh2_core_p159" }, { "id": "whip", "name": "Whip", "class": "Melee", "group": "Low-Tech", "isMelee": true, "damage": "1d10", "sbMultiplier": 0, "damageType": "Rending", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 3, "qualities": ["Flexible", "Primitive (6)"], "source": "src_dh2_core_p159" }, { "id": "omnissian_axe", "name": "Omnissian Axe", "class": "Melee", "group": "Power", "isMelee": true, "damage": "2d10+4", "sbMultiplier": 0, "damageType": "Energy", "pen": 6, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Power Field", "Unbalanced", "Two-Handed"], "source": "src_dh2_core_p159" }, { "id": "power_fist", "name": "Power Fist", "class": "Melee", "group": "Power", "isMelee": true, "damage": "2d10", "sbMultiplier": 2, "damageType": "Energy", "pen": 9, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Power Field", "Unwieldy", "Special: SB x2 damage"], "source": "src_dh2_core_p159" }, { "id": "power_sword", "name": "Power Sword", "class": "Melee", "group": "Power", "isMelee": true, "damage": "1d10+5", "sbMultiplier": 0, "damageType": "Energy", "pen": 5, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Balanced", "Power Field"], "source": "src_dh2_core_p159" }, { "id": "power_axe", "name": "Power Axe", "class": "Melee", "group": "Power", "isMelee": true, "damage": "1d10+7", "sbMultiplier": 0, "damageType": "Energy", "pen": 7, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Power Field", "Unbalanced", "Two-Handed"], "source": "src_dh2_core_p159" }, { "id": "power_maul_high", "name": "Power Maul (High)", "class": "Melee", "group": "Power", "isMelee": true, "damage": "1d10+5", "sbMultiplier": 0, "damageType": "Energy", "pen": 4, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Power Field", "Shocking"], "source": "src_dh2_core_p159" }, { "id": "power_maul_low", "name": "Power Maul (Low)", "class": "Melee", "group": "Power", "isMelee": true, "damage": "1d10+1", "sbMultiplier": 0, "damageType": "Energy", "pen": 2, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Shocking"], "source": "src_dh2_core_p159" }, { "id": "shock_maul", "name": "Shock Maul", "class": "Melee", "group": "Shock", "isMelee": true, "damage": "1d10+3", "sbMultiplier": 0, "damageType": "Impact", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Shocking"], "source": "src_dh2_core_p159" }, { "id": "shock_whip", "name": "Shock Whip", "class": "Melee", "group": "Shock", "isMelee": true, "damage": "1d10+1", "sbMultiplier": 0, "damageType": "Impact", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 3, "qualities": ["Flexible", "Shocking"], "source": "src_dh2_core_p159" }, { "id": "godwyn_deaz_bolt_pistol", "name": "Godwyn-De'az Bolt Pistol", "class": "Pistol", "group": "Bolt", "isMelee": false, "damage": "1d10+5", "sbMultiplier": 0, "damageType": "Explosive", "pen": 4, "rof": { "single": true, "burst": 2, "full": 0 }, "range_m": 40, "qualities": ["Reliable", "Tearing"], "source": "src_dh2_within_p42" }, { "id": "godwyn_deaz_bolter", "name": "Godwyn-De'az Bolter", "class": "Basic", "group": "Bolt", "isMelee": false, "damage": "1d10+5", "sbMultiplier": 0, "damageType": "Explosive", "pen": 4, "rof": { "single": true, "burst": 2, "full": 0 }, "range_m": 90, "qualities": ["Reliable", "Tearing"], "source": "src_dh2_within_p42" }, { "id": "godwyn_deaz_heavy_bolter", "name": "Godwyn-De'az Heavy Bolter", "class": "Heavy", "group": "Bolt", "isMelee": false, "damage": "1d10+8", "sbMultiplier": 0, "damageType": "Explosive", "pen": 5, "rof": { "single": false, "burst": 0, "full": 6 }, "range_m": 140, "qualities": ["Reliable", "Tearing"], "source": "src_dh2_within_p42" }, { "id": "godwyn_deaz_storm_bolter", "name": "Godwyn-De'az Storm Bolter", "class": "Basic", "group": "Bolt", "isMelee": false, "damage": "1d10+5", "sbMultiplier": 0, "damageType": "Explosive", "pen": 4, "rof": { "single": true, "burst": 2, "full": 4 }, "range_m": 80, "qualities": ["Reliable", "Storm", "Tearing"], "source": "src_dh2_within_p42" }, { "id": "cerberus_heavy_flamer", "name": "Cerberus Heavy Flamer", "class": "Heavy", "group": "Flame", "isMelee": false, "damage": "1d10+5", "sbMultiplier": 0, "damageType": "Energy", "pen": 3, "rof": { "single": true, "burst": 2, "full": 0 }, "range_m": 30, "qualities": ["Flame", "Reliable", "Spray"], "source": "src_dh2_within_p42" }, { "id": "gorgon_chemical_flamer", "name": "Gorgon Chemical Flamer", "class": "Basic", "group": "Flame", "isMelee": false, "damage": "1d10+4", "sbMultiplier": 0, "damageType": "Energy", "pen": 2, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 20, "qualities": ["Corrosive", "Felling (1)", "Flame", "Spray", "Toxic (2)"], "source": "src_dh2_within_p42" }, { "id": "hydra_flamer_array", "name": "Hydra Flamer Array", "class": "Basic", "group": "Flame", "isMelee": false, "damage": "1d10+4", "sbMultiplier": 0, "damageType": "Energy", "pen": 2, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 8, "qualities": ["Flame", "Proven (3)", "Spray"], "source": "src_dh2_within_p42" }, { "id": "arquebus", "name": "Arquebus", "class": "Basic", "group": "Low-Tech", "isMelee": false, "damage": "2d10", "sbMultiplier": 0, "damageType": "Impact", "pen": 2, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 45, "qualities": ["Concussive (1)", "Inaccurate", "Unreliable"], "source": "src_dh2_within_p42" }, { "id": "castigator_heavy_crossbow", "name": "Castigator Heavy Crossbow", "class": "Heavy", "group": "Low-Tech", "isMelee": false, "damage": "1d10+6", "sbMultiplier": 0, "damageType": "Impact", "pen": 1, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 70, "qualities": ["Concussive (2)", "Reliable"], "source": "src_dh2_within_p42" }, { "id": "deliverance_light_crossbow", "name": "Deliverance Light Crossbow", "class": "Pistol", "group": "Low-Tech", "isMelee": false, "damage": "1d10", "sbMultiplier": 0, "damageType": "Rending", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 15, "qualities": ["Primitive (7)"], "source": "src_dh2_within_p42" }, { "id": "drakes_claw", "name": "Drake's Claw", "class": "Heavy", "group": "Low-Tech", "isMelee": false, "damage": "1d10+2", "sbMultiplier": 0, "damageType": "Explosive", "pen": 2, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 200, "qualities": ["Blast (3)", "Crippling (1)", "Inaccurate", "Primitive (7)", "Tearing"], "source": "src_dh2_within_p42" }, { "id": "flintlock_pistol", "name": "Flintlock Pistol", "class": "Pistol", "group": "Low-Tech", "isMelee": false, "damage": "1d10+2", "sbMultiplier": 0, "damageType": "Impact", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 15, "qualities": ["Inaccurate", "Primitive (8)", "Unreliable"], "source": "src_dh2_within_p42" }, { "id": "longflame", "name": "Longflame", "class": "Heavy", "group": "Low-Tech", "isMelee": false, "damage": "1d10", "sbMultiplier": 0, "damageType": "Rending", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 200, "qualities": ["Blast (4)", "Flame", "Inaccurate", "Primitive (8)"], "source": "src_dh2_within_p42" }, { "id": "musket", "name": "Musket", "class": "Basic", "group": "Low-Tech", "isMelee": false, "damage": "1d10+3", "sbMultiplier": 0, "damageType": "Impact", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 30, "qualities": ["Inaccurate", "Primitive (8)", "Unreliable"], "source": "src_dh2_within_p42" }, { "id": "snapper_repeating_rifle", "name": "Snapper Repeating Rifle", "class": "Basic", "group": "Low-Tech", "isMelee": false, "damage": "1d10+3", "sbMultiplier": 0, "damageType": "Impact", "pen": 0, "rof": { "single": true, "burst": 2, "full": 0 }, "range_m": 50, "qualities": ["Inaccurate", "Overheats", "Primitive (8)", "Unreliable"], "source": "src_dh2_within_p42" }, { "id": "sentinel_plasma_rifle", "name": "Sentinel Plasma Rifle", "class": "Basic", "group": "Plasma", "isMelee": false, "damage": "1d10+5", "sbMultiplier": 0, "damageType": "Energy", "pen": 3, "rof": { "single": true, "burst": 5, "full": 10 }, "range_m": 120, "qualities": ["Reliable"], "source": "src_dh2_within_p42" }, { "id": "purgatus_crossbow", "name": "Purgatus Crossbow", "class": "Basic", "group": "Exotic", "isMelee": false, "damage": "1d10+5", "sbMultiplier": 0, "damageType": "Impact", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 50, "qualities": ["Reliable"], "source": "src_dh2_within_p42" }, { "id": "condemnor", "name": "Condemnor", "class": "Basic", "group": "Exotic", "isMelee": false, "damage": "1d10+4", "sbMultiplier": 0, "damageType": "Rending", "pen": 2, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 100, "qualities": ["Accurate", "Reliable"], "source": "src_dh2_within_p42" }, { "id": "psyk_out_grenade", "name": "Psyk-Out Grenade", "class": "Thrown", "group": "Grenade", "isMelee": false, "damage": "1d10", "sbMultiplier": 0, "damageType": "Explosive", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": "SBx3", "qualities": ["Blast (3)", "Smoke (3)"], "source": "src_dh2_within_p44" }, { "id": "rad_grenade", "name": "Rad Grenade", "class": "Thrown", "group": "Grenade", "isMelee": false, "damage": "1d10", "sbMultiplier": 0, "damageType": "Energy", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": "SBx3", "qualities": ["Blast (2)"], "source": "src_dh2_within_p44" }, { "id": "tears_of_the_emperor", "name": "Tears of the Emperor", "class": "Thrown", "group": "Grenade", "isMelee": false, "damage": "1d10", "sbMultiplier": 0, "damageType": "Explosive", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": "SBx3", "qualities": ["Blast (2)", "Sanctified"], "source": "src_dh2_within_p44" }, { "id": "whitefire_grenade", "name": "Whitefire Grenade", "class": "Thrown", "group": "Grenade", "isMelee": false, "damage": "1d10+4", "sbMultiplier": 0, "damageType": "Explosive", "pen": 3, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": "SBx3", "qualities": ["Blast (3)", "Corrosive", "Flame", "Smoke (5)", "Toxic (2)"], "source": "src_dh2_within_p44" }, { "id": "brazier_of_holy_fire", "name": "Brazier of Holy Fire", "class": "Melee", "group": "Flame", "isMelee": true, "damage": "1d10+5", "sbMultiplier": 0, "damageType": "Energy", "pen": 3, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Flame", "Unbalanced"], "source": "src_dh2_within_p46" }, { "id": "fire_gauntlets", "name": "Fire Gauntlets", "class": "Melee", "group": "Flame", "isMelee": true, "damage": "1d10", "sbMultiplier": 0, "damageType": "Impact", "pen": 2, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Flame", "Unbalanced"], "source": "src_dh2_within_p46" }, { "id": "axe_of_retribution", "name": "Axe of Retribution", "class": "Melee", "group": "Low-Tech", "isMelee": true, "damage": "2d10", "sbMultiplier": 0, "damageType": "Rending", "pen": 6, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Felling (2)", "Sanctified", "Two-Handed"], "source": "src_dh2_within_p46" }, { "id": "ablative_projector", "name": "Ablative Projector", "class": "Basic", "group": "Xenos-Lost", "isMelee": false, "damage": "1d10+8", "sbMultiplier": 0, "damageType": "Energy", "pen": 5, "rof": { "single": true, "burst": 2, "full": 0 }, "range_m": 100, "qualities": ["Reliable", "Vengeful (9)"], "source": "src_dh2_without_p50" }, { "id": "cascade_lance_melee", "name": "Cascade Lance (Melee)", "class": "Melee", "group": "Xenos-Lost", "isMelee": true, "damage": "1d10+6", "sbMultiplier": 0, "damageType": "Energy", "pen": 8, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Concussive (1)", "Power Field"], "source": "src_dh2_without_p50" }, { "id": "cascade_lance_ranged", "name": "Cascade Lance (Ranged)", "class": "Basic", "group": "Xenos-Lost", "isMelee": false, "damage": "1d10+12", "sbMultiplier": 0, "damageType": "Energy", "pen": 10, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 15, "qualities": ["Proven (5)", "Reliable"], "source": "src_dh2_without_p50" }, { "id": "concussion_beamer", "name": "Concussion Beamer", "class": "Pistol", "group": "Xenos-Lost", "isMelee": false, "damage": "2d10+5", "sbMultiplier": 0, "damageType": "Explosive", "pen": 4, "rof": { "single": true, "burst": 3, "full": 0 }, "range_m": 30, "qualities": ["Concussive (1)", "Reliable"], "source": "src_dh2_without_p50" }, { "id": "molecular_blade", "name": "Molecular Blade", "class": "Melee", "group": "Xenos-Lost", "isMelee": true, "damage": "1d10", "sbMultiplier": 0, "damageType": "Rending", "pen": 5, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Corrosive", "Razor Sharp", "Tearing"], "source": "src_dh2_without_p50" }, { "id": "resonance_arc", "name": "Resonance Arc", "class": "Basic", "group": "Xenos-Lost", "isMelee": false, "damage": "2d10+3", "sbMultiplier": 0, "damageType": "Energy", "pen": 3, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 75, "qualities": ["Shocking", "Reliable"], "source": "src_dh2_without_p50" }, { "id": "akvran_cutter", "name": "Akvran Cutter", "class": "Thrown", "group": "Xenos-Lost", "isMelee": false, "damage": "2d10", "sbMultiplier": 0, "damageType": "Energy", "pen": 6, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": "3xSB", "qualities": ["Blast (3)", "Concussive (3)", "Proven (4)"], "source": "src_dh2_without_p51" }, { "id": "guldaniri_bile_projector", "name": "Guldaniri Bile Projector", "class": "Basic", "group": "Xenos-Lost", "isMelee": false, "damage": "3d10", "sbMultiplier": 0, "damageType": "Energy", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 60, "qualities": ["Blast (2)", "Corrosive", "Toxic (2)"], "source": "src_dh2_without_p51" }, { "id": "havatian_ringblade_melee", "name": "Havatian Ringblade (Melee)", "class": "Melee", "group": "Xenos-Lost", "isMelee": true, "damage": "1d10+4", "sbMultiplier": 0, "damageType": "Rending", "pen": 3, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Razor Sharp"], "source": "src_dh2_without_p51" }, { "id": "psycannon", "name": "Psycannon", "class": "Heavy", "group": "Bolt", "isMelee": false, "damage": "2d10+5", "sbMultiplier": 0, "damageType": "Explosive", "pen": 5, "rof": { "single": false, "burst": 2, "full": 5 }, "range_m": 120, "qualities": ["Daemonbane", "Reliable", "Tearing"], "source": "src_dh2_beyond_p41" }, { "id": "incinerator", "name": "Incinerator", "class": "Basic", "group": "Flame", "isMelee": false, "damage": "1d10+6", "sbMultiplier": 0, "damageType": "Energy", "pen": 6, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 30, "qualities": ["Daemonbane", "Flame", "Spray"], "source": "src_dh2_beyond_p41" }, { "id": "hellrifle", "name": "Hellrifle", "class": "Basic", "group": "Exotic", "isMelee": false, "damage": "1d10+4", "sbMultiplier": 0, "damageType": "Rending", "pen": 4, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 300, "qualities": ["Felling (2)"], "source": "src_dh2_beyond_p41" }, { "id": "silverseine_launcher", "name": "Silverseine Launcher", "class": "Heavy", "group": "Exotic", "isMelee": false, "damage": "1d10", "sbMultiplier": 0, "damageType": "Impact", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 60, "qualities": ["Blast (4)", "Reliable", "Sanctified", "Snare (2)"], "source": "src_dh2_beyond_p41" }, { "id": "abyssal_charge", "name": "Abyssal Charge", "class": "Thrown", "group": "Grenade", "isMelee": false, "damage": "1d10+4", "sbMultiplier": 0, "damageType": "Explosive", "pen": 4, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": "SBx3", "qualities": ["Blast (3)", "Crippling (2)", "Tainted"], "source": "src_dh2_beyond_p41" }, { "id": "argent_globe", "name": "Argent Globe", "class": "Thrown", "group": "Grenade", "isMelee": false, "damage": "2d10", "sbMultiplier": 0, "damageType": "Explosive", "pen": 2, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": "SBx3", "qualities": ["Blast (3)", "Crippling (3)\u2020", "Sanctified"], "source": "src_dh2_beyond_p41" }, { "id": "ironfaith_incense_grenade", "name": '"Ironfaith" Incense Grenade', "class": "Thrown", "group": "Grenade", "isMelee": false, "damage": "1d10", "sbMultiplier": 0, "damageType": "Explosive", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": "SBx3", "qualities": ["Daemonbane", "Sanctified", "Smoke (3)"], "source": "src_dh2_beyond_p41" }, { "id": "animus_hammer", "name": "Animus Hammer", "class": "Melee", "group": "Force", "isMelee": true, "damage": "2d10+10", "sbMultiplier": 0, "damageType": "Energy", "pen": 4, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Daemonbane", "Force", "Power Field", "Unwieldy"], "source": "src_dh2_beyond_p42" }, { "id": "force_hammer", "name": "Force Hammer", "class": "Melee", "group": "Force", "isMelee": true, "damage": "2d10", "sbMultiplier": 0, "damageType": "Rending", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Force", "Unbalanced"], "source": "src_dh2_beyond_p42" }, { "id": "nemesis_hammer", "name": "Nemesis Hammer", "class": "Melee", "group": "Force", "isMelee": true, "damage": "2d10+1", "sbMultiplier": 0, "damageType": "Energy", "pen": 8, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Daemonbane", "Force", "Power Field", "Unwieldy"], "source": "src_dh2_beyond_p42" }, { "id": "desoleum_power_blade", "name": "Desoleum Power Blade", "class": "Melee", "group": "Power", "isMelee": true, "damage": "1d10+3", "sbMultiplier": 0, "damageType": "Energy", "pen": 5, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Power Field"], "source": "src_dh2_without_p43" }, { "id": "digi_weapon", "name": "Digi-Weapon", "class": "Pistol", "group": "Exotic", "isMelee": false, "damage": "1d10+2", "sbMultiplier": 0, "damageType": "Energy", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 3, "qualities": ["Reliable"], "source": "src_dh2_without_p45" }, { "id": "firesprite_needler", "name": "Firesprite Needler", "class": "Pistol", "group": "Exotic", "isMelee": false, "damage": "1d10+2", "sbMultiplier": 0, "damageType": "Rending", "pen": 2, "rof": { "single": false, "burst": 4, "full": 8 }, "range_m": 30, "qualities": ["Inaccurate", "Toxic (2)"], "source": "src_dh2_without_p45" }, { "id": "ghostblade", "name": "Ghostblade", "class": "Melee", "group": "Power", "isMelee": true, "damage": "1d10+5", "sbMultiplier": 0, "damageType": "Energy", "pen": 6, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Felling (4)", "Razor Sharp", "Overheats"], "source": "src_dh2_without_p45" }, { "id": "graviton_grenade", "name": "Graviton Grenade", "class": "Thrown", "group": "Exotic", "isMelee": false, "damage": "1d10+7", "sbMultiplier": 0, "damageType": "Impact", "pen": 7, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Blast (3)", "Concussive (3)", "Graviton"], "source": "src_dh2_without_p45" }, { "id": "graviton_hammer", "name": "Graviton Hammer", "class": "Melee", "group": "Power", "isMelee": true, "damage": "2d10+5", "sbMultiplier": 0, "damageType": "Impact", "pen": 7, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Concussive (3)", "Graviton"], "source": "src_dh2_without_p45" }, { "id": "integration_cannon", "name": "Integration Cannon", "class": "Heavy", "group": "Exotic", "isMelee": false, "damage": "4d10+4", "sbMultiplier": 0, "damageType": "Impact", "pen": 8, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 100, "qualities": ["Blast (5)", "Concussive (0)", "Inaccurate"], "source": "src_dh2_without_p45" }, { "id": "silver_shield_dh24", "name": "Silver Shield", "class": "Melee", "group": "Low-Tech", "isMelee": true, "damage": "1d5+1", "sbMultiplier": 0, "damageType": "Impact", "pen": 1, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Defensive"], "source": "src_dh2_without_p45" }, { "id": "agoniser", "name": "Agoniser", "class": "Melee", "group": "Power", "isMelee": true, "damage": "1d10+3", "sbMultiplier": 0, "damageType": "Energy", "pen": 6, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 3, "qualities": ["Flexible", "Power Field", "Tearing", "Shocking"], "source": "src_dh2_without_p47" }, { "id": "eldar_plasma_grenade", "name": "Eldar Plasma Grenade", "class": "Thrown", "group": "Plasma", "isMelee": false, "damage": "1d10+8", "sbMultiplier": 0, "damageType": "Energy", "pen": 8, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Blast (4)", "Shocking"], "source": "src_dh2_without_p47" }, { "id": "eldar_power_sword", "name": "Eldar Power Sword", "class": "Melee", "group": "Power", "isMelee": true, "damage": "1d10+5", "sbMultiplier": 0, "damageType": "Energy", "pen": 4, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Balanced", "Power Field"], "source": "src_dh2_without_p47" }, { "id": "harlequins_kiss", "name": "Harlequin's Kiss", "class": "Melee", "group": "Exotic", "isMelee": true, "damage": "1d10+8", "sbMultiplier": 0, "damageType": "Rending", "pen": 10, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Felling (4)", "Tearing"], "source": "src_dh2_without_p47" }, { "id": "shardcarbine", "name": "Shardcarbine", "class": "Basic", "group": "Exotic", "isMelee": false, "damage": "1d10+2", "sbMultiplier": 0, "damageType": "Rending", "pen": 3, "rof": { "single": true, "burst": 3, "full": 5 }, "range_m": 60, "qualities": ["Storm", "Toxic (1)"], "source": "src_dh2_without_p47" }, { "id": "shuriken_cannon", "name": "Shuriken Cannon", "class": "Heavy", "group": "Exotic", "isMelee": false, "damage": "1d10+6", "sbMultiplier": 0, "damageType": "Rending", "pen": 4, "rof": { "single": false, "burst": 0, "full": 10 }, "range_m": 60, "qualities": ["Razor Sharp", "Reliable"], "source": "src_dh2_without_p47" }, { "id": "shuriken_catapult", "name": "Shuriken Catapult", "class": "Basic", "group": "Exotic", "isMelee": false, "damage": "1d10+4", "sbMultiplier": 0, "damageType": "Rending", "pen": 3, "rof": { "single": true, "burst": 3, "full": 10 }, "range_m": 80, "qualities": ["Razor Sharp", "Reliable"], "source": "src_dh2_without_p47" }, { "id": "shuriken_pistol", "name": "Shuriken Pistol", "class": "Pistol", "group": "Exotic", "isMelee": false, "damage": "1d10+4", "sbMultiplier": 0, "damageType": "Rending", "pen": 3, "rof": { "single": true, "burst": 3, "full": 0 }, "range_m": 30, "qualities": ["Razor Sharp", "Reliable"], "source": "src_dh2_without_p47" }, { "id": "splinter_cannon", "name": "Splinter Cannon", "class": "Heavy", "group": "Exotic", "isMelee": false, "damage": "1d10+5", "sbMultiplier": 0, "damageType": "Rending", "pen": 4, "rof": { "single": false, "burst": 0, "full": 10 }, "range_m": 110, "qualities": ["Tearing", "Toxic (4)"], "source": "src_dh2_without_p47" }, { "id": "splinter_pistol", "name": "Splinter Pistol", "class": "Pistol", "group": "Exotic", "isMelee": false, "damage": "1d10+2", "sbMultiplier": 0, "damageType": "Rending", "pen": 3, "rof": { "single": true, "burst": 3, "full": 0 }, "range_m": 30, "qualities": ["Toxic (1)"], "source": "src_dh2_without_p47" }, { "id": "splinter_rifle", "name": "Splinter Rifle", "class": "Basic", "group": "Exotic", "isMelee": false, "damage": "1d10+2", "sbMultiplier": 0, "damageType": "Rending", "pen": 3, "rof": { "single": true, "burst": 3, "full": 5 }, "range_m": 80, "qualities": ["Toxic (2)"], "source": "src_dh2_without_p47" }, { "id": "big_choppa", "name": "Big Choppa", "class": "Melee", "group": "Low-Tech", "isMelee": true, "damage": "2d10", "sbMultiplier": 0, "damageType": "Rending", "pen": 2, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Tearing", "Unbalanced"], "source": "src_dh2_without_p48" }, { "id": "big_shoota", "name": "Big Shoota", "class": "Basic", "group": "SP", "isMelee": false, "damage": "1d10+6", "sbMultiplier": 0, "damageType": "Impact", "pen": 2, "rof": { "single": false, "burst": 0, "full": 10 }, "range_m": 120, "qualities": ["Inaccurate", "Unreliable\u2020"], "source": "src_dh2_without_p48" }, { "id": "burna_melee", "name": "Burna (Melee)", "class": "Melee", "group": "Power", "isMelee": true, "damage": "1d10+5", "sbMultiplier": 0, "damageType": "Energy", "pen": 5, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Power Field", "Unwieldy"], "source": "src_dh2_without_p48" }, { "id": "burna_ranged", "name": "Burna (Ranged)", "class": "Basic", "group": "Flame", "isMelee": false, "damage": "1d10+4", "sbMultiplier": 0, "damageType": "Energy", "pen": 2, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 20, "qualities": ["Flame", "Spray", "Unreliable\u2020"], "source": "src_dh2_without_p48" }, { "id": "choppa", "name": "Choppa", "class": "Melee", "group": "Low-Tech", "isMelee": true, "damage": "1d10+1", "sbMultiplier": 0, "damageType": "Rending", "pen": 2, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Unbalanced"], "source": "src_dh2_without_p48" }, { "id": "rokkit_launcha", "name": "Rokkit Launcha", "class": "Basic", "group": "Launcher", "isMelee": false, "damage": "2d10+5", "sbMultiplier": 0, "damageType": "Explosive", "pen": 6, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 150, "qualities": ["Blast (2)", "Inaccurate", "Unreliable\u2020"], "source": "src_dh2_without_p48" }, { "id": "shoota", "name": "Shoota", "class": "Basic", "group": "SP", "isMelee": false, "damage": "1d10+4", "sbMultiplier": 0, "damageType": "Impact", "pen": 0, "rof": { "single": true, "burst": 3, "full": 0 }, "range_m": 60, "qualities": ["Inaccurate", "Unreliable\u2020"], "source": "src_dh2_without_p48" }, { "id": "slugga", "name": "Slugga", "class": "Pistol", "group": "SP", "isMelee": false, "damage": "1d10+4", "sbMultiplier": 0, "damageType": "Impact", "pen": 0, "rof": { "single": true, "burst": 3, "full": 0 }, "range_m": 20, "qualities": ["Inaccurate", "Unreliable\u2020"], "source": "src_dh2_without_p48" }, { "id": "stikkbomb", "name": "Stikkbomb", "class": "Thrown", "group": "Launcher", "isMelee": false, "damage": "2d10+5", "sbMultiplier": 0, "damageType": "Explosive", "pen": 2, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Blast (2)", "Unreliable\u2020"], "source": "src_dh2_without_p48" }, { "id": "pulse_carbine", "name": "Pulse Carbine", "class": "Basic", "group": "Exotic", "isMelee": false, "damage": "2d10+2", "sbMultiplier": 0, "damageType": "Energy", "pen": 4, "rof": { "single": true, "burst": 0, "full": 3 }, "range_m": 60, "qualities": [], "source": "src_dh2_without_p50" }, { "id": "pulse_pistol", "name": "Pulse Pistol", "class": "Pistol", "group": "Exotic", "isMelee": false, "damage": "2d10+2", "sbMultiplier": 0, "damageType": "Energy", "pen": 4, "rof": { "single": true, "burst": 2, "full": 0 }, "range_m": 40, "qualities": [], "source": "src_dh2_without_p50" }, { "id": "pulse_rifle", "name": "Pulse Rifle", "class": "Basic", "group": "Exotic", "isMelee": false, "damage": "2d10+3", "sbMultiplier": 0, "damageType": "Energy", "pen": 4, "rof": { "single": true, "burst": 2, "full": 4 }, "range_m": 150, "qualities": [], "source": "src_dh2_without_p50" }, { "id": "havatian_ringblade_ranged", "name": "Havatian Ringblade (Ranged)", "class": "Thrown", "group": "Exotic", "isMelee": false, "damage": "1d10+6", "sbMultiplier": 0, "damageType": "Explosive", "pen": 6, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Blast (2)", "Corrosive"], "source": "src_dh2_without_p52" }, { "id": "kyaire_riveblade_grenade", "name": "Kyaire Riveblade Grenade", "class": "Thrown", "group": "Exotic", "isMelee": false, "damage": "1d10+6", "sbMultiplier": 0, "damageType": "Rending", "pen": 10, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Razor Sharp"], "source": "src_dh2_without_p52" }, { "id": "neural_catalyser", "name": "Neural Catalyser", "class": "Pistol", "group": "Exotic", "isMelee": false, "damage": "2d10", "sbMultiplier": 0, "damageType": "Explosive", "pen": 0, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": 35, "qualities": ["Concussive (3)", "Overheats"], "source": "src_dh2_without_p53" }, { "id": "talonblade", "name": "Talonblade", "class": "Melee", "group": "Low-Tech", "isMelee": true, "damage": "1d10+3", "sbMultiplier": 0, "damageType": "Rending", "pen": 4, "rof": { "single": true, "burst": 0, "full": 0 }, "range_m": null, "qualities": ["Razor Sharp", "Tearing"], "source": "src_dh2_without_p53" }, { "id": "xenarch_death_arc", "name": "Xenarch Death-Arc", "class": "Basic", "group": "Exotic", "isMelee": false, "damage": "1d10+3", "sbMultiplier": 0, "damageType": "Energy", "pen": 0, "rof": { "single": true, "burst": 3, "full": 6 }, "range_m": 100, "qualities": ["Inaccurate", "Shocking"], "source": "src_dh2_without_p53" }] };
 
   // api/lib/rules/index.mjs
@@ -1835,16 +2266,17 @@ roll_table "Power Field Destruction" {
   var availableValued = valuedNames(
     [qualitiesSrc, talentsSrc, traitsSrc, conditionsSrc, circumstancesSrc, configurationsSrc, mechanicsSrc].join("\n\n")
   );
+  var withInfo = (entry, src) => ({ ...entry, source: src, ...programInfo(src) });
   var builtinSources = [
-    { category: "Weapon qualities", file: "weapon-qualities.dsl", source: qualitiesSrc },
-    { category: "Talents", file: "talents.dsl", source: talentsSrc },
-    { category: "Traits", file: "traits.dsl", source: traitsSrc },
-    { category: "Conditions", file: "conditions.dsl", source: conditionsSrc },
-    { category: "Circumstances", file: "circumstances.dsl", source: circumstancesSrc },
-    { category: "Configurations", file: "configurations.dsl", source: configurationsSrc },
-    { category: "Mechanical", file: "mechanics.dsl", source: mechanicsSrc },
-    { category: "Actions", file: "actions.dsl", source: actionsSrc },
-    { category: "Roll tables", file: "roll-tables.dsl", source: rollTablesSrc }
+    withInfo({ category: "Weapon qualities", file: "weapon-qualities.dsl" }, qualitiesSrc),
+    withInfo({ category: "Talents", file: "talents.dsl" }, talentsSrc),
+    withInfo({ category: "Traits", file: "traits.dsl" }, traitsSrc),
+    withInfo({ category: "Conditions", file: "conditions.dsl" }, conditionsSrc),
+    withInfo({ category: "Circumstances", file: "circumstances.dsl" }, circumstancesSrc),
+    withInfo({ category: "Configurations", file: "configurations.dsl" }, configurationsSrc),
+    withInfo({ category: "Mechanical", file: "mechanics.dsl" }, mechanicsSrc),
+    withInfo({ category: "Actions", file: "actions.dsl" }, actionsSrc),
+    withInfo({ category: "Roll tables", file: "roll-tables.dsl" }, rollTablesSrc)
   ];
   var KIND_GROUP = {
     quality: "Weapon qualities",
@@ -1875,7 +2307,19 @@ roll_table "Power Field Destruction" {
     for (const e of all) {
       if (seen.has(e.ruleId)) continue;
       seen.add(e.ruleId);
-      out.push({ id: e.ruleId, name: e.name, kind: e.source, checkpoint: e.checkpoint, category: KIND_GROUP[e.source] ?? "Other" });
+      out.push({
+        id: e.ruleId,
+        name: e.name,
+        kind: e.source,
+        checkpoint: e.checkpoint,
+        category: KIND_GROUP[e.source] ?? "Other",
+        // provenance (Stage 0)
+        qualifiedId: e.qualifiedId ?? e.ruleId,
+        page: e.page ?? null,
+        package: e.package ?? null,
+        system: e.system ?? null,
+        sourceBook: e.sourceBook ?? null
+      });
     }
     out.sort((a, b) => GROUP_ORDER.indexOf(a.category) - GROUP_ORDER.indexOf(b.category));
     return out;
@@ -1944,15 +2388,17 @@ roll_table "Power Field Destruction" {
       isMelee = false,
       aimValue = 0,
       craftsmanship = "Common",
-      targetArmour = 0
+      targetArmour = 0,
       // the target's AP at the struck location, for Graviton (+damage = armour)
+      target = null
+      // the (normalised) target block, so target.* scoped facts work at the damage checkpoints
     } = opts;
     const parsed = parseDamageFormula(formula);
     if (!parsed) return { error: `Cannot parse damage formula "${formula}"` };
     const ctx = new RollContext({
       parsed,
       formula,
-      qualities,
+      qualities: canonList(qualities),
       sbTimes,
       strengthBonus,
       dos,
@@ -1961,8 +2407,8 @@ roll_table "Power Field Destruction" {
       damageType,
       rangeBand,
       rng,
-      talents,
-      traits,
+      talents: canonList(talents),
+      traits: canonList(traits),
       statuses,
       firingModes,
       configs,
@@ -1970,6 +2416,7 @@ roll_table "Power Field Destruction" {
       aimValue,
       craftsmanship,
       targetArmour,
+      target,
       // accumulators the effects mutate:
       extraDice: 0,
       keepHighest: null,
@@ -2052,7 +2499,7 @@ roll_table "Power Field Destruction" {
     const action = input.action ?? "Standard Attack";
     const actionInfo = COMBAT_ACTIONS[action] ?? COMBAT_ACTIONS["Standard Attack"];
     const isMelee = !!weapon.isMelee;
-    const qualities = weapon.qualities ?? [];
+    const qualities = canonList(weapon.qualities);
     const baseTarget = isMelee ? characteristics.ws ?? 0 : characteristics.bs ?? 0;
     const rangeBand = isMelee ? "Melee" : input.rangeBand ?? "Normal Range";
     const aimValue = AIM_MODES[input.aim ?? "None"] ?? 0;
@@ -2071,8 +2518,8 @@ roll_table "Power Field Destruction" {
       rangeBand,
       aimValue,
       rng,
-      talents: input.talents ?? [],
-      traits: input.traits ?? [],
+      talents: canonList(input.talents),
+      traits: canonList(input.traits),
       statuses: input.conditions ?? input.statuses ?? [],
       circumstances: input.circumstances ?? [],
       firingModes: input.firingModes ?? [],
@@ -2190,20 +2637,22 @@ roll_table "Power Field Destruction" {
       aimValue: AIM_MODES[src.aim ?? "None"] ?? 0,
       rangeBand: weapon.isMelee ? "Melee" : src.rangeBand ?? "Normal Range",
       craftsmanship: weapon.craftsmanship ?? "Common",
-      targetArmour
+      targetArmour,
+      target: src.target ?? null
+      // target.* scoped facts at the damage checkpoints
     }, rng, registry);
   }
   function applyOnHit(hit, attacker, target, dmg, registry, rng, autoRoll, reduced = /* @__PURE__ */ new Map(), effArmour = null) {
     const ctx = new RollContext({
-      qualities: attacker.weapon?.qualities ?? [],
+      qualities: canonList(attacker.weapon?.qualities),
       target,
       location: hit.location,
       rng,
       targetArmour: effArmour ?? (Number(target?.armour) || 0),
       isMelee: !!attacker.weapon?.isMelee,
       action: attacker.action ?? "Standard Attack",
-      talents: attacker.talents ?? [],
-      traits: attacker.traits ?? [],
+      talents: canonList(attacker.talents),
+      traits: canonList(attacker.traits),
       statuses: attacker.conditions ?? attacker.statuses ?? [],
       circumstances: attacker.circumstances ?? [],
       damageDealt: dmg.error ? 0 : dmg.total,
@@ -2334,7 +2783,7 @@ roll_table "Power Field Destruction" {
   }
   function resolveParry(input, rng = Math.random, registry = defaultRegistry) {
     const { characteristics = {}, weapon = {} } = input;
-    const qualities = weapon.qualities ?? [];
+    const qualities = canonList(weapon.qualities);
     const opposing = input.against ?? null;
     const ctx = new RollContext({
       input,
@@ -2342,15 +2791,15 @@ roll_table "Power Field Destruction" {
       weapon,
       qualities,
       opposingProvided: !!opposing,
-      opposingQualities: opposing?.qualities ?? [],
+      opposingQualities: canonList(opposing?.qualities),
       action: "Parry",
       isMelee: true,
       rangeBand: "Melee",
       aimValue: 0,
       rng,
       craftsmanship: weapon.craftsmanship ?? "Common",
-      talents: input.talents ?? [],
-      traits: input.traits ?? [],
+      talents: canonList(input.talents),
+      traits: canonList(input.traits),
       statuses: input.conditions ?? input.statuses ?? [],
       circumstances: input.circumstances ?? [],
       combat: { dualWielding: false, firingOffhand: false, firingBoth: false },
@@ -2410,8 +2859,8 @@ roll_table "Power Field Destruction" {
       aimValue: 0,
       rng,
       craftsmanship: "Common",
-      talents: defender.talents ?? [],
-      traits: defender.traits ?? [],
+      talents: canonList(defender.talents),
+      traits: canonList(defender.traits),
       statuses: defender.conditions ?? defender.statuses ?? [],
       circumstances: defender.circumstances ?? [],
       combat: { dualWielding: false, firingOffhand: false, firingBoth: false },
@@ -2431,7 +2880,7 @@ roll_table "Power Field Destruction" {
     strength: d2.characteristics?.s ?? 0,
     agility: d2.characteristics?.ag ?? d2.characteristics?.agility ?? 0,
     willpower: d2.characteristics?.wp ?? d2.characteristics?.willpower ?? 0,
-    traits: d2.traits ?? []
+    traits: canonList(d2.traits)
     // so target_has_trait() works (Sanctified vs Daemonic)
   });
   function engageAttackRoll(attacker, registry = defaultRegistry, rng = Math.random, defender = null) {
@@ -2450,8 +2899,9 @@ roll_table "Power Field Destruction" {
     const action = attacker.action ?? "Standard Attack";
     const meta = attackState.meta ?? {};
     const targetArmour = Number(defender?.armour) || 0;
+    const src = defender ? { ...attacker, target: defenderTarget(defender) } : attacker;
     const hits = (attackState.hits ?? []).map((h) => {
-      const dmg = rollHitDamage(weapon, action, meta, h.location, meta.dos, attacker, rng, registry, targetArmour);
+      const dmg = rollHitDamage(weapon, action, meta, h.location, meta.dos, src, rng, registry, targetArmour);
       return { hitNumber: h.hitNumber, location: h.location, damageType: dmg.damageType ?? weapon.damageType ?? "Impact", damage: dmg, penetration: meta.pen, penetrationModifiers: meta.penModifiers, totalPenetration: meta.totalPen, fellingReduction: meta.fellingReduction || 0 };
     });
     return { hits };
@@ -2519,7 +2969,14 @@ roll_table "Power Field Destruction" {
   // api/lib/dsl/docs.mjs
   var DSL_DOCS = {
     structure: {
-      template: `<kind> "<name>" [tier N] {
+      template: `dsl 2                             // optional version pragma (files without it are dsl 1)
+package "dh2.core.example" {      // optional, one per file \u2014 provenance for every rule in it
+  system "dh2"                    // rule system id
+  source "Dark Heresy 2e Core Rulebook"
+}
+
+<kind> "<name>" [tier N] {
+  meta { page <N> [ref "\u2026"] }     // optional \u2014 rule provenance (book page / cross-ref)
   on <CHECKPOINT>                 // required \u2014 where the rule fires
   priority <N>                    // optional \u2014 order within a checkpoint (default 0)
   [when <predicate>] then <action> [; <action> ...]   // one or more branches
@@ -2539,6 +2996,8 @@ roll_table "Power Field Destruction" {
         "priority: lower runs first within a checkpoint. Convention \u2014 injectors 0\u201349, additive bonuses 50\u201399, cancellers/clamps 100+.",
         "tier N is optional metadata (e.g. talent tier); it does not affect execution.",
         "Comments run from // or # to end of line.",
+        'Provenance (Stage 0): a file may open with a `dsl 2` pragma and one `package "name" { system "\u2026" source "\u2026" }` block; rules may carry `meta { page N }`. Compiled effects then expose page/package/system/sourceBook and a stable qualifiedId ("pkg/rule-id").',
+        'Levelled entries (Stage 1): qualities/talents/traits are canonically { name, level } objects internally; strings like "Proven (3)" or "Vengeful 9" are accepted at the API boundary and parsed once. Both forms work everywhere (has_quality, quality_level, bump_quality, \u2026).',
         'A rule may have several "when \u2026 then \u2026" branches; each is evaluated independently (compiles to its own effect, in order). A branch with no "when" is unconditional. Use this for stepped effects \u2014 e.g. Accurate adds one die at DoS\u22653 and a second only at DoS\u22655.',
         'Within a branch, several actions may be separated by ";". Multiple rules may share a file/snippet.'
       ]
@@ -2560,65 +3019,26 @@ roll_table "Power Field Destruction" {
       { name: "EVASION", group: "Defensive reaction", summary: "Modifiers for a Dodge (Agility) evasion test in an Engagement (POST /api/resolve).", use: "Dodge bonuses from defender talents/conditions." }
     ],
     // Read-only variables usable in `when` predicates and action expressions.
-    facts: [
-      { name: "is_melee", type: "bool", summary: "The attack is a melee attack." },
-      { name: "is_ranged", type: "bool", summary: "The attack is a ranged attack." },
-      { name: "pen", type: "number", summary: "The hit's base armour penetration. Meaningful at PENETRATION." },
-      { name: "sb", type: "number", summary: "Attacker Strength Bonus (tens digit of Strength)." },
-      { name: "tb", type: "number", summary: "Toughness Bonus (tens digit of Toughness)." },
-      { name: "bs_bonus", type: "number", summary: "Ballistic Skill bonus (tens digit of BS)." },
-      { name: "ws_bonus", type: "number", summary: "Weapon Skill bonus (tens digit of WS)." },
-      { name: "jam_threshold", type: "number", summary: "A ranged weapon jams on a roll greater than this (default 96 \u2192 jams on 97+). Adjusted by Reliable/Unreliable and craftsmanship; 100 = never jams." },
-      { name: "craftsmanship", type: "string", summary: `The weapon's craftsmanship: "Poor", "Common", "Good", or "Best".` },
-      { name: "damage_dealt", type: "number", summary: "This hit's total damage (before soak). Meaningful at ON_HIT." },
-      { name: "wounds", type: "number", summary: "Wounds this hit inflicted after soak. Meaningful at ON_HIT." },
-      { name: "target_sb", type: "number", summary: "The target's Strength Bonus (from the optional target block)." },
-      { name: "target_tb", type: "number", summary: "The target's Toughness Bonus (from the optional target block)." },
-      { name: "target_armour", type: "number", summary: "The struck location's current Armour Points (base AP minus any already corroded this attack; 0 if unarmoured). Read at ON_HIT." },
-      { name: "target_unnatural_toughness", type: "number", summary: "The target's Unnatural Toughness bonus (added to TB when soaking; Felling reduces it). 0 if none." },
-      { name: "roll", type: "number", summary: "The d100 to-hit roll (1\u2013100). Available from POST_ROLL onward." },
-      { name: "dos", type: "number", summary: "Degrees of Success on the to-hit test (0 on a miss)." },
-      { name: "dof", type: "number", summary: "Degrees of Failure on the to-hit test (0 on a hit)." },
-      { name: "success", type: "bool", summary: "Whether the to-hit test passed. Available from POST_ROLL onward." },
-      { name: "action", type: "string", summary: 'The current action name, e.g. "Standard Attack", "Called Shot", "Parry", "Dodge" \u2014 set in every flow including reactions.' },
-      { name: "action_type", type: "string", summary: `The current action's type: "Half" | "Full" | "Reaction" | "Free" (from the Actions taxonomy), or "" if unknown.` },
-      { name: "is_attack", type: "bool", summary: 'The current action carries the "attack" subtype (the key designation, e.g. Standard Attack, Charge). Used by Defensive (-10 to attacks) and many others.' },
-      { name: "range", type: "string", summary: 'The range band, e.g. "Short Range", "Point Blank", "Melee".' },
-      { name: "aim", type: "number", summary: "Aim bonus value applied (0 = none, 10 = half, 20 = full)." },
-      { name: "half_aim", type: "bool", summary: 'Aiming as a Half Action (Aim dropdown = Half, or a "Half Aim" status). The aim bonus is +10.' },
-      { name: "full_aim", type: "bool", summary: 'Aiming as a Full Action (Aim dropdown = Full, or a "Full Aim" status). The aim bonus is +20.' },
-      { name: "location", type: "string", summary: 'The current hit location (e.g. "Head"). Meaningful in the per-hit damage stages.' },
-      { name: "damage_type", type: "string", summary: "The weapon damage type: Impact, Energy, Explosive, or Rending." },
-      { name: "hit_index", type: "number", summary: "Zero-based index of the current hit in a multi-hit attack." },
-      { name: "opposing_present", type: "bool", summary: "In a Parry, an opposing (attacking) weapon was supplied (the engagement provides it). Used by Power Field to avoid firing on a bare /api/parry test." },
-      { name: "dual_wielding", type: "bool", summary: "Wielding and firing two weapons this turn (set via combat.dualWielding)." },
-      { name: "firing_offhand", type: "bool", summary: "This attack uses the off-hand weapon (set via combat.firingOffhand)." },
-      { name: "firing_both", type: "bool", summary: "Firing both weapons this turn (set via combat.firingBoth)." }
-    ],
-    functions: [
-      { signature: 'has_quality("Name")', returns: "bool", summary: 'Weapon has the named quality. Prefix match \u2014 "Proven (3)" matches has_quality("Proven").' },
-      { signature: 'has_talent("Name")', returns: "bool", summary: "Character has the named talent (from the attack's talents[] list). Prefix match." },
-      { signature: 'has_trait("Name")', returns: "bool", summary: 'Character/creature has the named DH2.0 trait (from traits[]). Prefix match \u2014 "Brutal Charge (3)" matches has_trait("Brutal Charge").' },
-      { signature: 'target_has_trait("Name")', returns: "bool", summary: `The TARGET/defender has the named trait (from the target block's traits[]), e.g. target_has_trait("Daemonic"). Used by Sanctified (Holy damage negates a Daemonic target's Unnatural Toughness).` },
-      { signature: 'opposing_has_quality("Name")', returns: "bool", summary: "In a Parry (POST_PARRY), the OPPOSING attacking weapon being parried has the named quality. Used by Power Field (immune if the attacker's weapon is Force/Warp/etc.)." },
-      { signature: 'has_status("Name")', returns: "bool", summary: "Alias of has_condition() (back-compat). A named Condition is active on the character." },
-      { signature: 'has_condition("Name")', returns: "bool", summary: 'A named Condition is active on the character (from conditions[] / statuses[]), e.g. "On Fire", "Full Aim", "Stunned".' },
-      { signature: 'has_circumstance("Name")', returns: "bool", summary: "A named environmental Circumstance is in effect (from circumstances[])." },
-      { signature: 'circumstance_severity("Name", default)', returns: "number", summary: "Severity of a structured Circumstance in circumstances[] (e.g. the Haywire Field strength 1\u20135), or default." },
-      { signature: 'configuration("Name")', returns: "bool", summary: 'A per-character Configuration toggle is on (from configs[] / firingModes[]), e.g. configuration("Maximal").' },
-      { signature: 'is_action("Name")', returns: "bool", summary: 'The current action is the named one (case-insensitive), e.g. is_action("Parry"). Works in every flow including reactions.' },
-      { signature: "is_reaction()", returns: "bool", summary: "The current action is a Reaction (Parry, Dodge, \u2026)." },
-      { signature: 'action_subtype("Name")', returns: "bool", summary: 'The current action carries the named subtype (declared via `subtype`/`attack` on the action). `is_attack` is shorthand for action_subtype("attack").' },
-      { signature: 'firing_mode("Name")', returns: "bool", summary: 'Alias of configuration() \u2014 reads the same toggle list (configs[] / firingModes[]), e.g. firing_mode("Maximal").' },
-      { signature: 'condition_severity("Name", default)', returns: "number", summary: "Severity of a structured Condition in conditions[] (e.g. Crippled severity), or default." },
-      { signature: 'condition_duration("Name", default)', returns: "number", summary: "Remaining duration (rounds) of a structured Condition in conditions[], or default." },
-      { signature: 'condition_location("Name")', returns: "string", summary: 'Hit location a structured Condition in conditions[] is bound to, or "".' },
-      { signature: 'quality_level("Name", default)', returns: "number", summary: 'Numeric level parsed from a quality like "Proven (3)" \u2192 3; returns default if absent/unnumbered.' },
-      { signature: 'trait_level("Name", default)', returns: "number", summary: 'Numeric level parsed from a trait like "Brutal Charge (3)" \u2192 3; returns default if absent/unnumbered.' },
-      { signature: "tens(n)", returns: "number", summary: "The tens digit of n, i.e. floor(n / 10)." },
-      { signature: "is_natural(n)", returns: "bool", summary: "True if the d100 roll equals n exactly." }
-    ],
+    // DERIVED from vocabulary.mjs (Stage 2 — single source): the unscoped facts
+    // plus legacy scoped aliases. Each entry lists the scopes it is available in.
+    facts: FACT_DOCS,
+    // Scoped-only bases (no unscoped form): reach them via <scope>.<name>.
+    scopes: {
+      names: SCOPE_NAMES,
+      summary: 'A fact/function may be read through a scope path \u2014 target.tb, weapon.pen, opposing_weapon.has_quality("Force"). The unscoped name is the attacker scope. Legacy prefixed names (target_sb, opposing_has_quality, \u2026) remain as aliases.',
+      scopedOnly: SCOPED_ONLY_DOCS
+    },
+    // DERIVED from vocabulary.mjs (Stage 2 — single source), incl. legacy aliases.
+    functions: FUNCTION_DOCS,
+    // Registered mutation targets (Stage 3): `set <slot> (=|+=) <expr>` and
+    // `flag <name>` — the primitives every set-verb/flag-verb is sugar for.
+    // DERIVED from vocabulary.mjs.
+    slots: SLOT_DOCS,
+    flags: FLAG_DOCS,
     actions: [
+      { syntax: "set <slot> (= | +=) <expr>", at: "per slot", summary: "THE generic mutation (Stage 3): write a registered slot \u2014 see the slots table. The specific set-verbs below (set pen, add_die, reduce_unnatural_toughness, \u2026) are sugar for this." },
+      { syntax: "flag <name>", at: "per flag", summary: "THE generic boolean state (Stage 3): raise a registered flag \u2014 see the flags table. prevent_parry/cannot_parry/detonate/fail/keep_highest are sugar for this." },
+      { syntax: "declare test|status|table_roll|armour_damage|event \u2026", at: "ON_HIT, POST_ROLL, \u2026", summary: "THE generic declaration namespace (Stage 3): alternative surface syntax for require_test / apply_status / roll_on / corrode / emit." },
       { syntax: 'add modifier "key" = <expr>', at: "MODIFIERS, DAMAGE_MODS", summary: "Add a named modifier (to-hit or damage) with the given value." },
       { syntax: 'set modifier "key" = <expr>', at: "MODIFIERS, DAMAGE_MODS", summary: "Set/overwrite a named modifier's value." },
       { syntax: 'cancel modifier "key"', at: "MODIFIERS, DAMAGE_MODS", summary: "Remove a named modifier entirely." },
@@ -2665,6 +3085,192 @@ roll_table "Power Field Destruction" {
   var DOCUMENTED_FACTS = DSL_DOCS.facts.map((f) => f.name);
   var DOCUMENTED_FUNCTIONS = DSL_DOCS.functions.map((f) => f.signature.split("(")[0]);
 
+  // api/lib/character-schema.mjs
+  var CHARACTER_SCHEMA_VERSION = 1;
+  var CHARACTERISTIC_KEYS = ["ws", "bs", "s", "t", "ag", "int", "per", "wp", "fel"];
+  var UNNATURAL_KEYS = ["ws", "bs", "s", "t", "ag"];
+  var ARMOUR_KEYS = ["head", "body", "leftArm", "rightArm", "leftLeg", "rightLeg"];
+  var DAMAGE_TYPES = ["Impact", "Energy", "Explosive", "Rending"];
+  var WEAPON_CLASSES = ["melee", "pistol", "basic", "heavy", "thrown"];
+  var CRAFTSMANSHIP = ["Poor", "Common", "Good", "Best"];
+  var CHARACTER_FIELDS = [
+    { path: "schemaVersion", type: "int", required: true, summary: `Document schema version (current: ${CHARACTER_SCHEMA_VERSION}). Migrations keep old documents loadable.` },
+    { path: "kind", type: '"dh2.character"', required: true, summary: "Document discriminator." },
+    { path: "name", type: "string", required: true, summary: "Character name." },
+    { path: "system", type: "string", required: false, summary: 'Rule system id (default "dh2").' },
+    { path: "characteristics.<ws|bs|s|t|ag|int|per|wp|fel>", type: "int 0\u2013200", required: true, summary: "The nine DH2 characteristics (percentile values)." },
+    { path: "unnatural.<ws|bs|s|t|ag>", type: "int \u2265 0", required: false, summary: "Unnatural Characteristic values (p.139): +X to the bonus, \u2308X/2\u2309 bonus DoS on successful tests." },
+    { path: "armour.<head|body|leftArm|rightArm|leftLeg|rightLeg>", type: "int \u2265 0", required: false, summary: "Armour points by hit location." },
+    { path: "wounds", type: "{ max, current }", required: false, summary: "Wound track (carried, not yet consumed by the attack loop)." },
+    { path: "fate", type: "{ max, current }", required: false, summary: "Fate points (carried, not yet consumed)." },
+    { path: "talents", type: "(string | {name, level})[]", required: false, summary: 'Talent list. "Name (X)" strings or {name, level} objects.' },
+    { path: "traits", type: "(string | {name, level})[]", required: false, summary: "Trait list (innate DH2.0 traits, e.g. Brutal Charge (3), Daemonic (4))." },
+    { path: "conditions", type: "(string | {name, severity, duration, location})[]", required: false, summary: "Active Conditions (Stunned, On Fire, \u2026)." },
+    { path: "circumstances", type: "(string | {name, severity})[]", required: false, summary: "Environmental Circumstances (Darkness, Haywire Field, \u2026)." },
+    { path: "weapons[]", type: "weapon", required: false, summary: "Weapon profiles (see weapon fields)." },
+    { path: "weapons[].name", type: "string", required: true, summary: "Weapon name." },
+    { path: "weapons[].class", type: WEAPON_CLASSES.join(" | "), required: false, summary: 'Weapon class; "melee" and "thrown" drive Strength-Bonus damage.' },
+    { path: "weapons[].damage", type: 'string "XdY+Z"', required: true, summary: "Damage formula." },
+    { path: "weapons[].pen", type: "int \u2265 0", required: false, summary: "Penetration." },
+    { path: "weapons[].damageType", type: DAMAGE_TYPES.join(" | "), required: false, summary: "Damage type." },
+    { path: "weapons[].rof", type: "{ single, burst, full }", required: false, summary: "Rate of fire (burst/full as ints)." },
+    { path: "weapons[].qualities", type: "(string | {name, level})[]", required: false, summary: "Weapon qualities." },
+    { path: "weapons[].craftsmanship", type: CRAFTSMANSHIP.join(" | "), required: false, summary: "Craftsmanship tier." },
+    { path: "weapons[].sbMultiplier", type: "int 0\u20132", required: false, summary: "Strength-Bonus multiple added to damage for melee/thrown (default 1 for melee)." },
+    { path: "field", type: "{ rating, overloadMax }", required: false, summary: "Force field (absorbs on roll \u2264 rating; overloads on roll \u2264 overloadMax)." },
+    { path: "source", type: "{ adapter, ... }", required: false, summary: "Import provenance (adapter name, source identifiers, timestamp)." }
+  ];
+  function emptyCharacter(name = "New Character") {
+    return {
+      schemaVersion: CHARACTER_SCHEMA_VERSION,
+      kind: "dh2.character",
+      name,
+      system: "dh2",
+      characteristics: Object.fromEntries(CHARACTERISTIC_KEYS.map((k) => [k, 30])),
+      unnatural: Object.fromEntries(UNNATURAL_KEYS.map((k) => [k, 0])),
+      armour: Object.fromEntries(ARMOUR_KEYS.map((k) => [k, 0])),
+      wounds: { max: 10, current: 10 },
+      fate: { max: 2, current: 2 },
+      talents: [],
+      traits: [],
+      conditions: [],
+      circumstances: [],
+      weapons: [],
+      field: { rating: 0, overloadMax: 0 }
+    };
+  }
+  var isInt = (v) => Number.isInteger(v);
+  var isNonNegInt = (v) => Number.isInteger(v) && v >= 0;
+  var isNamedEntry = (v) => typeof v === "string" || v && typeof v === "object" && typeof v.name === "string";
+  function validateCharacter(doc) {
+    const errors = [], warnings = [];
+    const err = (path, message) => errors.push({ path, message });
+    const warn = (path, message) => warnings.push({ path, message });
+    if (!doc || typeof doc !== "object") return { ok: false, errors: [{ path: "", message: "Not an object" }], warnings };
+    if (!isInt(doc.schemaVersion)) err("schemaVersion", "Required integer");
+    else if (doc.schemaVersion > CHARACTER_SCHEMA_VERSION) warn("schemaVersion", `Document is v${doc.schemaVersion}; this build knows v${CHARACTER_SCHEMA_VERSION} \u2014 fields may be ignored`);
+    if (doc.kind !== "dh2.character") err("kind", 'Must be "dh2.character"');
+    if (typeof doc.name !== "string" || !doc.name.trim()) err("name", "Required non-empty string");
+    if (doc.system !== void 0 && typeof doc.system !== "string") err("system", "Must be a string");
+    if (!doc.characteristics || typeof doc.characteristics !== "object") err("characteristics", "Required object");
+    else {
+      for (const k of CHARACTERISTIC_KEYS) {
+        const v = doc.characteristics[k];
+        if (v === void 0) err(`characteristics.${k}`, "Required");
+        else if (!isInt(v) || v < 0 || v > 200) err(`characteristics.${k}`, "Integer 0\u2013200 required");
+      }
+      for (const k of Object.keys(doc.characteristics)) if (!CHARACTERISTIC_KEYS.includes(k)) warn(`characteristics.${k}`, "Unknown characteristic (ignored)");
+    }
+    if (doc.unnatural !== void 0) {
+      if (typeof doc.unnatural !== "object") err("unnatural", "Must be an object");
+      else for (const [k, v] of Object.entries(doc.unnatural)) {
+        if (!UNNATURAL_KEYS.includes(k)) warn(`unnatural.${k}`, "Unknown/unsupported unnatural characteristic (ignored)");
+        else if (!isNonNegInt(v)) err(`unnatural.${k}`, "Non-negative integer required");
+      }
+    }
+    if (doc.armour !== void 0) {
+      if (typeof doc.armour !== "object") err("armour", "Must be an object");
+      else for (const [k, v] of Object.entries(doc.armour)) {
+        if (!ARMOUR_KEYS.includes(k)) warn(`armour.${k}`, "Unknown hit location (ignored)");
+        else if (!isNonNegInt(v)) err(`armour.${k}`, "Non-negative integer required");
+      }
+    }
+    for (const trackName of ["wounds", "fate"]) {
+      const track = doc[trackName];
+      if (track === void 0) continue;
+      if (typeof track !== "object") {
+        err(trackName, "Must be { max, current }");
+        continue;
+      }
+      for (const p of ["max", "current"]) if (track[p] !== void 0 && !isInt(track[p])) err(`${trackName}.${p}`, "Integer required");
+    }
+    for (const listName of ["talents", "traits", "conditions", "circumstances"]) {
+      const list = doc[listName];
+      if (list === void 0) continue;
+      if (!Array.isArray(list)) {
+        err(listName, "Must be an array");
+        continue;
+      }
+      list.forEach((entry, i) => {
+        if (!isNamedEntry(entry)) err(`${listName}[${i}]`, "Must be a string or { name, \u2026 } object");
+      });
+    }
+    if (doc.weapons !== void 0) {
+      if (!Array.isArray(doc.weapons)) err("weapons", "Must be an array");
+      else doc.weapons.forEach((w, i) => {
+        const at = (p) => `weapons[${i}].${p}`;
+        if (!w || typeof w !== "object") {
+          err(`weapons[${i}]`, "Must be an object");
+          return;
+        }
+        if (typeof w.name !== "string" || !w.name.trim()) err(at("name"), "Required non-empty string");
+        if (typeof w.damage !== "string" || !/^\s*\d+\s*d\s*\d+\s*([+-]\s*\d+)?\s*$/i.test(w.damage)) err(at("damage"), 'Damage formula "XdY[+Z]" required');
+        if (w.class !== void 0 && !WEAPON_CLASSES.includes(w.class)) err(at("class"), `One of: ${WEAPON_CLASSES.join(", ")}`);
+        if (w.pen !== void 0 && !isNonNegInt(w.pen)) err(at("pen"), "Non-negative integer required");
+        if (w.damageType !== void 0 && !DAMAGE_TYPES.includes(w.damageType)) err(at("damageType"), `One of: ${DAMAGE_TYPES.join(", ")}`);
+        if (w.craftsmanship !== void 0 && !CRAFTSMANSHIP.includes(w.craftsmanship)) err(at("craftsmanship"), `One of: ${CRAFTSMANSHIP.join(", ")}`);
+        if (w.qualities !== void 0) {
+          if (!Array.isArray(w.qualities)) err(at("qualities"), "Must be an array");
+          else w.qualities.forEach((q, qi) => {
+            if (!isNamedEntry(q)) err(at(`qualities[${qi}]`), "Must be a string or { name, level }");
+          });
+        }
+        if (w.rof !== void 0 && (typeof w.rof !== "object" || w.rof === null)) err(at("rof"), "Must be { single, burst, full }");
+        if (w.sbMultiplier !== void 0 && (!isInt(w.sbMultiplier) || w.sbMultiplier < 0 || w.sbMultiplier > 2)) err(at("sbMultiplier"), "Integer 0\u20132 required");
+      });
+    }
+    if (doc.field !== void 0) {
+      if (typeof doc.field !== "object") err("field", "Must be { rating, overloadMax }");
+      else for (const p of ["rating", "overloadMax"]) if (doc.field[p] !== void 0 && !isNonNegInt(doc.field[p])) err(`field.${p}`, "Non-negative integer required");
+    }
+    return { ok: errors.length === 0, errors, warnings };
+  }
+  function migrateCharacter(doc) {
+    const d2 = { ...doc };
+    switch (d2.schemaVersion) {
+      case void 0:
+      case 0:
+        d2.schemaVersion = 1;
+        d2.kind = d2.kind ?? "dh2.character";
+      // fallthrough for future versions:
+      case 1:
+        break;
+      default:
+        break;
+    }
+    return d2;
+  }
+  function characterToCombatant(doc, { weaponIndex = 0, location = "body" } = {}) {
+    const c = doc.characteristics ?? {};
+    const w = (doc.weapons ?? [])[weaponIndex];
+    return {
+      name: doc.name,
+      characteristics: { ws: c.ws ?? 0, bs: c.bs ?? 0, s: c.s ?? 0, t: c.t ?? 0, ag: c.ag ?? 0, wp: c.wp ?? 0 },
+      unnatural: { ...doc.unnatural ?? {} },
+      weapon: w ? {
+        name: w.name,
+        isMelee: w.class === "melee",
+        thrown: w.class === "thrown" || void 0,
+        damage: w.damage,
+        pen: w.pen ?? 0,
+        damageType: w.damageType ?? "Impact",
+        rof: { single: true, burst: Number(w.rof?.burst) || 0, full: Number(w.rof?.full) || 0 },
+        qualities: canonList(w.qualities),
+        craftsmanship: w.craftsmanship ?? "Common",
+        sbMultiplier: w.sbMultiplier ?? (w.class === "melee" || w.class === "thrown" ? 1 : 0)
+      } : void 0,
+      talents: canonList(doc.talents),
+      traits: canonList(doc.traits),
+      conditions: doc.conditions ?? [],
+      circumstances: doc.circumstances ?? [],
+      // defender-side extras (harmless on the attacker side):
+      armour: (doc.armour ?? {})[location] ?? 0,
+      toughnessBonus: Math.floor((c.t ?? 0) / 10),
+      unnaturalToughness: doc.unnatural?.t ?? 0,
+      field: doc.field ?? { rating: 0, overloadMax: 0 }
+    };
+  }
+
   // api/lib/api-router.mjs
   var GET = {
     "/api/weapons": () => weaponsJson,
@@ -2689,7 +3295,13 @@ roll_table "Power Field Destruction" {
       // names that take a numeric severity/level variable
     }),
     "/api/dsl-docs": () => DSL_DOCS,
-    "/api/rules/source": () => ({ builtins: builtinSources, rules: builtinRules })
+    "/api/rules/source": () => ({ builtins: builtinSources, rules: builtinRules }),
+    // Character schema v1 (Phase 2): the field reference + an empty template.
+    "/api/character/schema": () => ({
+      version: CHARACTER_SCHEMA_VERSION,
+      fields: CHARACTER_FIELDS,
+      template: emptyCharacter()
+    })
   };
   var POST = {
     "/api/test": (body) => rollTest(body),
@@ -2732,6 +3344,13 @@ roll_table "Power Field Destruction" {
       return out;
     }
   };
+  function validateCharacterRoute(body) {
+    const doc = migrateCharacter(body?.character ?? body ?? {});
+    const result = validateCharacter(doc);
+    const out = { ok: result.ok, errors: result.errors, warnings: result.warnings, character: doc };
+    if (result.ok) out.combatant = characterToCombatant(doc);
+    return { status: 200, body: out };
+  }
   function validateRules(body) {
     const text = body?.rules ?? "";
     try {
@@ -2767,6 +3386,7 @@ roll_table "Power Field Destruction" {
     }
     if (verb === "POST") {
       if (path === "/api/rules/validate") return validateRules(body ?? {});
+      if (path === "/api/character/validate") return validateCharacterRoute(body ?? {});
       const fn = POST[path];
       if (!fn) return { status: 404, body: { error: `Unknown endpoint ${path}` } };
       try {

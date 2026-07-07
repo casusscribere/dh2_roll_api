@@ -23,7 +23,7 @@ app.use(express.static(join(__dirname, '..', 'ui')));
 const send = (res, { status, body }) => res.status(status).json(body);
 
 // GET endpoints — reference data for building forms + the DSL reference.
-for (const path of ['/api/weapons', '/api/options', '/api/rules', '/api/dsl-docs', '/api/rules/source']) {
+for (const path of ['/api/weapons', '/api/options', '/api/rules', '/api/dsl-docs', '/api/rules/source', '/api/character/schema']) {
     app.get(path, (req, res) => send(res, dispatch('GET', path)));
 }
 
@@ -32,7 +32,7 @@ for (const path of ['/api/weapons', '/api/options', '/api/rules', '/api/dsl-docs
 //   /api/test  /api/damage  /api/soak  /api/parry  /api/attack
 //   /api/resolve                  full engagement (forcedRolls → rollTrace)
 //   /api/engage                   one engagement phase (stepped UI)
-for (const path of ['/api/rules/validate', '/api/test', '/api/damage', '/api/soak', '/api/parry', '/api/attack', '/api/resolve', '/api/engage']) {
+for (const path of ['/api/rules/validate', '/api/character/validate', '/api/test', '/api/damage', '/api/soak', '/api/parry', '/api/attack', '/api/resolve', '/api/engage']) {
     app.post(path, (req, res) => send(res, dispatch('POST', path, req.body ?? {})));
 }
 

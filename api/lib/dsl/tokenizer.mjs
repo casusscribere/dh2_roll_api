@@ -22,7 +22,7 @@ const isIdentPart = (ch) => isIdentStart(ch) || isDigit(ch);
 
 const TWO_CHAR_OPS = new Set(['==', '!=', '>=', '<=', '+=', '=>']);
 const ONE_CHAR_OPS = new Set(['>', '<', '=', '+', '-', '*', '/']);
-const PUNCT = new Set(['{', '}', '(', ')', ',', ';', ':']);
+const PUNCT = new Set(['{', '}', '(', ')', ',', ';', ':', '.']);   // '.' joins scoped fact paths (target.tb)
 
 /**
  * Tokenize DSL source. Token shape:

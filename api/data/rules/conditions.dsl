@@ -1,3 +1,9 @@
+dsl 2
+package "dh2.core.conditions" {
+  system "dh2"
+  source "Dark Heresy 2e Core Rulebook"
+}
+
 # Conditions currently applied to the character — transient states such as
 # aiming or being on fire (most are listed on DH2 core p.242; others come from
 # weapon qualities, e.g. Crippled, Stunned). Gated on has_condition("…") and
@@ -26,6 +32,7 @@ condition "Full Aim" {
 # attack-time effect modelled here is the -10 a burning attacker suffers (distracted
 # by the flames — an approximation of failing the Willpower test to act).
 condition "On Fire" {
+  meta { page 243 }
   on MODIFIERS
   when has_condition("On Fire")
   then add modifier "on_fire" = -10
@@ -42,6 +49,7 @@ condition "On Fire" {
 # it in the report if a Toxified character later acts. Full implementation (the
 # end-of-turn resolution) is planned in POTENTIAL_FEATURES.md.
 condition "Toxified" {
+  meta { page 150 }
   on POST_ROLL
   priority 0
   when has_condition("Toxified")

@@ -1,3 +1,9 @@
+dsl 2
+package "dh2.core.traits" {
+  system "dh2"
+  source "Dark Heresy 2e Core Rulebook"
+}
+
 # DH2.0 traits — innate abilities (like talents, but NOT bought with XP).
 # Gated on has_trait("…"). A character/creature's traits are supplied per
 # attack via traits: ["Brutal Charge (3)", …].

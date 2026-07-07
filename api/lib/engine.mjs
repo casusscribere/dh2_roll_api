@@ -16,6 +16,7 @@ import { getHitLocationForRoll, ADDITIONAL_HIT_LOCATIONS, HIT_LOCATIONS } from '
 import { getCriticalDamage } from './critical-damage.mjs';
 import { CHECKPOINTS, runCheckpoint } from './pipeline.mjs';
 import { RollContext } from './context.mjs';
+import { canonList } from './rules/_util.mjs';
 import {
     defaultRegistry,
     COMBAT_ACTIONS, RANGE_BANDS, AIM_MODES,
@@ -89,14 +90,15 @@ export function rollDamage(opts, rng = Math.random, registry = defaultRegistry) 
         // Accurate which requires aiming).
         talents = [], traits = [], statuses = [], firingModes = [], configs = [], isMelee = false, aimValue = 0, craftsmanship = 'Common',
         targetArmour = 0,   // the target's AP at the struck location, for Graviton (+damage = armour)
+        target = null,      // the (normalised) target block, so target.* scoped facts work at the damage checkpoints
     } = opts;
 
     const parsed = parseDamageFormula(formula);
     if (!parsed) return { error: `Cannot parse damage formula "${formula}"` };
 
     const ctx = new RollContext({
-        parsed, formula, qualities, sbTimes, strengthBonus, dos, action, location, damageType, rangeBand, rng,
-        talents, traits, statuses, firingModes, configs, isMelee, aimValue, craftsmanship, targetArmour,
+        parsed, formula, qualities: canonList(qualities), sbTimes, strengthBonus, dos, action, location, damageType, rangeBand, rng,
+        talents: canonList(talents), traits: canonList(traits), statuses, firingModes, configs, isMelee, aimValue, craftsmanship, targetArmour, target,
         // accumulators the effects mutate:
         extraDice: 0, keepHighest: null, tearing: false,
         rfThreshold: 10, dieTransforms: [], proven: null, primitive: null,
@@ -207,7 +209,7 @@ function runToHit(input, rng, registry) {
     const action = input.action ?? 'Standard Attack';
     const actionInfo = COMBAT_ACTIONS[action] ?? COMBAT_ACTIONS['Standard Attack'];
     const isMelee = !!weapon.isMelee;
-    const qualities = weapon.qualities ?? [];
+    const qualities = canonList(weapon.qualities);   // canonical { name, level } (Stage 1)
     const baseTarget = isMelee ? (characteristics.ws ?? 0) : (characteristics.bs ?? 0);
     const rangeBand = isMelee ? 'Melee' : (input.rangeBand ?? 'Normal Range');
     const aimValue = AIM_MODES[input.aim ?? 'None'] ?? 0;
@@ -220,7 +222,7 @@ function runToHit(input, rng, registry) {
     const ctx = new RollContext({
         input, characteristics, weapon, target,
         action, actionInfo, isMelee, qualities, rangeBand, aimValue, rng,
-        talents: input.talents ?? [], traits: input.traits ?? [], statuses: input.conditions ?? input.statuses ?? [], circumstances: input.circumstances ?? [], firingModes: input.firingModes ?? [], configs: input.configs ?? input.firingModes ?? [],
+        talents: canonList(input.talents), traits: canonList(input.traits), statuses: input.conditions ?? input.statuses ?? [], circumstances: input.circumstances ?? [], firingModes: input.firingModes ?? [], configs: input.configs ?? input.firingModes ?? [],
         craftsmanship: weapon.craftsmanship ?? 'Common',
         combat: {
             dualWielding: !!(input.combat?.dualWielding ?? input.dualWielding),
@@ -326,6 +328,7 @@ function rollHitDamage(weapon, action, hitMeta, location, dos, src, rng, registr
         isMelee: !!weapon.isMelee, aimValue: AIM_MODES[src.aim ?? 'None'] ?? 0,
         rangeBand: weapon.isMelee ? 'Melee' : (src.rangeBand ?? 'Normal Range'),
         craftsmanship: weapon.craftsmanship ?? 'Common', targetArmour,
+        target: src.target ?? null,   // target.* scoped facts at the damage checkpoints
     }, rng, registry);
 }
 
@@ -336,10 +339,10 @@ function rollHitDamage(weapon, action, hitMeta, location, dos, src, rng, registr
  *  DSL as the `target_armour` fact. */
 function applyOnHit(hit, attacker, target, dmg, registry, rng, autoRoll, reduced = new Map(), effArmour = null) {
     const ctx = new RollContext({
-        qualities: attacker.weapon?.qualities ?? [], target, location: hit.location, rng,
+        qualities: canonList(attacker.weapon?.qualities), target, location: hit.location, rng,
         targetArmour: effArmour ?? (Number(target?.armour) || 0),
         isMelee: !!attacker.weapon?.isMelee, action: attacker.action ?? 'Standard Attack',
-        talents: attacker.talents ?? [], traits: attacker.traits ?? [], statuses: attacker.conditions ?? attacker.statuses ?? [], circumstances: attacker.circumstances ?? [],
+        talents: canonList(attacker.talents), traits: canonList(attacker.traits), statuses: attacker.conditions ?? attacker.statuses ?? [], circumstances: attacker.circumstances ?? [],
         damageDealt: dmg.error ? 0 : dmg.total, woundsInflicted: hit.soak?.woundsInflicted ?? null,
         targetEffects: { tests: [], statuses: [], armour: [] },
     });
@@ -487,17 +490,17 @@ function resolveTargetTests(tests, target, rng, autoRoll = true, registry = null
  */
 export function resolveParry(input, rng = Math.random, registry = defaultRegistry) {
     const { characteristics = {}, weapon = {} } = input;
-    const qualities = weapon.qualities ?? [];
+    const qualities = canonList(weapon.qualities);   // canonical { name, level } (Stage 1)
     // the OPPOSING (attacking) weapon being parried — supplied as input.against in
     // an engagement so Power Field can read its qualities (and immunities).
     const opposing = input.against ?? null;
 
     const ctx = new RollContext({
         input, characteristics, weapon, qualities,
-        opposingProvided: !!opposing, opposingQualities: opposing?.qualities ?? [],
+        opposingProvided: !!opposing, opposingQualities: canonList(opposing?.qualities),
         action: 'Parry', isMelee: true, rangeBand: 'Melee', aimValue: 0, rng,
         craftsmanship: weapon.craftsmanship ?? 'Common',
-        talents: input.talents ?? [], traits: input.traits ?? [], statuses: input.conditions ?? input.statuses ?? [], circumstances: input.circumstances ?? [],
+        talents: canonList(input.talents), traits: canonList(input.traits), statuses: input.conditions ?? input.statuses ?? [], circumstances: input.circumstances ?? [],
         combat: { dualWielding: false, firingOffhand: false, firingBoth: false },
         effects: [],
         modifiers: {},
@@ -554,7 +557,7 @@ function resolveDodge(defender, rng, registry) {
     const ctx = new RollContext({
         input: defender, characteristics: c, weapon: {}, qualities: [],
         action: 'Dodge', isMelee: false, rangeBand: 'Melee', aimValue: 0, rng, craftsmanship: 'Common',
-        talents: defender.talents ?? [], traits: defender.traits ?? [], statuses: defender.conditions ?? defender.statuses ?? [], circumstances: defender.circumstances ?? [],
+        talents: canonList(defender.talents), traits: canonList(defender.traits), statuses: defender.conditions ?? defender.statuses ?? [], circumstances: defender.circumstances ?? [],
         combat: { dualWielding: false, firingOffhand: false, firingBoth: false },
         modifiers: {},
     });
@@ -575,7 +578,7 @@ const defenderTarget = (d) => ({
     strength: d.characteristics?.s ?? 0,
     agility: d.characteristics?.ag ?? d.characteristics?.agility ?? 0,
     willpower: d.characteristics?.wp ?? d.characteristics?.willpower ?? 0,
-    traits: d.traits ?? [],   // so target_has_trait() works (Sanctified vs Daemonic)
+    traits: canonList(d.traits),   // so target_has_trait() works (Sanctified vs Daemonic)
 });
 
 // The engagement is decomposed into four re-rollable phases (each rolls its own
@@ -607,8 +610,10 @@ export function engageDamage(attacker, attackState, registry = defaultRegistry, 
     const action = attacker.action ?? 'Standard Attack';
     const meta = attackState.meta ?? {};
     const targetArmour = Number(defender?.armour) || 0;
+    // thread the normalised defender in as `target` so target.* scoped facts work
+    const src = defender ? { ...attacker, target: defenderTarget(defender) } : attacker;
     const hits = (attackState.hits ?? []).map((h) => {
-        const dmg = rollHitDamage(weapon, action, meta, h.location, meta.dos, attacker, rng, registry, targetArmour);
+        const dmg = rollHitDamage(weapon, action, meta, h.location, meta.dos, src, rng, registry, targetArmour);
         return { hitNumber: h.hitNumber, location: h.location, damageType: dmg.damageType ?? weapon.damageType ?? 'Impact', damage: dmg, penetration: meta.pen, penetrationModifiers: meta.penModifiers, totalPenetration: meta.totalPen, fellingReduction: meta.fellingReduction || 0 };
     });
     return { hits };

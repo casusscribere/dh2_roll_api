@@ -64,8 +64,11 @@ test('parser: program with multiple rules', () => {
     `);
     assert.equal(prog.rules.length, 2);
     assert.deepEqual(prog.rules.map((r) => r.name), ['Tearing', 'Storm']);
-    assert.equal(prog.rules[0].actions[0].action, 'add_die');
-    assert.equal(prog.rules[0].actions[1].action, 'keep_highest');
+    // add_die / keep_highest are sugar over the slot/flag primitives (Stage 3)
+    assert.equal(prog.rules[0].actions[0].action, 'set_slot');
+    assert.equal(prog.rules[0].actions[0].slot, 'extra_dice');
+    assert.equal(prog.rules[0].actions[1].action, 'set_flag');
+    assert.equal(prog.rules[0].actions[1].flag, 'keep_highest');
 });
 
 // --- predicate precedence + grouping ----------------------------------------
@@ -114,15 +117,18 @@ test('parser: arithmetic precedence and dice/call operands in action values', ()
     assert.equal(v.right.op, '*');
 });
 
-test('parser: set pen += pen and quality_level call', () => {
+test('parser: set pen += pen and quality_level call (slots — Stage 3)', () => {
+    // the old set-verbs are sugar for the generic `set <slot>` action
     const rule = parseRule(`quality "Vengeful" { on DIE_ADJUST when has_quality("Vengeful") then set rf_threshold = quality_level("Vengeful", 9) }`);
-    assert.equal(rule.actions[0].action, 'set_rf_threshold');
+    assert.equal(rule.actions[0].action, 'set_slot');
+    assert.equal(rule.actions[0].slot, 'rf_threshold');
     assert.equal(rule.actions[0].value.type, 'Call');
     assert.equal(rule.actions[0].value.name, 'quality_level');
     assert.equal(rule.actions[0].value.args.length, 2);
 
     const razor = parseRule(`quality "Razor Sharp" { on PENETRATION when is_melee then set pen += pen }`);
-    assert.equal(razor.actions[0].action, 'set_pen');
+    assert.equal(razor.actions[0].action, 'set_slot');
+    assert.equal(razor.actions[0].slot, 'pen');
     assert.equal(razor.actions[0].op, '+=');
     assert.deepEqual(razor.actions[0].value, { type: 'Identifier', name: 'pen' });
 });

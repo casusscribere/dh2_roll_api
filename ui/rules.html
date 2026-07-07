@@ -103,7 +103,10 @@ function renderBuiltin() {
     h += `<label class="gold" style="margin-top:.6rem">${esc(cat)}</label><div class="chips">`;
     for (const r of list) {
       const active = RulesStore.isBuiltinActive(r.id);
-      h += `<span class="toggle-box ${active ? 'active' : 'inactive'}" data-id="${r.id}" title="${esc(r.kind)} @ ${r.checkpoint}">${esc(r.name)}</span>`;
+      // provenance (Stage 0): page cite on the chip, package/source in the tooltip
+      const cite = r.page ? ` <span class="dim">p.${r.page}</span>` : '';
+      const prov = [r.kind + ' @ ' + r.checkpoint, r.package, r.sourceBook ? `${r.sourceBook}${r.page ? ` p.${r.page}` : ''}` : null].filter(Boolean).join(' · ');
+      h += `<span class="toggle-box ${active ? 'active' : 'inactive'}" data-id="${r.id}" title="${esc(prov)}">${esc(r.name)}${cite}</span>`;
     }
     h += '</div>';
   }
@@ -244,17 +247,44 @@ async function loadDocs() {
   }
   h += '</table></div>';
 
-  // --- facts ---
+  // --- facts (with scopes — Stage 2) ---
+  const scopeTag = (f) => (f.scopes && f.scopes.length > 1) ? ` <span class="dim">[${f.scopes.join(', ')}]</span>` : '';
   h += '<div class="docsection"><h3>Variables — facts usable in <code>when</code> &amp; expressions</h3>';
   h += '<table class="doctable"><tr><th>Name</th><th>Type</th><th>Meaning</th></tr>';
-  for (const f of d.facts) h += `<tr><td><code>${f.name}</code></td><td class="dim">${f.type}</td><td>${esc(f.summary)}</td></tr>`;
+  for (const f of d.facts) h += `<tr><td><code>${f.name}</code>${scopeTag(f)}</td><td class="dim">${f.type}</td><td>${esc(f.summary)}</td></tr>`;
   h += '</table></div>';
+
+  // --- scopes (Stage 2) ---
+  if (d.scopes) {
+    h += '<div class="docsection"><h3>Scopes — <code>&lt;scope&gt;.&lt;fact&gt;</code></h3>';
+    h += `<p class="note">${esc(d.scopes.summary)} Scopes: ${d.scopes.names.map(s => `<code>${s}</code>`).join(' ')}.</p>`;
+    if (d.scopes.scopedOnly?.length) {
+      h += '<table class="doctable"><tr><th>Scoped-only fact</th><th>Type</th><th>Meaning</th></tr>';
+      for (const f of d.scopes.scopedOnly) h += `<tr><td><code>${f.scopes[0]}.${f.name}</code></td><td class="dim">${f.type}</td><td>${esc(f.summary)}</td></tr>`;
+      h += '</table>';
+    }
+    h += '</div>';
+  }
 
   // --- functions ---
   h += '<div class="docsection"><h3>Functions</h3>';
   h += '<table class="doctable"><tr><th>Signature</th><th>Returns</th><th>Meaning</th></tr>';
-  for (const f of d.functions) h += `<tr><td><code>${esc(f.signature)}</code></td><td class="dim">${f.returns}</td><td>${esc(f.summary)}</td></tr>`;
+  for (const f of d.functions) h += `<tr><td><code>${esc(f.signature)}</code>${scopeTag(f)}</td><td class="dim">${f.returns}</td><td>${esc(f.summary)}</td></tr>`;
   h += '</table></div>';
+
+  // --- slots & flags (Stage 3) ---
+  if (d.slots) {
+    h += '<div class="docsection"><h3>Slots — <code>set &lt;slot&gt; (= | +=) &lt;expr&gt;</code></h3>';
+    h += '<table class="doctable"><tr><th>Slot</th><th>Modes</th><th>Checkpoint(s)</th><th>Meaning</th></tr>';
+    for (const s of d.slots) h += `<tr><td><code>${s.name}</code></td><td class="dim">${s.modes.join(' ')}</td><td class="dim">${esc(s.at)}</td><td>${esc(s.summary)}</td></tr>`;
+    h += '</table></div>';
+  }
+  if (d.flags) {
+    h += '<div class="docsection"><h3>Flags — <code>flag &lt;name&gt;</code></h3>';
+    h += '<table class="doctable"><tr><th>Flag</th><th>Checkpoint(s)</th><th>Meaning</th></tr>';
+    for (const f of d.flags) h += `<tr><td><code>${f.name}</code></td><td class="dim">${esc(f.at)}</td><td>${esc(f.summary)}</td></tr>`;
+    h += '</table></div>';
+  }
 
   // --- actions ---
   h += '<div class="docsection"><h3>Actions — <code>then &lt;action&gt;</code></h3>';
@@ -290,7 +320,11 @@ function renderActiveDsl() {
   // (Weapon qualities, Talents, Traits, Circumstances, …) — open by default.
   for (const b of BUILTIN_SOURCES) {
     const lines = b.source.trim().split('\n').length;
-    h += `<details class="docsection" open><summary class="toggle">${esc(b.category)} <span class="dim">— ${esc(b.file)} (${lines} lines)</span></summary>`;
+    // provenance (Stage 0): the file's package header + source book + dsl version
+    const pkg = b.package
+      ? ` · <span class="gold">${esc(b.package.name)}</span>${b.package.source ? ` <span class="dim">(${esc(b.package.source)})</span>` : ''} <span class="dim">dsl ${b.dslVersion}</span>`
+      : '';
+    h += `<details class="docsection" open><summary class="toggle">${esc(b.category)} <span class="dim">— ${esc(b.file)} (${lines} lines)</span>${pkg}</summary>`;
     h += `<pre class="tmpl">${esc(b.source.trim())}</pre></details>`;
   }
 

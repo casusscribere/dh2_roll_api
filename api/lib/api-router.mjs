@@ -25,6 +25,10 @@ import { weaponsJson } from './rules/sources.mjs';
 import { compile } from './dsl/compiler.mjs';
 import { DslError } from './dsl/tokenizer.mjs';
 import { DSL_DOCS } from './dsl/docs.mjs';
+import {
+    CHARACTER_SCHEMA_VERSION, CHARACTER_FIELDS, emptyCharacter,
+    validateCharacter, migrateCharacter, characterToCombatant,
+} from './character-schema.mjs';
 
 /** GET endpoints — pure reads of the engine's static, load-time data. */
 const GET = {
@@ -49,6 +53,12 @@ const GET = {
     }),
     '/api/dsl-docs': () => DSL_DOCS,
     '/api/rules/source': () => ({ builtins: builtinSources, rules: builtinRules }),
+    // Character schema v1 (Phase 2): the field reference + an empty template.
+    '/api/character/schema': () => ({
+        version: CHARACTER_SCHEMA_VERSION,
+        fields: CHARACTER_FIELDS,
+        template: emptyCharacter(),
+    }),
 };
 
 /** POST endpoints — engine calls. Each returns the response body, or throws to
@@ -86,6 +96,17 @@ const POST = {
     },
 };
 
+/** POST /api/character/validate — migrate + validate a character document;
+ *  field-level errors/warnings, plus the migrated doc and the engine-side
+ *  combatant preview when valid. Always 200 (the body carries ok:false). */
+function validateCharacterRoute(body) {
+    const doc = migrateCharacter(body?.character ?? body ?? {});
+    const result = validateCharacter(doc);
+    const out = { ok: result.ok, errors: result.errors, warnings: result.warnings, character: doc };
+    if (result.ok) out.combatant = characterToCombatant(doc);
+    return { status: 200, body: out };
+}
+
 /** POST /api/rules/validate has a bespoke success/error shape (DSL line/col), so
  *  it is handled directly rather than through the throw→400 path. */
 function validateRules(body) {
@@ -121,6 +142,7 @@ export function dispatch(method, path, body = {}) {
     }
     if (verb === 'POST') {
         if (path === '/api/rules/validate') return validateRules(body ?? {});
+        if (path === '/api/character/validate') return validateCharacterRoute(body ?? {});
         const fn = POST[path];
         if (!fn) return { status: 404, body: { error: `Unknown endpoint ${path}` } };
         try { return { status: 200, body: fn(body ?? {}) }; }

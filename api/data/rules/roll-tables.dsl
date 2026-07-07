@@ -1,3 +1,9 @@
+dsl 2
+package "dh2.core.roll-tables" {
+  system "dh2"
+  source "Dark Heresy 2e Core Rulebook"
+}
+
 # DH2 roll tables — data for the `roll_on` action.
 #
 # A roll_table names a die and a set of <lo>[-<hi>]: "outcome" rows; an optional
