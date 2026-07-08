@@ -23,7 +23,7 @@ app.use(express.static(join(__dirname, '..', 'ui')));
 const send = (res, { status, body }) => res.status(status).json(body);
 
 // GET endpoints — reference data for building forms + the DSL reference.
-for (const path of ['/api/weapons', '/api/options', '/api/rules', '/api/dsl-docs', '/api/rules/source', '/api/character/schema']) {
+for (const path of ['/api/weapons', '/api/options', '/api/rules', '/api/dsl-docs', '/api/rules/source', '/api/character/schema', '/api/characters']) {
     app.get(path, (req, res) => send(res, dispatch('GET', path)));
 }
 

@@ -73,7 +73,11 @@
     <details style="margin-bottom:.6rem">
       <summary class="toggle">Character import / export <span class="dim">— canonical JSON (schema v1; see tools/ for the Google-Sheet &amp; Roll20 adapters)</span></summary>
       <div class="row" style="margin-top:.4rem">
+        <div><label>Preset <span class="dim">— campaign roster (imported from the character spreadsheets)</span></label>
+          <select id="char-preset"><option value="">— none (use a file) —</option></select></div>
         <div><label>Character JSON file</label><input type="file" id="char-file" accept=".json,application/json"></div>
+      </div>
+      <div class="row">
         <div><label>&nbsp;</label>
           <div class="checks" style="margin:0">
             <button class="minibtn" style="margin-top:0" onclick="applyCharacter('a')">→ Attacker</button>
@@ -476,9 +480,43 @@ function setRulePanel(side, cat, entries) {
   }
   return unmatched;
 }
+// --- campaign preset roster (CHARACTER_MODEL.md §6b) ---------------------------
+// One code path, two sources: a chosen PRESET takes priority over the file
+// input; picking one clears the other so the active source is always explicit.
+let PRESET_DOCS = {};   // id → character document (from GET /api/characters)
+async function loadPresets() {
+  const sel = $('char-preset');
+  if (!sel) return;
+  try {
+    const d = await fetch('/api/characters').then((r) => r.json());
+    const byPlayer = {};
+    for (const c of (d.characters ?? [])) {
+      PRESET_DOCS[c.id] = c.doc;
+      (byPlayer[c.player] ??= []).push(c);
+    }
+    for (const [player, list] of Object.entries(byPlayer)) {
+      const og = document.createElement('optgroup');
+      og.label = player;
+      for (const c of list) og.appendChild(new Option(c.name, c.id));
+      sel.appendChild(og);
+    }
+  } catch { /* offline/static without roster — dropdown stays empty */ }
+  sel.onchange = () => {
+    if (sel.value) {
+      $('char-file').value = '';
+      const doc = PRESET_DOCS[sel.value];
+      const un = doc?.source?.unmapped ?? [];
+      charStatus(`Preset <span class="gold">${esc(doc?.name ?? sel.value)}</span> ready — click →Attacker or →Defender.` +
+        (un.length ? `\n<span class="dim">not carried by schema v1: ${esc(un.join('; '))}</span>` : ''));
+    }
+  };
+  $('char-file').addEventListener('change', () => { sel.value = ''; });
+}
 async function readCharFile() {
+  const preset = $('char-preset')?.value;
+  if (preset && PRESET_DOCS[preset]) return structuredClone(PRESET_DOCS[preset]);
   const f = $('char-file').files[0];
-  if (!f) { charStatus('Choose a character JSON file first.', true); return null; }
+  if (!f) { charStatus('Choose a preset or a character JSON file first.', true); return null; }
   try { return JSON.parse(await f.text()); }
   catch { charStatus('Not valid JSON.', true); return null; }
 }
@@ -658,6 +696,7 @@ async function init() {
   renderActionRadios();
 }
 init();
+loadPresets();   // campaign preset dropdown (non-blocking; empty if no roster)
 window.addEventListener('focus', refreshActiveRules); // pick up edits made on the Rules page
 
 const sign = (n) => (n >= 0 ? '+' : '') + n;

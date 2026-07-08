@@ -3216,6 +3216,1442 @@ roll_table "Power Field Destruction" {
     return warnings;
   }
 
+  // api/data/characters/roster.mjs
+  var CHARACTER_ROSTER = [
+    {
+      "id": "jack-balvdin-first-officer",
+      "player": "Chris",
+      "name": '"Jack" "Balvdin?" (First Officer)',
+      "doc": {
+        "schemaVersion": 1,
+        "kind": "dh2.character",
+        "system": "dh2",
+        "name": '"Jack" "Balvdin?" (First Officer)',
+        "characteristics": {
+          "ws": 36,
+          "bs": 64,
+          "s": 33,
+          "t": 41,
+          "ag": 61,
+          "int": 34,
+          "per": 41,
+          "wp": 40,
+          "fel": 51
+        },
+        "unnatural": {},
+        "armour": {
+          "head": 0,
+          "body": 0,
+          "leftArm": 0,
+          "rightArm": 0,
+          "leftLeg": 0,
+          "rightLeg": 0
+        },
+        "wounds": {
+          "current": 1,
+          "max": 13
+        },
+        "fate": {
+          "current": 1,
+          "max": 2
+        },
+        "talents": [
+          "Step Aside",
+          "Quick Draw",
+          "Ambidextrous",
+          "Rapid Reload",
+          "Two-Weapon Wielder",
+          "Double-Tap",
+          "Jaded",
+          "Two-Weapon Master",
+          "Hard Target",
+          "Resistance: Fear",
+          "Mighty Shot",
+          "Marksman",
+          "Target Selection",
+          "Hatred: Genestealers",
+          "Resistance: Psychic Powers",
+          "Able Gunman",
+          "Track The Target",
+          "Unarmed Specialist",
+          "This'll Do"
+        ],
+        "traits": [],
+        "conditions": [],
+        "circumstances": [],
+        "weapons": [
+          {
+            "name": "Pummeller x 2",
+            "class": "basic",
+            "damage": "1d10+3",
+            "pen": 0,
+            "damageType": "Impact",
+            "qualities": [
+              "Accurate",
+              "Felling(2)",
+              "Silencer",
+              "Custom Grip"
+            ],
+            "craftsmanship": "Common",
+            "rof": {
+              "single": true,
+              "burst": 2,
+              "full": 0
+            }
+          },
+          {
+            "name": "Volkite Disruptor",
+            "class": "basic",
+            "damage": "1d10+8",
+            "pen": 0,
+            "damageType": "Energy",
+            "qualities": [
+              "Reliable (Good)"
+            ],
+            "craftsmanship": "Good",
+            "rof": {
+              "single": true,
+              "burst": 3,
+              "full": 0
+            }
+          },
+          {
+            "name": "Needle Pistol",
+            "class": "basic",
+            "damage": "1d10+2",
+            "pen": 0,
+            "damageType": "Rending",
+            "qualities": [
+              "Accurate",
+              "Felling(4)",
+              "Toxic (5)",
+              "Reliable(Good)"
+            ],
+            "craftsmanship": "Good",
+            "rof": {
+              "single": true,
+              "burst": 0,
+              "full": 0
+            }
+          },
+          {
+            "name": "Radium Pistol",
+            "class": "basic",
+            "damage": "1d10+3",
+            "pen": 0,
+            "damageType": "Impact",
+            "qualities": [
+              "Felling (20)",
+              "Rld 1 Full (w/ rapid). Cust Grip",
+              "Exp Mag",
+              "Mod Stock"
+            ],
+            "craftsmanship": "Good",
+            "rof": {
+              "single": true,
+              "burst": 0,
+              "full": 0
+            }
+          }
+        ],
+        "field": {
+          "rating": 0,
+          "overloadMax": 0
+        },
+        "source": {
+          "adapter": "xlsx-campaign-v1",
+          "file": "_Jack_.xlsx",
+          "player": "Chris",
+          "importedAt": "2026-07-08T17:46:33.508Z",
+          "unmapped": [
+            "skills (schema v2)",
+            "weapon clip (schema v2)",
+            "weapon trainings (schema v2)",
+            "xp / aptitudes / gear / house content (schema v2)"
+          ]
+        }
+      }
+    },
+    {
+      "id": "augustine-haake",
+      "player": "Chris",
+      "name": "Augustine Haake",
+      "doc": {
+        "schemaVersion": 1,
+        "kind": "dh2.character",
+        "system": "dh2",
+        "name": "Augustine Haake",
+        "characteristics": {
+          "ws": 31,
+          "bs": 68,
+          "s": 34,
+          "t": 57,
+          "ag": 52,
+          "int": 70,
+          "per": 53,
+          "wp": 61,
+          "fel": 29
+        },
+        "unnatural": {},
+        "armour": {
+          "head": 6,
+          "body": 6,
+          "leftArm": 6,
+          "rightArm": 6,
+          "leftLeg": 6,
+          "rightLeg": 6
+        },
+        "wounds": {
+          "current": 10,
+          "max": 10
+        },
+        "fate": {
+          "current": 1,
+          "max": 4
+        },
+        "talents": [
+          "Clues from Crowds",
+          "Enemy(Ordos Xenos)",
+          "Infused Knowledge",
+          "Subversive Programming",
+          "Cogs within Cogs",
+          "Whispers of Samhadi",
+          "Cold-Trader",
+          "Peer(Eldar)",
+          "Sprint",
+          "Target Selection",
+          "Mighty Shot",
+          "Deathdealer",
+          "Quick Draw",
+          "Jaded",
+          "Weapon Tech",
+          "Peer: Ogryn",
+          "Plasma Weapon Training",
+          "Constant Vigilance",
+          "Mechadendrite Use",
+          "Deny the Witch",
+          "Hard Target",
+          "3 WP",
+          "Luminen Shield",
+          "Luminen Barrier",
+          "Strong Minded",
+          "Resistance: Psychic Powers",
+          "Insanity Bonus",
+          "Rapid Reload",
+          "Slip the Bouded Realm",
+          "See The Unseen Worlds"
+        ],
+        "traits": [],
+        "conditions": [],
+        "circumstances": [],
+        "weapons": [
+          {
+            "name": "Shuriken Catapult",
+            "class": "basic",
+            "damage": "1d10+4",
+            "pen": 3,
+            "damageType": "Rending",
+            "qualities": [
+              "Razor-Sharp",
+              "Reliable"
+            ],
+            "craftsmanship": "Common",
+            "rof": {
+              "single": true,
+              "burst": 3,
+              "full": 10
+            }
+          },
+          {
+            "name": "Archangel MkII",
+            "class": "basic",
+            "damage": "1d10+6",
+            "pen": 6,
+            "damageType": "Energy",
+            "qualities": [
+              "Maximal",
+              "Proven(3)",
+              "Recharge",
+              "Vengeful(9)"
+            ],
+            "craftsmanship": "Best",
+            "rof": {
+              "single": true,
+              "burst": 2,
+              "full": 0
+            }
+          },
+          {
+            "name": "Culling",
+            "class": "basic",
+            "damage": "1d10+5",
+            "pen": 4,
+            "damageType": "Rending",
+            "qualities": [
+              "Reliable",
+              "Razor-Sharp",
+              "Toxic (4)"
+            ],
+            "craftsmanship": "Common",
+            "rof": {
+              "single": true,
+              "burst": 0,
+              "full": 8
+            }
+          }
+        ],
+        "field": {
+          "rating": 0,
+          "overloadMax": 0
+        },
+        "source": {
+          "adapter": "xlsx-campaign-v1",
+          "file": "Augustine Haake.xlsx",
+          "player": "Chris",
+          "importedAt": "2026-07-08T17:46:33.463Z",
+          "unmapped": [
+            "armour is the STATS scalar applied to all locations",
+            "psychic powers (schema v2)",
+            "skills (schema v2)",
+            "weapon clip (schema v2)",
+            "weapon trainings (schema v2)",
+            "xp / aptitudes / gear / house content (schema v2)"
+          ]
+        }
+      }
+    },
+    {
+      "id": "gnaeus",
+      "player": "John",
+      "name": "Gnaeus",
+      "doc": {
+        "schemaVersion": 1,
+        "kind": "dh2.character",
+        "system": "dh2",
+        "name": "Gnaeus",
+        "characteristics": {
+          "ws": 27,
+          "bs": 45,
+          "s": 32,
+          "t": 31,
+          "ag": 55,
+          "int": 54,
+          "per": 42,
+          "wp": 36,
+          "fel": 34
+        },
+        "unnatural": {},
+        "armour": {
+          "head": 0,
+          "body": 0,
+          "leftArm": 0,
+          "rightArm": 0,
+          "leftLeg": 0,
+          "rightLeg": 0
+        },
+        "wounds": {
+          "current": 13,
+          "max": 13
+        },
+        "fate": {
+          "current": 3,
+          "max": 3
+        },
+        "talents": [
+          "Clues from the Crowds",
+          "Infused Knowledge",
+          "Divine Protection",
+          "Technical Knock",
+          "Step Aside",
+          "Jaded",
+          "Quick Draw",
+          "Spotter",
+          "Grenadier",
+          "Sprint",
+          "Hatred (Orks)",
+          "Hotshot Pilot",
+          "Push the Limit",
+          "Nowhere to Hide",
+          "Inescapable Attack",
+          "Rapid Reload"
+        ],
+        "traits": [],
+        "conditions": [],
+        "circumstances": [],
+        "weapons": [
+          {
+            "name": "Exterminator Pistol (2x)",
+            "class": "basic",
+            "damage": "1d10+5",
+            "pen": 1,
+            "damageType": "Energy",
+            "qualities": [
+              "Flame",
+              "Spray",
+              "Felling (2)"
+            ],
+            "craftsmanship": "Common",
+            "rof": {
+              "single": true,
+              "burst": 0,
+              "full": 0
+            }
+          },
+          {
+            "name": "Midnight Essense",
+            "class": "basic",
+            "damage": "2d10+14",
+            "pen": 5,
+            "damageType": "Energy",
+            "qualities": [
+              "Heavy",
+              "Lance"
+            ],
+            "craftsmanship": "Best",
+            "rof": {
+              "single": true,
+              "burst": 0,
+              "full": 0
+            }
+          },
+          {
+            "name": "Darloth Chain Cannon (Not Carried)",
+            "class": "basic",
+            "damage": "1d10+5",
+            "pen": 3,
+            "damageType": "Impact",
+            "qualities": [
+              "Storm",
+              "Tearing"
+            ],
+            "craftsmanship": "Best",
+            "rof": {
+              "single": false,
+              "burst": 0,
+              "full": 0
+            }
+          },
+          {
+            "name": "Lascutter",
+            "class": "basic",
+            "damage": "2d10+10",
+            "pen": 12,
+            "damageType": "Energy",
+            "qualities": [
+              "Melta"
+            ],
+            "craftsmanship": "Common",
+            "rof": {
+              "single": true,
+              "burst": 0,
+              "full": 0
+            }
+          }
+        ],
+        "field": {
+          "rating": 0,
+          "overloadMax": 0
+        },
+        "source": {
+          "adapter": "xlsx-campaign-v1",
+          "file": "Gnaeus (John).xlsx",
+          "player": "John",
+          "importedAt": "2026-07-08T17:46:33.688Z",
+          "unmapped": [
+            "skills (schema v2)",
+            "weapon clip (schema v2)",
+            "weapon trainings (schema v2)",
+            "xp / aptitudes / gear / house content (schema v2)"
+          ]
+        }
+      }
+    },
+    {
+      "id": "harys-abaoth",
+      "player": "John",
+      "name": "Harys Abaoth",
+      "doc": {
+        "schemaVersion": 1,
+        "kind": "dh2.character",
+        "system": "dh2",
+        "name": "Harys Abaoth",
+        "characteristics": {
+          "ws": 48,
+          "bs": 32,
+          "s": 30,
+          "t": 33,
+          "ag": 43,
+          "int": 52,
+          "per": 48,
+          "wp": 57,
+          "fel": 60
+        },
+        "unnatural": {},
+        "armour": {
+          "head": 0,
+          "body": 0,
+          "leftArm": 0,
+          "rightArm": 0,
+          "leftLeg": 0,
+          "rightLeg": 0
+        },
+        "wounds": {
+          "current": 11,
+          "max": 11
+        },
+        "fate": {
+          "current": 7,
+          "max": 7
+        },
+        "talents": [
+          "Contact Network",
+          "Light Sleeper",
+          "Peer (Cartels, Ostrakis)",
+          "Clues from the Crowd",
+          "Warrant of Trade",
+          "Ambassador Imperialis",
+          "Halo of Command",
+          "Renowned Warrant",
+          "Superior Chirugeon",
+          "Jaded",
+          "Legendary",
+          "Infused Knowledge",
+          "Keen Intuition",
+          "Resistance (Fear, Psychic)",
+          "Adamantium Faith",
+          "Iron Resolve",
+          "Iron Faith",
+          "Inspiring Aura",
+          "Bulwark of Faith",
+          "Field Vivisection (Human)",
+          "Precision Killer",
+          "Instrument of His Will",
+          "Personal Equipment",
+          "Deny the Witch",
+          "Witch Hunter",
+          "Unfaultering Redemption",
+          "Firebrand's Call",
+          "Purity of Hatred",
+          "Hatred (Psykers)",
+          "House Honors",
+          "House Marksman\u2019s Honors",
+          "The Grey Hand",
+          "Step Aside",
+          "Mind Sight",
+          "Mind Trap",
+          "Cleanse and Purify",
+          "Bodyguard",
+          "Improved Initiative",
+          "Inescapable Attack",
+          "Swift Attack",
+          "Sprint",
+          "Mounted Warrior",
+          "Counter Attack",
+          "One-on-One",
+          "Lightning Attack",
+          "Master and Commander"
+        ],
+        "traits": [],
+        "conditions": [],
+        "circumstances": [],
+        "weapons": [
+          {
+            "name": "Aether Blade",
+            "class": "melee",
+            "damage": "1d5+2",
+            "pen": 0,
+            "damageType": "Energy",
+            "qualities": [
+              "See note"
+            ],
+            "craftsmanship": "Good",
+            "rof": {
+              "single": true,
+              "burst": 0,
+              "full": 0
+            },
+            "sbMultiplier": 1
+          },
+          {
+            "name": "Edge of Night",
+            "class": "melee",
+            "damage": "1d10+3",
+            "pen": 1,
+            "damageType": "Rending",
+            "qualities": [
+              "Balanced",
+              "Proven(4)",
+              "RazorSharp"
+            ],
+            "craftsmanship": "Best",
+            "rof": {
+              "single": true,
+              "burst": 0,
+              "full": 0
+            },
+            "sbMultiplier": 1
+          },
+          {
+            "name": "Shield of Commander Yalder",
+            "class": "melee",
+            "damage": "1d10",
+            "pen": 0,
+            "damageType": "Impact",
+            "qualities": [
+              "Defensive"
+            ],
+            "craftsmanship": "Common",
+            "rof": {
+              "single": true,
+              "burst": 0,
+              "full": 0
+            },
+            "sbMultiplier": 1
+          },
+          {
+            "name": "Hand Cannon",
+            "class": "basic",
+            "damage": "1d10+4",
+            "pen": 2,
+            "damageType": "Impact",
+            "qualities": [
+              "Reliable",
+              "Reload Full"
+            ],
+            "craftsmanship": "Common",
+            "rof": {
+              "single": true,
+              "burst": 0,
+              "full": 0
+            }
+          },
+          {
+            "name": "[STORED FOR XENOS] Our Leader's Ire",
+            "class": "basic",
+            "damage": "1d10+4",
+            "pen": 2,
+            "damageType": "Energy",
+            "qualities": [
+              "Flame",
+              "Spray",
+              "Recharge"
+            ],
+            "craftsmanship": "Common",
+            "rof": {
+              "single": true,
+              "burst": 0,
+              "full": 0
+            }
+          },
+          {
+            "name": "Exterminator Pistol (2x)",
+            "class": "basic",
+            "damage": "1d10+5",
+            "pen": 1,
+            "damageType": "Energy",
+            "qualities": [
+              "Flame",
+              "Spray",
+              "Felling (2)"
+            ],
+            "craftsmanship": "Common",
+            "rof": {
+              "single": true,
+              "burst": 0,
+              "full": 0
+            }
+          },
+          {
+            "name": "[STORED FOR XENOS] Voidblade",
+            "class": "melee",
+            "damage": "1d10",
+            "pen": 10,
+            "damageType": "Rending",
+            "qualities": [
+              "Corrosive",
+              "Felling(10)",
+              "Razor Sharp",
+              "Tearing"
+            ],
+            "craftsmanship": "Best",
+            "rof": {
+              "single": true,
+              "burst": 0,
+              "full": 0
+            },
+            "sbMultiplier": 1
+          },
+          {
+            "name": "Hand of Retribution",
+            "class": "melee",
+            "damage": "1d10+5",
+            "pen": 6,
+            "damageType": "Energy",
+            "qualities": [
+              "Power Field"
+            ],
+            "craftsmanship": "Best",
+            "rof": {
+              "single": true,
+              "burst": 0,
+              "full": 0
+            },
+            "sbMultiplier": 1
+          }
+        ],
+        "field": {
+          "rating": 30,
+          "overloadMax": 0
+        },
+        "source": {
+          "adapter": "xlsx-campaign-v1",
+          "file": "Harys Abaoth (John).xlsx",
+          "player": "John",
+          "importedAt": "2026-07-08T17:46:33.900Z",
+          "unmapped": [
+            "skills (schema v2)",
+            "weapon clip (schema v2)",
+            "weapon trainings (schema v2)",
+            "xp / aptitudes / gear / house content (schema v2)"
+          ]
+        }
+      }
+    },
+    {
+      "id": "ogg",
+      "player": "Matt",
+      "name": "Ogg",
+      "doc": {
+        "schemaVersion": 1,
+        "kind": "dh2.character",
+        "system": "dh2",
+        "name": "Ogg",
+        "characteristics": {
+          "ws": 62,
+          "bs": 38,
+          "s": 50,
+          "t": 60,
+          "ag": 45,
+          "int": 21,
+          "per": 38,
+          "wp": 50,
+          "fel": 32
+        },
+        "unnatural": {
+          "s": 2,
+          "t": 2
+        },
+        "armour": {
+          "head": 0,
+          "body": 0,
+          "leftArm": 0,
+          "rightArm": 0,
+          "leftLeg": 0,
+          "rightLeg": 0
+        },
+        "wounds": {
+          "current": 19,
+          "max": 19
+        },
+        "fate": {
+          "current": 1,
+          "max": 1
+        },
+        "talents": [
+          "Iron Jaw",
+          "Weapon Training (Power)",
+          "Step Aside",
+          "Bodyguard",
+          "Combat master",
+          "Crushing Blow",
+          "Swift Attack",
+          "Counter Attack",
+          "One-on-one",
+          "Hardy",
+          "True Grit",
+          "Lightning Attack",
+          "Weapon Training (SP)",
+          "Weapon Training (Low Tech)",
+          "Weapon Training (Tau Fire Caste)",
+          "Whirlwind of Death",
+          "Inescapable Attck (WS)",
+          "Leaping Dodge",
+          "Ambidextrous",
+          "Hatred (Genestealers)",
+          "Hard Target",
+          "Two Weapon Wielder",
+          "Two Weapon Master",
+          "Sound Constitution x 6",
+          "He was good to me",
+          "Dis A Job for a Tougher Me",
+          "Shield Wall"
+        ],
+        "traits": [],
+        "conditions": [],
+        "circumstances": [],
+        "weapons": [
+          {
+            "name": "(unnamed weapon)",
+            "class": "melee",
+            "damage": "1d10+4",
+            "pen": 6,
+            "damageType": "Energy",
+            "qualities": [
+              "balanced",
+              "power",
+              "+30 to conceal"
+            ],
+            "craftsmanship": "Best",
+            "rof": {
+              "single": true,
+              "burst": 0,
+              "full": 0
+            },
+            "sbMultiplier": 1
+          },
+          {
+            "name": "The Greaterest Good",
+            "class": "melee",
+            "damage": "2d10+5",
+            "pen": 0,
+            "damageType": "Energy",
+            "qualities": [
+              "defensive",
+              "6 ap to body and arm"
+            ],
+            "craftsmanship": "Best",
+            "rof": {
+              "single": true,
+              "burst": 0,
+              "full": 0
+            },
+            "sbMultiplier": 1
+          }
+        ],
+        "field": {
+          "rating": 0,
+          "overloadMax": 0
+        },
+        "source": {
+          "adapter": "xlsx-campaign-v1",
+          "file": "Ogg.xlsx",
+          "player": "Matt",
+          "importedAt": "2026-07-08T17:46:34.020Z",
+          "unmapped": [
+            "armour is the STATS scalar applied to all locations",
+            "psychic powers (schema v2)",
+            "skills (schema v2)",
+            "weapon trainings (schema v2)",
+            "xp / aptitudes / gear / house content (schema v2)"
+          ]
+        }
+      }
+    },
+    {
+      "id": "shas-ui-kai-ta-ran-y-eldi",
+      "player": "Matt",
+      "name": "Shas\u2019ui Kai ta ran Y\u2019eldi",
+      "doc": {
+        "schemaVersion": 1,
+        "kind": "dh2.character",
+        "system": "dh2",
+        "name": "Shas\u2019ui Kai ta ran Y\u2019eldi",
+        "characteristics": {
+          "ws": 32,
+          "bs": 70,
+          "s": 33,
+          "t": 44,
+          "ag": 70,
+          "int": 58,
+          "per": 62,
+          "wp": 63,
+          "fel": 34
+        },
+        "unnatural": {},
+        "armour": {
+          "head": 4,
+          "body": 4,
+          "leftArm": 4,
+          "rightArm": 4,
+          "leftLeg": 4,
+          "rightLeg": 4
+        },
+        "wounds": {
+          "current": 14,
+          "max": 14
+        },
+        "fate": {
+          "current": 4,
+          "max": 7
+        },
+        "talents": [
+          "Hotshot Pilot",
+          "Windstrider",
+          "Fire Caste Weapon Training",
+          "Marksman",
+          "Rapid Reload",
+          "Supporting Fire",
+          "Unshakable Faith",
+          "Target Selection",
+          "Deathdealer",
+          "Mighty Shot",
+          "Step Aside",
+          "Weapon Tech",
+          "Inescapable Attack",
+          "Damage Control",
+          "Quick Draw",
+          "Peer (Ogryn)",
+          "Sniper Training (Tau)",
+          "Precision Killer (Ranged)",
+          "Preternatural Precision",
+          "One shot one kill",
+          "Bait the Trap",
+          "Keen Intuition",
+          "Sprint",
+          "Disciple of Mont'ka",
+          "Improved Initiative",
+          "Eye of Vengeance",
+          "Jaded",
+          "Resistance (Fear)",
+          "Adamantium Faith",
+          "Resistance (Psychic Powers)",
+          "Strong Minded",
+          "Technology Triumphant",
+          "+10 vs fear",
+          "Personal Equipment",
+          "Leap Up",
+          "Catfall",
+          "New Allies",
+          "Tactical Flexibility",
+          "Hard Target",
+          "Favored Item",
+          "Legendary Armament",
+          "Entrant",
+          "Line up the Shot"
+        ],
+        "traits": [],
+        "conditions": [],
+        "circumstances": [],
+        "weapons": [
+          {
+            "name": "Brotherhood",
+            "class": "basic",
+            "damage": "2d10+3",
+            "pen": 4,
+            "damageType": "Energy",
+            "qualities": [
+              "Gyro-Stabilised",
+              "Custom Grip",
+              "Targeter"
+            ],
+            "craftsmanship": "Best",
+            "rof": {
+              "single": true,
+              "burst": 2,
+              "full": 4
+            }
+          },
+          {
+            "name": "Tau Pulse Pistol",
+            "class": "basic",
+            "damage": "2d10+2",
+            "pen": 4,
+            "damageType": "Energy",
+            "qualities": [
+              "Gyro-Stabilised"
+            ],
+            "craftsmanship": "Common",
+            "rof": {
+              "single": true,
+              "burst": 2,
+              "full": 0
+            }
+          }
+        ],
+        "field": {
+          "rating": 0,
+          "overloadMax": 0
+        },
+        "source": {
+          "adapter": "xlsx-campaign-v1",
+          "file": "Shas\u2019ui Kai_ta_ran Y\u2019eldi (La_y_eldi) (Matt).xlsx",
+          "player": "Matt",
+          "importedAt": "2026-07-08T17:46:34.136Z",
+          "unmapped": [
+            "armour is the STATS scalar applied to all locations",
+            "psychic powers (schema v2)",
+            "skills (schema v2)",
+            "weapon clip (schema v2)",
+            "weapon trainings (schema v2)",
+            "xp / aptitudes / gear / house content (schema v2)"
+          ]
+        }
+      }
+    },
+    {
+      "id": "baron-talvdin-hourace-horp",
+      "player": "Ryan",
+      "name": "Baron Talvdin Hourace Horp",
+      "doc": {
+        "schemaVersion": 1,
+        "kind": "dh2.character",
+        "system": "dh2",
+        "name": "Baron Talvdin Hourace Horp",
+        "characteristics": {
+          "ws": 66,
+          "bs": 40,
+          "s": 50,
+          "t": 61,
+          "ag": 43,
+          "int": 36,
+          "per": 66,
+          "wp": 62,
+          "fel": 44
+        },
+        "unnatural": {},
+        "armour": {
+          "head": 6,
+          "body": 6,
+          "leftArm": 6,
+          "rightArm": 6,
+          "leftLeg": 6,
+          "rightLeg": 6
+        },
+        "wounds": {
+          "current": 10,
+          "max": 10
+        },
+        "fate": {
+          "current": 5,
+          "max": 6
+        },
+        "talents": [
+          "Enemy Slaanesh"
+        ],
+        "traits": [],
+        "conditions": [],
+        "circumstances": [],
+        "weapons": [
+          {
+            "name": "Laspistol",
+            "class": "basic",
+            "damage": "1d10+2",
+            "pen": 0,
+            "damageType": "Energy",
+            "qualities": [
+              "Reliable"
+            ],
+            "craftsmanship": "Common",
+            "rof": {
+              "single": true,
+              "burst": 2,
+              "full": 0
+            }
+          },
+          {
+            "name": "Collapsable Staff",
+            "class": "melee",
+            "damage": "1d10",
+            "pen": 0,
+            "damageType": "Impact",
+            "qualities": [
+              "Balanced"
+            ],
+            "craftsmanship": "Common",
+            "rof": {
+              "single": true,
+              "burst": 0,
+              "full": 0
+            },
+            "sbMultiplier": 1
+          }
+        ],
+        "field": {
+          "rating": 0,
+          "overloadMax": 0
+        },
+        "source": {
+          "adapter": "xlsx-campaign-v1",
+          "file": "Baron Talvdin Horp of Grizdek.xlsx",
+          "player": "Ryan",
+          "importedAt": "2026-07-08T17:46:34.245Z",
+          "unmapped": [
+            "armour is the STATS scalar applied to all locations",
+            "psychic powers (schema v2)",
+            "skills (schema v2)",
+            "weapon clip (schema v2)",
+            "weapon trainings (schema v2)",
+            "xp / aptitudes / gear / house content (schema v2)"
+          ]
+        }
+      }
+    },
+    {
+      "id": "sgt-reco-tamarin-of-the-401st-trailblaizer-unit",
+      "player": "Ryan",
+      "name": "Sgt. Reco Tamarin of the 401st Trailblaizer Unit",
+      "doc": {
+        "schemaVersion": 1,
+        "kind": "dh2.character",
+        "system": "dh2",
+        "name": "Sgt. Reco Tamarin of the 401st Trailblaizer Unit",
+        "characteristics": {
+          "ws": 34,
+          "bs": 59,
+          "s": 30,
+          "t": 36,
+          "ag": 44,
+          "int": 38,
+          "per": 63,
+          "wp": 33,
+          "fel": 35
+        },
+        "unnatural": {},
+        "armour": {
+          "head": 0,
+          "body": 0,
+          "leftArm": 0,
+          "rightArm": 0,
+          "leftLeg": 0,
+          "rightLeg": 0
+        },
+        "wounds": {
+          "current": 0,
+          "max": 13
+        },
+        "fate": {
+          "current": 3,
+          "max": 3
+        },
+        "talents": [
+          "Keen Intuition",
+          "Inescapable Attack",
+          "Target Selection",
+          "Preternatural Precision",
+          "Hatred Orcs",
+          "Mighty Shot",
+          "Quick Draw"
+        ],
+        "traits": [],
+        "conditions": [],
+        "circumstances": [],
+        "weapons": [
+          {
+            "name": "Long-Las",
+            "class": "basic",
+            "damage": "1d10+3",
+            "pen": 1,
+            "damageType": "Energy",
+            "qualities": [
+              "Accurate"
+            ],
+            "craftsmanship": "Common",
+            "rof": {
+              "single": true,
+              "burst": 0,
+              "full": 0
+            }
+          },
+          {
+            "name": "Lasgun",
+            "class": "basic",
+            "damage": "1d10+3",
+            "pen": 0,
+            "damageType": "Energy",
+            "qualities": [
+              "Reliable"
+            ],
+            "craftsmanship": "Common",
+            "rof": {
+              "single": true,
+              "burst": 0,
+              "full": 0
+            }
+          },
+          {
+            "name": "Lasgun",
+            "class": "basic",
+            "damage": "1d10+3",
+            "pen": 0,
+            "damageType": "Energy",
+            "qualities": [
+              "Reliable"
+            ],
+            "craftsmanship": "Common",
+            "rof": {
+              "single": true,
+              "burst": 0,
+              "full": 0
+            }
+          },
+          {
+            "name": "Laspistol",
+            "class": "basic",
+            "damage": "1d10+3",
+            "pen": 0,
+            "damageType": "Energy",
+            "qualities": [
+              "Reliable"
+            ],
+            "craftsmanship": "Common",
+            "rof": {
+              "single": true,
+              "burst": 0,
+              "full": 0
+            }
+          }
+        ],
+        "field": {
+          "rating": 0,
+          "overloadMax": 0
+        },
+        "source": {
+          "adapter": "xlsx-campaign-v1",
+          "file": "Reco Tamarin.xlsx",
+          "player": "Ryan",
+          "importedAt": "2026-07-08T17:46:34.283Z",
+          "unmapped": [
+            "skills (schema v2)",
+            "weapon clip (schema v2)",
+            "weapon trainings (schema v2)",
+            "xp / aptitudes / gear / house content (schema v2)"
+          ]
+        }
+      }
+    },
+    {
+      "id": "rex-hellerand",
+      "player": "Steve",
+      "name": "Rex Hellerand",
+      "doc": {
+        "schemaVersion": 1,
+        "kind": "dh2.character",
+        "system": "dh2",
+        "name": "Rex Hellerand",
+        "characteristics": {
+          "ws": 41,
+          "bs": 63,
+          "s": 34,
+          "t": 41,
+          "ag": 56,
+          "int": 54,
+          "per": 45,
+          "wp": 44,
+          "fel": 53
+        },
+        "unnatural": {},
+        "armour": {
+          "head": 6,
+          "body": 6,
+          "leftArm": 6,
+          "rightArm": 6,
+          "leftLeg": 6,
+          "rightLeg": 6
+        },
+        "wounds": {
+          "current": 11,
+          "max": 11
+        },
+        "fate": {
+          "current": 4,
+          "max": 4
+        },
+        "talents": [
+          "Strong Minded",
+          "Weapon Training (Las)",
+          "Weapon Training (Chain)",
+          "Catfall",
+          "Ambidextrous",
+          "Quick Draw",
+          "Keen Intuition",
+          "Mastery of Gunnery",
+          "Marksman",
+          "Double Tap",
+          "Clues from the Crowd",
+          "Inescapable Attack",
+          "Hard Target",
+          "Two-Weapon Wielder (Ranged)",
+          "Weapon Training (SP)",
+          "Mighty Shot",
+          "Step Aside",
+          "Two-Weapon Master",
+          "Weapon Training (Driver)",
+          "Rapid Reload",
+          "Deathdealer",
+          "Independent Targeting",
+          "Coordinated Interrogation",
+          "Precision Killer",
+          "Mounted Warrior (Ranged) x1",
+          "Leaping Dodge",
+          "Sprint",
+          "Jaded",
+          "Target Selection",
+          "Weapon-Tech",
+          "Close-Quarters Expertise",
+          "Inspiring Aura",
+          "Exotic WT (Shuriken)",
+          "Resistance (Fear)",
+          "Resistance (Psy Power)",
+          "Weapon Training (Melta)",
+          "Fleet and Fated",
+          "Evasive Action",
+          "The Iron Warren"
+        ],
+        "traits": [],
+        "conditions": [],
+        "circumstances": [],
+        "weapons": [
+          {
+            "name": "Driver SMG",
+            "class": "basic",
+            "damage": "1d10",
+            "pen": 0,
+            "damageType": "Impact",
+            "qualities": [
+              "Storm",
+              "Driver Grip",
+              "Extended Mag"
+            ],
+            "craftsmanship": "Common",
+            "rof": {
+              "single": false,
+              "burst": 0,
+              "full": 10
+            }
+          },
+          {
+            "name": "Shuriken Pistol",
+            "class": "basic",
+            "damage": "1d10+4",
+            "pen": 3,
+            "damageType": "Rending",
+            "qualities": [
+              "Razor Sharp",
+              "Reliable"
+            ],
+            "craftsmanship": "Common",
+            "rof": {
+              "single": true,
+              "burst": 3,
+              "full": 0
+            }
+          },
+          {
+            "name": "Cerberus",
+            "class": "basic",
+            "damage": "1d10+4",
+            "pen": 2,
+            "damageType": "Impact",
+            "qualities": [],
+            "craftsmanship": "Common",
+            "rof": {
+              "single": true,
+              "burst": 0,
+              "full": 0
+            }
+          }
+        ],
+        "field": {
+          "rating": 0,
+          "overloadMax": 0
+        },
+        "source": {
+          "adapter": "xlsx-campaign-v1",
+          "file": "Rex Hellerand - Sheet.xlsx",
+          "player": "Steve",
+          "importedAt": "2026-07-08T17:46:34.401Z",
+          "unmapped": [
+            "armour is the STATS scalar applied to all locations",
+            "psychic powers (schema v2)",
+            "skills (schema v2)",
+            "weapon clip (schema v2)",
+            "weapon trainings (schema v2)",
+            "xp / aptitudes / gear / house content (schema v2)"
+          ]
+        }
+      }
+    },
+    {
+      "id": "uriel-yuri",
+      "player": "Steve",
+      "name": 'Uriel "Yuri"',
+      "doc": {
+        "schemaVersion": 1,
+        "kind": "dh2.character",
+        "system": "dh2",
+        "name": 'Uriel "Yuri"',
+        "characteristics": {
+          "ws": 30,
+          "bs": 32,
+          "s": 35,
+          "t": 44,
+          "ag": 41,
+          "int": 40,
+          "per": 61,
+          "wp": 69,
+          "fel": 40
+        },
+        "unnatural": {},
+        "armour": {
+          "head": 0,
+          "body": 0,
+          "leftArm": 0,
+          "rightArm": 0,
+          "leftLeg": 0,
+          "rightLeg": 0
+        },
+        "wounds": {
+          "current": 11,
+          "max": 11
+        },
+        "fate": {
+          "current": 4,
+          "max": 4
+        },
+        "talents": [],
+        "traits": [],
+        "conditions": [],
+        "circumstances": [],
+        "weapons": [
+          {
+            "name": "Laspistol",
+            "class": "basic",
+            "damage": "1d10+2",
+            "pen": 0,
+            "damageType": "Energy",
+            "qualities": [
+              "Reliable"
+            ],
+            "craftsmanship": "Common",
+            "rof": {
+              "single": true,
+              "burst": 2,
+              "full": 0
+            }
+          }
+        ],
+        "field": {
+          "rating": 0,
+          "overloadMax": 0
+        },
+        "source": {
+          "adapter": "xlsx-campaign-v1",
+          "file": "Uriel.xlsx",
+          "player": "Steve",
+          "importedAt": "2026-07-08T17:46:34.528Z",
+          "unmapped": [
+            "armour is the STATS scalar applied to all locations",
+            "psychic powers (schema v2)",
+            "skills (schema v2)",
+            "weapon clip (schema v2)",
+            "weapon trainings (schema v2)",
+            "xp / aptitudes / gear / house content (schema v2)"
+          ]
+        }
+      }
+    }
+  ];
+
   // api/lib/dsl/docs.mjs
   var DSL_DOCS = {
     structure: {
@@ -3675,6 +5111,9 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
       hitLocations: HIT_LOCATIONS,
       firingModes: FIRING_MODES
     }),
+    // Campaign preset roster (CHARACTER_MODEL.md §6b) — full documents included
+    // (the roster is small); generated by `npm run import:campaign`.
+    "/api/characters": () => ({ characters: CHARACTER_ROSTER }),
     "/api/rules": () => ({
       talents: availableTalents,
       traits: availableTraits,

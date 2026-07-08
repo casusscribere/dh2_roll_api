@@ -92,13 +92,15 @@ Detailed design sketches for the engine gaps live in
       the module; validated against the RT campaign's custom spreadsheets
       (`ORIGINAL MATERIALS/RT_GDRIVE/Character Sheets/`). See
       CHARACTER_MODEL.md (planning doc, this session).
-- [ ] **Roll-UI character loading (CHARACTER_MODEL.md §6b)** — JSON upload
-      already exists (Phase 2); add the campaign **preset dropdown**
-      (`api/data/characters/` roster + `GET /api/characters[/<id>]`, grouped by
-      player, same validate/apply path as file upload), then the v2
-      apply-coverage upgrade (skills → d100 box, psy rating, clip/mods,
-      multi-weapon picker). Dependency-staged in §8: dropdown plumbing is
-      schema-agnostic (can ship now with v1 stubs); the faithful roster waits
-      on schema v2 + the xlsx-campaign adapter. Decisions D9 (don't publish PC
-      data via the Pages build — proposed) and D10 (regenerate roster only via
-      explicit `npm run import:campaign`) gate the roster commit.
+- [x] **Roll-UI preset dropdown (CHARACTER_MODEL.md §6b Deltas 1+3)** — SHIPPED
+      (2026-07-08) on the v1-lossy adapter: `npm run import:campaign` parses
+      the ten active PCs' workbooks (anchor-label scanning) into
+      `api/data/characters/roster.mjs`; `GET /api/characters`; player-grouped
+      dropdown sharing the file-upload validate/apply path; lossiness recorded
+      per document in `source.unmapped` and shown in the status panel.
+      D10 resolved as proposed (explicit re-run only). **D9 still open**: the
+      roster is currently bundled by `build:static` — decide before the next
+      Pages publish whether PC data should ship (exclude flag is trivial).
+- [ ] **§6b Delta 2 — apply-coverage upgrade** (needs schema v2): skills →
+      d100 box, psy rating, clip/range/mods, multi-weapon picker, re-import on
+      v2 to recover the fields v1 drops.
