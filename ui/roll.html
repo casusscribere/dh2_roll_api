@@ -102,27 +102,8 @@
           <div><label>Unnat. S</label><input type="number" id="a-un-s" value="0" min="0"></div>
           <div></div>
         </div>
-        <div>
-          <label>Action <span class="dim">— filtered by the weapon (melee/ranged + RoF); ⚠ = RAW talent-gated</span></label>
-          <input type="hidden" id="a-action" value="Standard Attack">
-          <div id="a-action-radios" class="checks"><span class="dim">loading…</span></div>
-        </div>
-        <div class="row">
-          <div><label>Aim</label><select id="a-aim"><option>None</option><option>Half</option><option>Full</option></select></div>
-          <div></div>
-        </div>
-        <div class="row">
-          <div><label>Range band</label><select id="a-range"></select></div>
-          <div><label>Other modifier</label><input type="number" id="a-mod" value="0"></div>
-        </div>
-        <div id="a-calledshot-wrap" style="display:none"><label>Called shot location</label>
-          <select id="a-calledshot"></select></div>
         <label style="margin-top:.6rem">Active rules <span class="dim">— toggle on/off; set a value where it applies. Talents &amp; Traits default ON.</span></label>
         <div id="a-rules" class="rulepanel"><span class="dim">loading…</span></div>
-        <div class="checks">
-          <label><input type="checkbox" id="a-dualwield"> Dual-wielding</label>
-          <label><input type="checkbox" id="a-offhand"> Off-hand</label>
-        </div>
       </div>
 
       <!-- ============ WEAPON ============ -->
@@ -135,11 +116,15 @@
           <div><label>Type</label><select id="w-type"><option>Impact</option><option>Energy</option><option selected>Explosive</option><option>Rending</option></select></div>
           <div><label>Melee?</label><select id="w-melee"><option value="no">Ranged</option><option value="yes">Melee</option></select></div>
         </div>
-        <div class="row4">
-          <div><label>RoF burst</label><input type="number" id="w-burst" value="2"></div>
-          <div><label>RoF full</label><input type="number" id="w-full" value="0"></div>
+        <div class="row4" title="Rate of Fire: S/x/y (p.144). Untick Single for weapons with no single-shot mode; 0 = the weapon lacks that fire mode.">
+          <div><label>Single shot</label><label class="checks" style="margin:0"><input type="checkbox" id="w-single" style="width:auto" checked> S</label></div>
+          <div><label>RoF semi</label><select id="w-burst"></select></div>
+          <div><label>RoF full</label><select id="w-full"></select></div>
           <div><label>SB &times; (melee)</label><input type="number" id="w-sbx" value="1" min="0" max="2"></div>
+        </div>
+        <div class="row">
           <div><label>Craft</label><select id="w-craft"><option>Poor</option><option selected>Common</option><option>Good</option><option>Best</option></select></div>
+          <div></div>
         </div>
         <label>Qualities (comma separated — e.g. Tearing, Accurate, Concussive (2), Blast (3), Razor Sharp)</label>
         <input id="w-qualities" value="Tearing" oninput="syncFiringModes()">
@@ -151,6 +136,31 @@
           <button type="button" class="minibtn" onclick="validateRules()">Validate</button>
           <div class="result" id="a-rules-result" style="margin-top:.5rem">&mdash;</div>
         </details>
+      </div>
+
+      <!-- ============ ACTIONS ============ -->
+      <div>
+        <label class="gold">— Actions —</label>
+        <div>
+          <label>Attack action <span class="dim">— filtered by the weapon's fire modes; ⚠ = RAW talent-gated</span></label>
+          <input type="hidden" id="a-action" value="Standard Attack">
+          <div id="a-action-radios" class="checks"><span class="dim">loading…</span></div>
+        </div>
+        <div class="row">
+          <div><label>Aim</label><select id="a-aim"><option>None</option><option>Half</option><option>Full</option></select></div>
+          <div><label>Range band</label><select id="a-range"></select></div>
+        </div>
+        <div class="row">
+          <div><label>Other modifier</label><input type="number" id="a-mod" value="0"></div>
+          <div></div>
+        </div>
+        <div id="a-calledshot-wrap" style="display:none"><label>Called shot location</label>
+          <select id="a-calledshot"></select></div>
+        <label style="margin-top:.6rem">Combat state</label>
+        <div class="checks">
+          <label><input type="checkbox" id="a-dualwield"> Dual-wielding</label>
+          <label><input type="checkbox" id="a-offhand"> Off-hand</label>
+        </div>
       </div>
 
       <!-- ============ DEFENDER ============ -->
@@ -191,6 +201,8 @@
         <div id="d-rules" class="rulepanel"><span class="dim">loading…</span></div>
       </div>
     </div>
+    <label style="margin-top:.6rem">Warnings / errors <span class="dim">— conflicts in the active configuration (RAW prerequisites, weapon fire modes); re-checked live as toggles change</span></label>
+    <div class="result" id="config-warnings"><span class="dim">— no conflicts —</span></div>
     <button onclick="doResolve()">Resolve Engagement</button>
     <label style="margin-top:.6rem">Step pacing — by default the resolution pauses between phases so you can inspect or reroll (e.g. a Fate Point). Tick a box to skip that pause.</label>
     <div class="checks" id="eng-pacing">
@@ -233,41 +245,105 @@ let WEAPONS = [];
 let FIRING_MODES = [];
 let ACTION_DEFS = [];   // /api/options actions: { name, modifier, rate, melee, ranged, talent? }
 
+// RoF selects run 0–10 (0 = the weapon lacks that fire mode; DH2 profiles top
+// out at 10). Populated once, before anything reads them.
+for (const id of ['w-burst', 'w-full']) {
+  const sel = document.getElementById(id);
+  for (let n = 0; n <= 10; n++) sel.add(new Option(String(n), String(n)));
+}
+document.getElementById('w-burst').value = '2';
+
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // --- attack-action radio group -------------------------------------------------
-// Renders the actions the CURRENT weapon supports: melee weapons list the melee
-// actions (Standard, All Out, Charge, Called Shot, Swift, Lightning — the last
-// two RAW-gated by their talents, marked ⚠; the engine emits the warning if the
-// talent is missing), ranged weapons list the fire modes their RoF allows
-// (Semi-Auto Burst / Suppressing Fire (Semi) need a semi RoF; Full Auto Burst /
-// Suppressing Fire (Full) need a full RoF). Re-rendered whenever the weapon's
-// melee/RoF fields change; the selection lives in the hidden #a-action input.
+// Renders the actions the CURRENT configuration supports, along two axes:
+//   weapon — melee weapons list the melee actions, ranged weapons list the fire
+//     modes their RoF allows (Semi-Auto Burst / Suppressing Fire (Semi) need a
+//     semi RoF; Full Auto Burst / Suppressing Fire (Full) need a full RoF);
+//   character — talent-gated actions (Swift/Lightning Attack, via the action's
+//     `talent` field from /api/options) are DISABLED (dimmed, ⚠) unless the
+//     attacker's Active-rules panel has that talent toggled on.
+// Re-rendered when the weapon's melee/RoF fields or the attacker's rule toggles
+// change; the selection lives in the hidden #a-action input.
+// Spelling-blind key, mirroring the server's normName ("Razor Sharp" ↔
+// "RazorSharp" ↔ "razor_sharp").
+const normKey = (s) => String(s ?? '').toLowerCase().replace(/[\s_-]+/g, '');
 function renderActionRadios() {
   const box = document.getElementById('a-action-radios');
   if (!box || !ACTION_DEFS.length) return;
   const melee = $('w-melee').value === 'yes';
+  const hasSingle = $('w-single').checked;
   const hasSemi = (+$('w-burst').value || 0) > 0;
   const hasFull = (+$('w-full').value || 0) > 0;
+  const talents = collectRules('a', 'talents').map((t) => normKey(typeof t === 'object' ? t.name : t));
+  const hasTalent = (name) => talents.some((t) => t.startsWith(normKey(name)));
   const avail = ACTION_DEFS
     .filter((a) => (melee ? a.melee : a.ranged))
-    .filter((a) => melee || a.rate === 'single' || (a.rate === 'semi' ? hasSemi : hasFull));
-  if (!avail.some((a) => a.name === $('a-action').value)) $('a-action').value = 'Standard Attack';
+    // ranged: each action needs its fire mode on the weapon (a semi/full-auto-
+    // only weapon cannot make single-shot Standard Attacks / Called Shots)
+    .filter((a) => melee || (a.rate === 'single' ? hasSingle : a.rate === 'semi' ? hasSemi : hasFull))
+    .map((a) => ({ ...a, gated: !!a.talent && !hasTalent(a.talent) }));
+  const current = avail.find((a) => a.name === $('a-action').value);
+  if (!current || current.gated) $('a-action').value = (avail.find((a) => !a.gated) ?? avail[0])?.name ?? 'Standard Attack';
+  if (!avail.length) { box.innerHTML = '<span class="bad">the weapon has no usable fire mode — enable Single or set a RoF</span>'; checkConfig(); return; }
   box.innerHTML = '';
   for (const a of avail) {
     const lab = document.createElement('label');
     const r = document.createElement('input');
     r.type = 'radio'; r.name = 'a-action-radio'; r.value = a.name;
     r.checked = a.name === $('a-action').value;
+    r.disabled = a.gated;
     r.onchange = () => {
       $('a-action').value = a.name;
       $('a-action').dispatchEvent(new Event('change'));   // Called Shot location toggle
     };
-    lab.append(r, ` ${a.name} (${a.modifier >= 0 ? '+' : ''}${a.modifier})${a.talent ? ' ⚠' : ''}`);
-    if (a.talent) lab.title = `RAW requires the ${a.talent} talent — the roll still resolves, with a warning, if it is missing`;
+    lab.append(r, ` ${a.name} (${a.modifier >= 0 ? '+' : ''}${a.modifier})${a.gated ? ' ⚠' : ''}`);
+    if (a.gated) {
+      lab.classList.add('dim');
+      lab.title = `requires the ${a.talent} talent — toggle it on in Active rules to enable`;
+    } else if (a.talent) {
+      lab.title = `enabled by the ${a.talent} talent`;
+    }
     box.append(lab);
   }
   $('a-action').dispatchEvent(new Event('change'));       // keep dependent UI in sync
+  checkConfig();                                           // warnings react to the same inputs
+}
+
+// --- Warnings / errors log -------------------------------------------------------
+// Live configuration sanity: RAW prerequisite violations among the toggled
+// talents/traits (POST /api/config/check — prerequisites outside the DSL and
+// characteristics the panel doesn't collect are skipped server-side), plus
+// local weapon-mode sanity. Re-runs whenever toggles, stats, or the weapon change.
+let checkSeq = 0;
+async function checkConfig() {
+  const box = document.getElementById('config-warnings');
+  if (!box) return;
+  const seq = ++checkSeq;
+  const local = [];
+  const melee = $('w-melee').value === 'yes';
+  if (!melee && !$('w-single').checked && !(+$('w-burst').value) && !(+$('w-full').value)) {
+    local.push('the ranged weapon has NO fire mode (Single unticked, semi and full RoF 0) — it cannot attack');
+  }
+  const sides = [
+    ['attacker', 'a', { ws: +$('a-ws').value, bs: +$('a-bs').value, s: +$('a-s').value, t: +$('a-t').value }],
+    ['defender', 'd', { ws: +$('d-ws').value, ag: +$('d-ag').value, t: +$('d-t').value, s: +$('d-s').value }],
+  ];
+  const warnings = [...local];
+  for (const [label, side, characteristics] of sides) {
+    try {
+      const r = await api('/api/config/check', {
+        talents: collectRules(side, 'talents'),
+        traits: collectRules(side, 'traits'),
+        characteristics,
+      });
+      for (const w of (r.warnings ?? [])) warnings.push(`${label}: ${w.message}`);
+    } catch { /* offline — leave the server checks out */ }
+  }
+  if (seq !== checkSeq) return;   // a newer check superseded this one
+  box.innerHTML = warnings.length
+    ? warnings.map((w) => `<span class="bad">⚠</span> ${esc(w)}`).join('\n')
+    : '<span class="dim">— no conflicts —</span>';
 }
 
 // --- dynamic per-side rule toggles (Talents / Traits / Circumstances / Conditions) ---
@@ -425,11 +501,13 @@ async function applyCharacter(side) {
       $('w-select').value = '';
       set('w-damage', w.damage); set('w-pen', w.pen ?? 0); set('w-type', w.damageType ?? 'Impact');
       $('w-melee').value = w.class === 'melee' ? 'yes' : 'no';
-      set('w-burst', w.rof?.burst ?? 0); set('w-full', w.rof?.full ?? 0);
+      set('w-burst', Math.min(10, w.rof?.burst ?? 0)); set('w-full', Math.min(10, w.rof?.full ?? 0));
+      $('w-single').checked = w.rof?.single !== false;
       set('w-sbx', w.sbMultiplier ?? (w.class === 'melee' ? 1 : 0));
       set('w-craft', w.craftsmanship ?? 'Common');
       $('w-qualities').value = (w.qualities ?? []).map(q => nameLevel(q).level != null ? `${nameLevel(q).name} (${nameLevel(q).level})` : nameLevel(q).name).join(', ');
       syncFiringModes();
+      renderActionRadios();
     }
     for (const [cat, list] of [['talents', c.talents], ['traits', c.traits], ['conditions', c.conditions], ['circumstances', c.circumstances]])
       unmatched.push(...setRulePanel('a', cat, list));
@@ -466,7 +544,7 @@ function exportCharacter(side) {
       name: $('w-select').selectedOptions[0]?.text.split(' (')[0] || 'Custom weapon',
       class: $('w-melee').value === 'yes' ? 'melee' : 'basic',
       damage: $('w-damage').value, pen: +$('w-pen').value, damageType: $('w-type').value,
-      rof: { single: true, burst: +$('w-burst').value, full: +$('w-full').value },
+      rof: { single: $('w-single').checked, burst: +$('w-burst').value, full: +$('w-full').value },
       qualities: $('w-qualities').value.split(',').map(x => x.trim()).filter(Boolean),
       craftsmanship: $('w-craft').value,
       sbMultiplier: $('w-melee').value === 'yes' ? +$('w-sbx').value : 0,
@@ -528,6 +606,10 @@ async function init() {
   buildRulePanel('d-rules', 'd', rules);
   ACTION_DEFS = opts.actions;
   renderActionRadios();
+  // talent toggles gate actions (Swift/Lightning) — re-render on any change
+  $('a-rules').addEventListener('change', (e) => {
+    if (e.target?.classList?.contains('rtoggle')) renderActionRadios();
+  });
   for (const [band, mod] of Object.entries(opts.rangeBands)) {
     if (band === 'Melee') continue;
     $('a-range').add(new Option(`${band} (${mod >= 0 ? '+' : ''}${mod})`, band, band === 'Normal Range', band === 'Normal Range'));
@@ -545,7 +627,8 @@ async function init() {
     if (!w) return;
     $('w-damage').value = w.damage; $('w-pen').value = w.pen; $('w-type').value = w.damageType;
     $('w-melee').value = w.isMelee ? 'yes' : 'no';
-    $('w-burst').value = w.rof.burst; $('w-full').value = w.rof.full;
+    $('w-burst').value = String(Math.min(10, w.rof.burst ?? 0)); $('w-full').value = String(Math.min(10, w.rof.full ?? 0));
+    $('w-single').checked = w.rof.single !== false;
     $('w-sbx').value = w.sbMultiplier || (w.isMelee ? 1 : 0);
     $('w-qualities').value = (w.qualities || []).join(', ');
     syncSbField();
@@ -559,8 +642,14 @@ async function init() {
     if (!melee) $('w-sbx').value = 0;
   };
   $('w-melee').onchange = () => { syncSbField(); renderActionRadios(); };
-  $('w-burst').oninput = renderActionRadios;
-  $('w-full').oninput = renderActionRadios;
+  $('w-single').onchange = renderActionRadios;
+  $('w-burst').onchange = renderActionRadios;
+  $('w-full').onchange = renderActionRadios;
+  // attacker/defender stats feed the prerequisite checks (WS 40 etc.)
+  for (const id of ['a-ws', 'a-bs', 'a-s', 'a-t', 'd-ws', 'd-ag', 'd-t', 'd-s']) $(id).oninput = checkConfig;
+  $('d-rules').addEventListener('change', (e) => {
+    if (e.target?.classList?.contains('rtoggle')) checkConfig();
+  });
   syncSbField();
   $('a-action').onchange = () => {
     $('a-calledshot-wrap').style.display = $('a-action').value === 'Called Shot' ? '' : 'none';
@@ -676,7 +765,7 @@ function buildEngagementInputs() {
       name: $('w-select').selectedOptions[0]?.text.split(' (')[0] || 'Custom weapon',
       isMelee: $('w-melee').value === 'yes',
       damage: $('w-damage').value, sbMultiplier: $('w-melee').value === 'yes' ? +$('w-sbx').value : 0, damageType: $('w-type').value, pen: +$('w-pen').value,
-      rof: { single: true, burst: +$('w-burst').value, full: +$('w-full').value },
+      rof: { single: $('w-single').checked, burst: +$('w-burst').value, full: +$('w-full').value },
       qualities: $('w-qualities').value.split(',').map(x => x.trim()).filter(Boolean),
       craftsmanship: $('w-craft').value,
     },
@@ -832,6 +921,12 @@ function renderEngagement(eng) {
   if (a.scatter) {
     s += `\n  <span class="rf">SCATTER</span> ${a.scatter.distance}m away, direction <span class="gold">${a.scatter.direction}</span>/10` +
       (v && a.scatter.directionText ? ` <span class="dim">— ${a.scatter.directionText}</span>` : '');
+    // Smoke (p.149): the screen forms at the scatter point even on a miss
+    for (const sm of (a.scatter.smoke || [])) {
+      s += `\n  <span class="rf">🌫 SMOKE SCREEN</span> radius <span class="gold">${sm.radius}</span> m at the scatter point` +
+        (sm.duration != null ? ` — lasts <span class="gold">${sm.duration}</span> rounds` : '') +
+        (v ? ` <span class="dim">(blocks line of sight; ${sm.source ?? 'Smoke'})</span>` : '');
+    }
     if (a.scatter.hit) {                          // Blast still detonates on a miss
       const sd = a.scatter.hit.damage;
       s += `\n  <span class="rf">💥 DETONATES</span> ${v ? `at the scatter point — ${a.scatter.hit.damageType} damage, ` : ''}Pen ${a.scatter.hit.totalPenetration}${v ? ' <span class="dim">(apply to any targets in the area)</span>' : ''}` +
@@ -884,6 +979,12 @@ function renderEngagement(eng) {
       if (h.fieldAbsorbed) { s += `<span class="ok">field absorbed</span>${v ? ` (roll ${h.field.roll} ≤ ${h.field.rating}${h.field.overloaded ? ', <span class="bad">OVERLOAD</span>' : ''})` : ''}`; continue; }
       if (h.field && v) s += `<span class="dim">field ${h.field.roll} &gt; ${h.field.rating}</span> · `;
       if (h.soak) s += `dmg ${h.damage.total} − soak ${h.soak.reduction} → <span class="${h.soak.woundsInflicted > 0 ? 'bad' : 'ok'}">${h.soak.woundsInflicted} wounds</span>`;
+      // Smoke (p.149): a hit deploys the screen at the point of impact
+      for (const sm of (h.smoke || [])) {
+        s += `\n    <span class="rf">🌫 SMOKE SCREEN</span> radius <span class="gold">${sm.radius}</span> m at the point of impact` +
+          (sm.duration != null ? ` — lasts <span class="gold">${sm.duration}</span> rounds` : '') +
+          (v ? ` <span class="dim">(blocks line of sight; ${sm.source ?? 'Smoke'})</span>` : '');
+      }
       if (h.targetEffects) {
         for (const te of h.targetEffects.tests) {
           let line = `\n    <span class="rf">⑤ ${te.characteristic} test</span>`;

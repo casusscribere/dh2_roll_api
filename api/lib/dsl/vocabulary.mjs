@@ -14,19 +14,20 @@
  * names (target_sb, opposing_has_quality, …) are declared as ALIASES onto
  * (scope, base) pairs and remain valid.
  */
-import { hasQuality, qualityLevel } from '../rules/_util.mjs';
+import { hasQuality, qualityLevel, normName } from '../rules/_util.mjs';
 import { actionType, isReaction, isAction, actionHasSubtype } from '../actions.mjs';
 
 const num = (x) => Number(x) || 0;
 
 /** Display name of a list entry (string or { name } object). */
 export const nameOf = (x) => (x && typeof x === 'object') ? String(x.name ?? '') : String(x ?? '');
-/** Case-insensitive prefix membership over strings / named objects. */
+/** Normalised prefix membership over strings / named objects — spelling-blind
+ *  ("Razor Sharp" ↔ "RazorSharp" ↔ "razor_sharp"; see normName). */
 const hasNamed = (list, name) => (list ?? [])
-    .some((x) => nameOf(x).toLowerCase().startsWith(String(name).toLowerCase()));
+    .some((x) => normName(nameOf(x)).startsWith(normName(name)));
 /** First entry matching `name` (for reading structured variables). */
 const findNamed = (list, name) => (list ?? [])
-    .find((x) => nameOf(x).toLowerCase().startsWith(String(name).toLowerCase()));
+    .find((x) => normName(nameOf(x)).startsWith(normName(name)));
 
 export const SCOPE_NAMES = ['attacker', 'target', 'weapon', 'opposing_weapon'];
 

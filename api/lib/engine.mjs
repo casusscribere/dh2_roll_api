@@ -19,7 +19,7 @@ import { RollContext } from './context.mjs';
 import { canonList, hasQuality } from './rules/_util.mjs';
 import {
     defaultRegistry,
-    COMBAT_ACTIONS, RANGE_BANDS, AIM_MODES,
+    COMBAT_ACTIONS, RANGE_BANDS, AIM_MODES, canonicalAction,
 } from './rules/index.mjs';
 
 // Re-export the primitives + reference tables that callers/tests expect from
@@ -255,7 +255,9 @@ function strengthBonusMultiple(weapon = {}, isMelee = false) {
  */
 function runToHit(input, rng, registry) {
     const { characteristics = {}, weapon = {}, target } = input;
-    const action = input.action ?? 'Standard Attack';
+    // canonicalise the spelling ("swift_attack" / "SwiftAttack" → "Swift Attack")
+    // so the modifier table AND every downstream exact compare see one form.
+    const action = canonicalAction(input.action) ?? input.action ?? 'Standard Attack';
     const actionInfo = COMBAT_ACTIONS[action] ?? COMBAT_ACTIONS['Standard Attack'];
     const isMelee = !!weapon.isMelee;
     const qualities = canonList(weapon.qualities);   // canonical { name, level } (Stage 1)
@@ -498,7 +500,7 @@ function resolveCorrosion(declarations, hit, target, reduced) {
 export function resolveAttack(input, rng = Math.random, registry = defaultRegistry) {
     const { weapon = {}, target, characteristics = {} } = input;
     const autoResolveTests = !!input.autoResolveTests;
-    const action = input.action ?? 'Standard Attack';
+    const action = canonicalAction(input.action) ?? input.action ?? 'Standard Attack';
     const { ctx, base, success, scatter, hitMeta } = runToHit(input, rng, registry);
     const result = { ...base, hits: [] };
     if (!success) { if (scatter) result.scatter = scatter; return result; }

@@ -24,7 +24,9 @@ export const ACTIONS = {
     'Dodge':            { type: 'Reaction', subtypes: [] },
 };
 
-const norm = (name) => String(name ?? '').trim().toLowerCase();
+// Spelling-blind key (same rule as rules/_util.mjs normName — kept inline to
+// avoid a lib → rules import): "SwiftAttack" / "swift_attack" ≡ "Swift Attack".
+const norm = (name) => String(name ?? '').toLowerCase().replace(/[\s_-]+/g, '');
 const byName = (name) => {
     const k = norm(name);
     for (const [n, meta] of Object.entries(ACTIONS)) if (norm(n) === k) return meta;

@@ -40,6 +40,19 @@ export const RANGE_BANDS = {
 
 export const AIM_MODES = { 'None': 0, 'Half': 10, 'Full': 20 };
 
+// Spelling-blind key (same rule as rules/_util.mjs normName): "SwiftAttack" /
+// "swift_attack" / "Swift Attack" all key identically.
+const normKey = (s) => String(s ?? '').toLowerCase().replace(/[\s_-]+/g, '');
+/** The canonical COMBAT_ACTIONS key for any spelling of an action name, or null
+ *  (non-attack actions like Parry pass through the caller's fallback). Resolved
+ *  ONCE at the engine boundary so every downstream exact compare
+ *  (action === 'Called Shot', is_action(...)) sees the canonical form. */
+export const canonicalAction = (name) => {
+    const k = normKey(name);
+    for (const key of Object.keys(COMBAT_ACTIONS)) if (normKey(key) === k) return key;
+    return null;
+};
+
 /**
  * Effects for these rules. The engine pre-computes the resolved action info,
  * range band and aim value onto the context (mechanism); these effects decide

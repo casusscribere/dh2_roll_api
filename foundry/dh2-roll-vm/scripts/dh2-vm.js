@@ -408,9 +408,10 @@ var entryLevel = (x) => {
   const m = /\((\d+)\)/.exec(String(x ?? "")) ?? /\s(\d+)$/.exec(String(x ?? ""));
   return m ? parseInt(m[1]) : null;
 };
-var hasQuality = (qualities, name) => (qualities ?? []).some((q) => entryName(q).toLowerCase().startsWith(String(name).toLowerCase()));
+var normName = (s) => String(s ?? "").toLowerCase().replace(/[\s_-]+/g, "");
+var hasQuality = (qualities, name) => (qualities ?? []).some((q) => normName(entryName(q)).startsWith(normName(name)));
 var qualityLevel = (qualities, name, fallback) => {
-  const q = (qualities ?? []).find((x) => entryName(x).toLowerCase().startsWith(String(name).toLowerCase()));
+  const q = (qualities ?? []).find((x) => normName(entryName(x)).startsWith(normName(name)));
   if (q === void 0) return fallback;
   return entryLevel(q) ?? fallback;
 };
@@ -1198,7 +1199,7 @@ var ACTIONS = {
   "Parry": { type: "Reaction", subtypes: [] },
   "Dodge": { type: "Reaction", subtypes: [] }
 };
-var norm = (name) => String(name ?? "").trim().toLowerCase();
+var norm = (name) => String(name ?? "").toLowerCase().replace(/[\s_-]+/g, "");
 var byName = (name) => {
   const k = norm(name);
   for (const [n, meta] of Object.entries(ACTIONS)) if (norm(n) === k) return meta;
@@ -1217,8 +1218,8 @@ var isAction = (current, name) => norm(current) === norm(name);
 // api/lib/dsl/vocabulary.mjs
 var num = (x) => Number(x) || 0;
 var nameOf = (x) => x && typeof x === "object" ? String(x.name ?? "") : String(x ?? "");
-var hasNamed = (list, name) => (list ?? []).some((x) => nameOf(x).toLowerCase().startsWith(String(name).toLowerCase()));
-var findNamed = (list, name) => (list ?? []).find((x) => nameOf(x).toLowerCase().startsWith(String(name).toLowerCase()));
+var hasNamed = (list, name) => (list ?? []).some((x) => normName(nameOf(x)).startsWith(normName(name)));
+var findNamed = (list, name) => (list ?? []).find((x) => normName(nameOf(x)).startsWith(normName(name)));
 var SCOPE_NAMES = ["attacker", "target", "weapon", "opposing_weapon"];
 var FACT_DEFS = [
   // --- weapon / actor ------------------------------------------------------
@@ -1999,6 +2000,12 @@ var RANGE_BANDS = {
   "Extreme Range": -30
 };
 var AIM_MODES = { "None": 0, "Half": 10, "Full": 20 };
+var normKey = (s) => String(s ?? "").toLowerCase().replace(/[\s_-]+/g, "");
+var canonicalAction = (name) => {
+  const k = normKey(name);
+  for (const key of Object.keys(COMBAT_ACTIONS)) if (normKey(key) === k) return key;
+  return null;
+};
 var combatActionEffects = [
   {
     id: "action-modifier",
@@ -2330,7 +2337,7 @@ var availableTables = rollTables.map((t) => ({ name: t.name, die: `${t.die.count
 var availableQualities = referencedNames(
   [qualitiesSrc, talentsSrc, traitsSrc, conditionsSrc, circumstancesSrc, configurationsSrc, mechanicsSrc].join("\n\n")
 ).qualities;
-var availableTalents = referencedNames(talentsSrc).talents;
+var availableTalents = referencedNames([talentsSrc, actionsSrc].join("\n\n")).talents;
 var availableTraits = referencedNames(traitsSrc).traits;
 var availableConditions = referencedNames(conditionsSrc).conditions;
 var availableCircumstances = referencedNames(circumstancesSrc).circumstances;
@@ -2577,7 +2584,7 @@ function strengthBonusMultiple(weapon = {}, isMelee = false) {
 }
 function runToHit(input, rng, registry) {
   const { characteristics = {}, weapon = {}, target } = input;
-  const action = input.action ?? "Standard Attack";
+  const action = canonicalAction(input.action) ?? input.action ?? "Standard Attack";
   const actionInfo = COMBAT_ACTIONS[action] ?? COMBAT_ACTIONS["Standard Attack"];
   const isMelee = !!weapon.isMelee;
   const qualities = canonList(weapon.qualities);
@@ -2832,7 +2839,7 @@ function resolveCorrosion(declarations, hit, target, reduced) {
 function resolveAttack(input, rng = Math.random, registry = defaultRegistry) {
   const { weapon = {}, target, characteristics = {} } = input;
   const autoResolveTests = !!input.autoResolveTests;
-  const action = input.action ?? "Standard Attack";
+  const action = canonicalAction(input.action) ?? input.action ?? "Standard Attack";
   const { ctx, base, success, scatter, hitMeta } = runToHit(input, rng, registry);
   const result = { ...base, hits: [] };
   if (!success) {
@@ -3128,6 +3135,7 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
     ],
     notes: [
       "The kind is a label/grouping; it does not change execution. Gate a rule with the matching function: talent\u2192has_talent, trait\u2192has_trait, condition\u2192has_condition, quality\u2192has_quality. (The v1 kind aliases status/generic/rule were removed in dsl 3.)",
+      'Name matching is spelling-blind: case, spaces, underscores, and hyphens are ignored on both sides, so has_quality("razor_sharp"), has_quality("RazorSharp"), and has_quality("Razor Sharp") all match a weapon carrying any of those spellings (prefix semantics unchanged \u2014 "Proven" still matches "Proven (3)"). The same applies to action names ("swift_attack" \u2261 "Swift Attack").',
       "Character inputs to an attack: talents[], traits[], statuses[] (and the weapon's qualities[]).",
       "priority: lower runs first within a checkpoint. Convention \u2014 injectors 0\u201349, additive bonuses 50\u201399, cancellers/clamps 100+.",
       "tier N is optional metadata (e.g. talent tier); it does not affect execution.",

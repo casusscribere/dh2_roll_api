@@ -15,7 +15,7 @@
  */
 import { Registry } from '../pipeline.mjs';
 import { compile, compileTables, compileActions, referencedNames, valuedNames, programInfo } from '../dsl/compiler.mjs';
-import { combatActionEffects, COMBAT_ACTIONS, RANGE_BANDS, AIM_MODES } from './combat-actions.mjs';
+import { combatActionEffects, COMBAT_ACTIONS, RANGE_BANDS, AIM_MODES, canonicalAction } from './combat-actions.mjs';
 import { qualityConflictEffects } from './quality-conflicts.mjs';
 import { registerActions, availableActions } from '../actions.mjs';
 import { ruleSources } from './sources.mjs';
@@ -59,7 +59,9 @@ export const availableTables = rollTables.map((t) => ({ name: t.name, die: `${t.
 export const availableQualities = referencedNames(
     [qualitiesSrc, talentsSrc, traitsSrc, conditionsSrc, circumstancesSrc, configurationsSrc, mechanicsSrc].join('\n\n'),
 ).qualities;
-export const availableTalents = referencedNames(talentsSrc).talents;
+// actions.dsl's legality rules reference talents too (Swift/Lightning Attack) —
+// include them so the UI's talent panel can gate the actions.
+export const availableTalents = referencedNames([talentsSrc, actionsSrc].join('\n\n')).talents;
 export const availableTraits = referencedNames(traitsSrc).traits;
 export const availableConditions = referencedNames(conditionsSrc).conditions;
 export const availableCircumstances = referencedNames(circumstancesSrc).circumstances;
@@ -130,7 +132,7 @@ export const builtinRules = (() => {
 
 // Re-export the combat-action reference tables so the engine/server can surface
 // them (e.g. /api/options) without reaching past the rules layer.
-export { COMBAT_ACTIONS, RANGE_BANDS, AIM_MODES };
+export { COMBAT_ACTIONS, RANGE_BANDS, AIM_MODES, canonicalAction };
 
 /** Weapon qualities that act as a firing-mode toggle (modify the profile when
  *  fired, rather than adding an Action). The UI offers a toggle for each one the

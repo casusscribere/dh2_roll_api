@@ -22,6 +22,7 @@ import {
     buildRegistry, builtinSources, builtinRules,
 } from './rules/index.mjs';
 import { weaponsJson } from './rules/sources.mjs';
+import { checkDependencies } from './rules/dependencies.mjs';
 import { compile } from './dsl/compiler.mjs';
 import { DslError } from './dsl/tokenizer.mjs';
 import { DSL_DOCS } from './dsl/docs.mjs';
@@ -124,6 +125,13 @@ const POST = {
         out.rollTrace = rng.trace;
         return out;
     },
+    // Configuration sanity: RAW prerequisite violations in the active talent/
+    // trait toggles (the Roll page's Warnings/errors log). Prerequisites not in
+    // the DSL (or characteristics not supplied) are skipped — see dependencies.mjs.
+    // { talents?, traits?, characteristics? } → { warnings: [...] }
+    '/api/config/check': (body) => ({
+        warnings: checkDependencies(body ?? {}, { talents: availableTalents, traits: availableTraits }),
+    }),
 };
 
 /** Merge persistent actor state (conditions, AP damage) into engagement inputs,

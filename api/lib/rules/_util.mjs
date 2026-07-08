@@ -36,14 +36,25 @@ export const entryLevel = (x) => {
     return m ? parseInt(m[1]) : null;
 };
 
-/** True if any entry's name starts with `name` (case-insensitive prefix match,
- *  so "Proven (3)" and { name: "Proven", level: 3 } both satisfy "Proven"). */
+/** Match-key normalisation: lowercase + strip spaces, underscores, and hyphens,
+ *  so the standard, camelCase, and snake_case spellings of a multi-word entry
+ *  all key identically — "Razor Sharp", "RazorSharp", and "razor_sharp" →
+ *  "razorsharp"; "Two-Weapon Wielder" ↔ "TwoWeaponWielder" ↔
+ *  "two_weapon_wielder". Used by EVERY name matcher (qualities here; talents/
+ *  traits/conditions/circumstances/configs via vocabulary.mjs; actions via
+ *  actions.mjs), on both the entry and the query, so it applies equally to DSL
+ *  text (has_quality("razor_sharp")) and API input lists. */
+export const normName = (s) => String(s ?? '').toLowerCase().replace(/[\s_-]+/g, '');
+
+/** True if any entry's name starts with `name` (normalised prefix match, so
+ *  "Proven (3)" and { name: "Proven", level: 3 } both satisfy "Proven", and
+ *  "RazorSharp" satisfies "Razor Sharp"). */
 export const hasQuality = (qualities, name) =>
-    (qualities ?? []).some((q) => entryName(q).toLowerCase().startsWith(String(name).toLowerCase()));
+    (qualities ?? []).some((q) => normName(entryName(q)).startsWith(normName(name)));
 
 /** The level of the first entry matching `name`, or `fallback` if absent/unlevelled. */
 export const qualityLevel = (qualities, name, fallback) => {
-    const q = (qualities ?? []).find((x) => entryName(x).toLowerCase().startsWith(String(name).toLowerCase()));
+    const q = (qualities ?? []).find((x) => normName(entryName(x)).startsWith(normName(name)));
     if (q === undefined) return fallback;
     return entryLevel(q) ?? fallback;
 };

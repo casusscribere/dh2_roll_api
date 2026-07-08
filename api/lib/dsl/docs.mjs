@@ -38,6 +38,7 @@ package "dh2.core.example" {      // optional, one per file — provenance for e
         ],
         notes: [
             'The kind is a label/grouping; it does not change execution. Gate a rule with the matching function: talent→has_talent, trait→has_trait, condition→has_condition, quality→has_quality. (The v1 kind aliases status/generic/rule were removed in dsl 3.)',
+            'Name matching is spelling-blind: case, spaces, underscores, and hyphens are ignored on both sides, so has_quality("razor_sharp"), has_quality("RazorSharp"), and has_quality("Razor Sharp") all match a weapon carrying any of those spellings (prefix semantics unchanged — "Proven" still matches "Proven (3)"). The same applies to action names ("swift_attack" ≡ "Swift Attack").',
             'Character inputs to an attack: talents[], traits[], statuses[] (and the weapon\'s qualities[]).',
             'priority: lower runs first within a checkpoint. Convention — injectors 0–49, additive bonuses 50–99, cancellers/clamps 100+.',
             'tier N is optional metadata (e.g. talent tier); it does not affect execution.',

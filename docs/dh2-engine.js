@@ -410,9 +410,10 @@
     const m = /\((\d+)\)/.exec(String(x ?? "")) ?? /\s(\d+)$/.exec(String(x ?? ""));
     return m ? parseInt(m[1]) : null;
   };
-  var hasQuality = (qualities, name) => (qualities ?? []).some((q) => entryName(q).toLowerCase().startsWith(String(name).toLowerCase()));
+  var normName = (s) => String(s ?? "").toLowerCase().replace(/[\s_-]+/g, "");
+  var hasQuality = (qualities, name) => (qualities ?? []).some((q) => normName(entryName(q)).startsWith(normName(name)));
   var qualityLevel = (qualities, name, fallback) => {
-    const q = (qualities ?? []).find((x) => entryName(x).toLowerCase().startsWith(String(name).toLowerCase()));
+    const q = (qualities ?? []).find((x) => normName(entryName(x)).startsWith(normName(name)));
     if (q === void 0) return fallback;
     return entryLevel(q) ?? fallback;
   };
@@ -1200,7 +1201,7 @@
     "Parry": { type: "Reaction", subtypes: [] },
     "Dodge": { type: "Reaction", subtypes: [] }
   };
-  var norm = (name) => String(name ?? "").trim().toLowerCase();
+  var norm = (name) => String(name ?? "").toLowerCase().replace(/[\s_-]+/g, "");
   var byName = (name) => {
     const k = norm(name);
     for (const [n, meta] of Object.entries(ACTIONS)) if (norm(n) === k) return meta;
@@ -1219,8 +1220,8 @@
   // api/lib/dsl/vocabulary.mjs
   var num = (x) => Number(x) || 0;
   var nameOf = (x) => x && typeof x === "object" ? String(x.name ?? "") : String(x ?? "");
-  var hasNamed = (list, name) => (list ?? []).some((x) => nameOf(x).toLowerCase().startsWith(String(name).toLowerCase()));
-  var findNamed = (list, name) => (list ?? []).find((x) => nameOf(x).toLowerCase().startsWith(String(name).toLowerCase()));
+  var hasNamed = (list, name) => (list ?? []).some((x) => normName(nameOf(x)).startsWith(normName(name)));
+  var findNamed = (list, name) => (list ?? []).find((x) => normName(nameOf(x)).startsWith(normName(name)));
   var SCOPE_NAMES = ["attacker", "target", "weapon", "opposing_weapon"];
   var FACT_DEFS = [
     // --- weapon / actor ------------------------------------------------------
@@ -2001,6 +2002,12 @@
     "Extreme Range": -30
   };
   var AIM_MODES = { "None": 0, "Half": 10, "Full": 20 };
+  var normKey = (s) => String(s ?? "").toLowerCase().replace(/[\s_-]+/g, "");
+  var canonicalAction = (name) => {
+    const k = normKey(name);
+    for (const key of Object.keys(COMBAT_ACTIONS)) if (normKey(key) === k) return key;
+    return null;
+  };
   var combatActionEffects = [
     {
       id: "action-modifier",
@@ -2333,7 +2340,7 @@ roll_table "Power Field Destruction" {
   var availableQualities = referencedNames(
     [qualitiesSrc, talentsSrc, traitsSrc, conditionsSrc, circumstancesSrc, configurationsSrc, mechanicsSrc].join("\n\n")
   ).qualities;
-  var availableTalents = referencedNames(talentsSrc).talents;
+  var availableTalents = referencedNames([talentsSrc, actionsSrc].join("\n\n")).talents;
   var availableTraits = referencedNames(traitsSrc).traits;
   var availableConditions = referencedNames(conditionsSrc).conditions;
   var availableCircumstances = referencedNames(circumstancesSrc).circumstances;
@@ -2616,7 +2623,7 @@ roll_table "Power Field Destruction" {
   }
   function runToHit(input, rng, registry) {
     const { characteristics = {}, weapon = {}, target } = input;
-    const action = input.action ?? "Standard Attack";
+    const action = canonicalAction(input.action) ?? input.action ?? "Standard Attack";
     const actionInfo = COMBAT_ACTIONS[action] ?? COMBAT_ACTIONS["Standard Attack"];
     const isMelee = !!weapon.isMelee;
     const qualities = canonList(weapon.qualities);
@@ -2871,7 +2878,7 @@ roll_table "Power Field Destruction" {
   function resolveAttack(input, rng = Math.random, registry = defaultRegistry) {
     const { weapon = {}, target, characteristics = {} } = input;
     const autoResolveTests = !!input.autoResolveTests;
-    const action = input.action ?? "Standard Attack";
+    const action = canonicalAction(input.action) ?? input.action ?? "Standard Attack";
     const { ctx, base, success, scatter, hitMeta } = runToHit(input, rng, registry);
     const result = { ...base, hits: [] };
     if (!success) {
@@ -3138,6 +3145,77 @@ roll_table "Power Field Destruction" {
     return result;
   }
 
+  // api/lib/rules/dependencies.mjs
+  var DEPENDENCIES = {
+    talents: {
+      // --- in the DSL today -------------------------------------------------
+      "Ambidextrous": { requires: [{ characteristic: "ag", min: 30 }] },
+      "Swift Attack": { page: 131, requires: [{ characteristic: "ws", min: 30 }] },
+      "Lightning Attack": { page: 129, requires: ["Swift Attack"] },
+      "Two-Weapon Master": { page: 132, requires: ["Ambidextrous", "Two-Weapon Wielder", { characteristic: "ag", min: 45 }, { anyOf: [{ characteristic: "bs", min: 40 }, { characteristic: "ws", min: 40 }] }] },
+      "Crushing Blow": { page: 125, requires: [{ characteristic: "ws", min: 40 }] },
+      "Mighty Shot": { page: 130, requires: [{ characteristic: "bs", min: 40 }] },
+      "Marksman": { page: 130, requires: [{ characteristic: "bs", min: 35 }] },
+      "Precision Killer": { page: 130, requires: [{ anyOf: [{ characteristic: "bs", min: 40 }, { characteristic: "ws", min: 40 }] }] },
+      "Die Hard": { page: 125, requires: [{ characteristic: "wp", min: 40 }] },
+      "Iron Jaw": { page: 128, requires: [{ characteristic: "t", min: 40 }] },
+      // Hatred, Two-Weapon Wielder: Prerequisite "—" (none).
+      // --- enumerated in advance of the DSL ----------------------------------
+      "Hammer Blow": { requires: ["Crushing Blow"] },
+      "Double Tap": { page: 125, requires: ["Two-Weapon Wielder"] },
+      "Hip Shooting": { page: 128, requires: [{ characteristic: "bs", min: 40 }, { characteristic: "ag", min: 40 }] },
+      "Deathdealer": { page: 125, requires: [{ anyOf: [{ characteristic: "bs", min: 45 }, { characteristic: "ws", min: 45 }] }] }
+    },
+    // DH2 traits are innate — none of the authored ones carry prerequisites.
+    // The structure is here so trait dependencies can be enumerated the same way.
+    traits: {}
+  };
+  var hasActive = (list, name) => (list ?? []).some((x) => normName(entryName(x)).startsWith(normName(name)));
+  function checkDependencies(config = {}, known = {}) {
+    const knownNames = new Set([...known.talents ?? [], ...known.traits ?? []].map(normName));
+    const chars = config.characteristics ?? {};
+    const activeAll = [...config.talents ?? [], ...config.traits ?? []];
+    const evalReq = (req) => {
+      if (typeof req === "string") {
+        if (!knownNames.has(normName(req))) return { checkable: false };
+        return { checkable: true, ok: hasActive(activeAll, req), text: `the ${req} talent` };
+      }
+      if (req.anyOf) {
+        const subs = req.anyOf.map(evalReq).filter((s) => s.checkable);
+        if (!subs.length) return { checkable: false };
+        return { checkable: true, ok: subs.some((s) => s.ok), text: subs.map((s) => s.text).join(" or ") };
+      }
+      if (req.characteristic) {
+        const v = chars[req.characteristic];
+        if (v == null || v === "") return { checkable: false };
+        return { checkable: true, ok: Number(v) >= req.min, text: `${req.characteristic.toUpperCase()} ${req.min}` };
+      }
+      return { checkable: false };
+    };
+    const warnings = [];
+    for (const [kind, table, list] of [
+      ["talent", DEPENDENCIES.talents, config.talents],
+      ["trait", DEPENDENCIES.traits, config.traits]
+    ]) {
+      for (const [subject, entry] of Object.entries(table)) {
+        if (!hasActive(list, subject)) continue;
+        for (const req of entry.requires ?? []) {
+          const r = evalReq(req);
+          if (r.checkable && !r.ok) {
+            warnings.push({
+              subject,
+              kind,
+              requirement: r.text,
+              page: entry.page ?? null,
+              message: `${subject} requires ${r.text}${entry.page ? ` (p.${entry.page})` : ""} \u2014 missing from the active configuration`
+            });
+          }
+        }
+      }
+    }
+    return warnings;
+  }
+
   // api/lib/dsl/docs.mjs
   var DSL_DOCS = {
     structure: {
@@ -3167,6 +3245,7 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
       ],
       notes: [
         "The kind is a label/grouping; it does not change execution. Gate a rule with the matching function: talent\u2192has_talent, trait\u2192has_trait, condition\u2192has_condition, quality\u2192has_quality. (The v1 kind aliases status/generic/rule were removed in dsl 3.)",
+        'Name matching is spelling-blind: case, spaces, underscores, and hyphens are ignored on both sides, so has_quality("razor_sharp"), has_quality("RazorSharp"), and has_quality("Razor Sharp") all match a weapon carrying any of those spellings (prefix semantics unchanged \u2014 "Proven" still matches "Proven (3)"). The same applies to action names ("swift_attack" \u2261 "Swift Attack").',
         "Character inputs to an attack: talents[], traits[], statuses[] (and the weapon's qualities[]).",
         "priority: lower runs first within a checkpoint. Convention \u2014 injectors 0\u201349, additive bonuses 50\u201399, cancellers/clamps 100+.",
         "tier N is optional metadata (e.g. talent tier); it does not affect execution.",
@@ -3691,7 +3770,14 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
       const out = tickEncounter(body.encounter ?? emptyEncounter(), body.phase, reg, rng, body.actorKey ?? null);
       out.rollTrace = rng.trace;
       return out;
-    }
+    },
+    // Configuration sanity: RAW prerequisite violations in the active talent/
+    // trait toggles (the Roll page's Warnings/errors log). Prerequisites not in
+    // the DSL (or characteristics not supplied) are skipped — see dependencies.mjs.
+    // { talents?, traits?, characteristics? } → { warnings: [...] }
+    "/api/config/check": (body) => ({
+      warnings: checkDependencies(body ?? {}, { talents: availableTalents, traits: availableTraits })
+    })
   };
   function withEncounter(body) {
     const enc = body.encounter;
