@@ -102,9 +102,14 @@
           <div><label>Unnat. S</label><input type="number" id="a-un-s" value="0" min="0"></div>
           <div></div>
         </div>
+        <div>
+          <label>Action <span class="dim">— filtered by the weapon (melee/ranged + RoF); ⚠ = RAW talent-gated</span></label>
+          <input type="hidden" id="a-action" value="Standard Attack">
+          <div id="a-action-radios" class="checks"><span class="dim">loading…</span></div>
+        </div>
         <div class="row">
-          <div><label>Action</label><select id="a-action"></select></div>
           <div><label>Aim</label><select id="a-aim"><option>None</option><option>Half</option><option>Full</option></select></div>
+          <div></div>
         </div>
         <div class="row">
           <div><label>Range band</label><select id="a-range"></select></div>
@@ -226,8 +231,44 @@ const api = (path, body) => fetch(path, {
 
 let WEAPONS = [];
 let FIRING_MODES = [];
+let ACTION_DEFS = [];   // /api/options actions: { name, modifier, rate, melee, ranged, talent? }
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// --- attack-action radio group -------------------------------------------------
+// Renders the actions the CURRENT weapon supports: melee weapons list the melee
+// actions (Standard, All Out, Charge, Called Shot, Swift, Lightning — the last
+// two RAW-gated by their talents, marked ⚠; the engine emits the warning if the
+// talent is missing), ranged weapons list the fire modes their RoF allows
+// (Semi-Auto Burst / Suppressing Fire (Semi) need a semi RoF; Full Auto Burst /
+// Suppressing Fire (Full) need a full RoF). Re-rendered whenever the weapon's
+// melee/RoF fields change; the selection lives in the hidden #a-action input.
+function renderActionRadios() {
+  const box = document.getElementById('a-action-radios');
+  if (!box || !ACTION_DEFS.length) return;
+  const melee = $('w-melee').value === 'yes';
+  const hasSemi = (+$('w-burst').value || 0) > 0;
+  const hasFull = (+$('w-full').value || 0) > 0;
+  const avail = ACTION_DEFS
+    .filter((a) => (melee ? a.melee : a.ranged))
+    .filter((a) => melee || a.rate === 'single' || (a.rate === 'semi' ? hasSemi : hasFull));
+  if (!avail.some((a) => a.name === $('a-action').value)) $('a-action').value = 'Standard Attack';
+  box.innerHTML = '';
+  for (const a of avail) {
+    const lab = document.createElement('label');
+    const r = document.createElement('input');
+    r.type = 'radio'; r.name = 'a-action-radio'; r.value = a.name;
+    r.checked = a.name === $('a-action').value;
+    r.onchange = () => {
+      $('a-action').value = a.name;
+      $('a-action').dispatchEvent(new Event('change'));   // Called Shot location toggle
+    };
+    lab.append(r, ` ${a.name} (${a.modifier >= 0 ? '+' : ''}${a.modifier})${a.talent ? ' ⚠' : ''}`);
+    if (a.talent) lab.title = `RAW requires the ${a.talent} talent — the roll still resolves, with a warning, if it is missing`;
+    box.append(lab);
+  }
+  $('a-action').dispatchEvent(new Event('change'));       // keep dependent UI in sync
+}
 
 // --- dynamic per-side rule toggles (Talents / Traits / Circumstances / Conditions) ---
 // Enumerates the rule set's active rules as toggle rows with an optional value.
@@ -485,9 +526,8 @@ async function init() {
 
   buildRulePanel('a-rules', 'a', rules);
   buildRulePanel('d-rules', 'd', rules);
-  for (const a of opts.actions) {
-    $('a-action').add(new Option(`${a.name} (${a.modifier >= 0 ? '+' : ''}${a.modifier})`, a.name));
-  }
+  ACTION_DEFS = opts.actions;
+  renderActionRadios();
   for (const [band, mod] of Object.entries(opts.rangeBands)) {
     if (band === 'Melee') continue;
     $('a-range').add(new Option(`${band} (${mod >= 0 ? '+' : ''}${mod})`, band, band === 'Normal Range', band === 'Normal Range'));
@@ -510,6 +550,7 @@ async function init() {
     $('w-qualities').value = (w.qualities || []).join(', ');
     syncSbField();
     syncFiringModes();
+    renderActionRadios();   // the weapon's melee/RoF profile changed
   };
   // Strength Bonus is melee-only: disable (and zero) the SB × field for ranged.
   const syncSbField = () => {
@@ -517,11 +558,14 @@ async function init() {
     $('w-sbx').disabled = !melee;
     if (!melee) $('w-sbx').value = 0;
   };
-  $('w-melee').onchange = syncSbField;
+  $('w-melee').onchange = () => { syncSbField(); renderActionRadios(); };
+  $('w-burst').oninput = renderActionRadios;
+  $('w-full').oninput = renderActionRadios;
   syncSbField();
   $('a-action').onchange = () => {
     $('a-calledshot-wrap').style.display = $('a-action').value === 'Called Shot' ? '' : 'none';
   };
+  renderActionRadios();
 }
 init();
 window.addEventListener('focus', refreshActiveRules); // pick up edits made on the Rules page

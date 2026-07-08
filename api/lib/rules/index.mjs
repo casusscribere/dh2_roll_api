@@ -46,6 +46,7 @@ export const conditionEffects = compile(conditionsSrc);       // active Conditio
 export const circumstanceEffects = compile(circumstancesSrc); // environmental Circumstances (off-hand, …)
 export const configurationEffects = compile(configurationsSrc); // per-character toggles (Maximal, …)
 export const mechanicEffects = compile(mechanicsSrc);   // Jam mechanic + craftsmanship
+export const actionRuleEffects = compile(actionsSrc);   // action legality + Suppressing Fire (the file's action DECLARATIONS compile separately above)
 
 /** Built-in roll tables (Scatter Diagram, Haywire, Hallucinogenic), for roll_on. */
 export const rollTables = compileTables(rollTablesSrc);
@@ -109,7 +110,7 @@ const GROUP_ORDER = [
 ];
 
 export const builtinRules = (() => {
-    const all = [...weaponQualityEffects, ...talentEffects, ...traitEffects, ...conditionEffects, ...circumstanceEffects, ...configurationEffects, ...mechanicEffects];
+    const all = [...weaponQualityEffects, ...talentEffects, ...traitEffects, ...conditionEffects, ...circumstanceEffects, ...configurationEffects, ...mechanicEffects, ...actionRuleEffects];
     const seen = new Set();
     const out = [];
     for (const e of all) {
@@ -184,6 +185,7 @@ export function buildRegistry(customRules, disabledIds = []) {
         .addAll(keep(circumstanceEffects))
         .addAll(keep(configurationEffects))
         .addAll(keep(mechanicEffects))
+        .addAll(keep(actionRuleEffects))
         .addTables(rollTables);
     if (custom.length) {
         registry.addAll(custom);

@@ -1183,13 +1183,16 @@ function parse(src) {
 // api/lib/actions.mjs
 var ACTIONS = {
   "Standard Attack": { type: "Half", subtypes: ["attack"] },
-  "Semi-Auto Burst": { type: "Half", subtypes: ["attack"] },
-  "Full Auto Burst": { type: "Half", subtypes: ["attack"] },
-  "All Out Attack": { type: "Full", subtypes: ["attack"] },
-  "Charge": { type: "Full", subtypes: ["attack"] },
+  "Semi-Auto Burst": { type: "Half", subtypes: ["attack", "ranged"] },
+  "Full Auto Burst": { type: "Half", subtypes: ["attack", "ranged"] },
+  "All Out Attack": { type: "Full", subtypes: ["attack", "melee"] },
+  "Charge": { type: "Full", subtypes: ["attack", "melee"] },
   "Called Shot": { type: "Full", subtypes: ["attack"] },
-  "Swift Attack": { type: "Full", subtypes: ["attack"] },
-  "Lightning Attack": { type: "Full", subtypes: ["attack"] },
+  // Half Actions in DH2 2e (Table 7-1 p.222; Swift p.225, Lightning p.223)
+  "Swift Attack": { type: "Half", subtypes: ["attack", "melee"] },
+  "Lightning Attack": { type: "Half", subtypes: ["attack", "melee"] },
+  "Suppressing Fire (Semi)": { type: "Full", subtypes: ["attack", "ranged"] },
+  "Suppressing Fire (Full)": { type: "Full", subtypes: ["attack", "ranged"] },
   "Defensive Stance": { type: "Full", subtypes: [] },
   "Aim": { type: "Half", subtypes: [] },
   "Parry": { type: "Reaction", subtypes: [] },
@@ -1980,10 +1983,12 @@ var COMBAT_ACTIONS = {
   "All Out Attack": { modifier: 30, rate: "single", melee: true, ranged: false },
   "Charge": { modifier: 20, rate: "single", melee: true, ranged: false },
   "Called Shot": { modifier: -20, rate: "single", melee: true, ranged: true },
-  "Swift Attack": { modifier: 0, rate: "semi", melee: true, ranged: false },
-  "Lightning Attack": { modifier: -10, rate: "full", melee: true, ranged: false },
+  "Swift Attack": { modifier: 0, rate: "semi", melee: true, ranged: false, cap: "wsb", talent: "Swift Attack" },
+  "Lightning Attack": { modifier: -10, rate: "full", melee: true, ranged: false, cap: "wsb", talent: "Lightning Attack" },
   "Semi-Auto Burst": { modifier: 0, rate: "semi", melee: false, ranged: true },
-  "Full Auto Burst": { modifier: -10, rate: "full", melee: false, ranged: true }
+  "Full Auto Burst": { modifier: -10, rate: "full", melee: false, ranged: true },
+  "Suppressing Fire (Semi)": { modifier: -20, rate: "semi", melee: false, ranged: true },
+  "Suppressing Fire (Full)": { modifier: -20, rate: "full", melee: false, ranged: true, hitAccrual: "semi" }
 };
 var RANGE_BANDS = {
   "Melee": 0,
@@ -2228,7 +2233,7 @@ configuration "Maximal" {
   when has_quality("Maximal") and configuration("Maximal")
   then emit "Maximal", "+10 m range and x3 ammunition this shot"
 }
-`, "mechanics.dsl": 'dsl 3\npackage "dh2.core.mechanics" {\n  system "dh2"\n  source "Dark Heresy 2e Core Rulebook"\n}\n\n# Weapon mechanics & craftsmanship \u2014 authored in the DSL.\n#\n# Jam is a base MECHANIC (not a weapon quality): a ranged weapon jams when the\n# attack roll exceeds the jam threshold (default 96 \u2192 jams on 97+). Qualities\n# (Reliable/Unreliable) and craftsmanship adjust `jam_threshold` BEFORE this\n# check runs (lower priority), so they compose. A threshold of 100 never jams.\n\nmechanic "Jam" {\n  on POST_ROLL\n  priority 50\n  when is_ranged and roll > jam_threshold\n  then emit "Jam", "The weapon jams!"; flag attack_failed\n}\n\n# ===== Weapon craftsmanship (DH2 core p.149) =================================\n# craftsmanship fact is "Poor" | "Common" | "Good" | "Best" (weapon.craftsmanship).\n\n# --- melee: WS modifier applies to every WS test made with the weapon, i.e.\n#     both attacks (MODIFIERS) and parries (PARRY). Best also adds +1 damage. ---\nmechanic "Poor Craftsmanship (melee)" {\n  on MODIFIERS  when is_melee and craftsmanship == "Poor"  then add modifier "craftsmanship" = -10\n}\nmechanic "Poor Craftsmanship (melee)" {\n  on PARRY  when craftsmanship == "Poor"  then add modifier "craftsmanship" = -10\n}\nmechanic "Good Craftsmanship (melee)" {\n  on MODIFIERS  when is_melee and craftsmanship == "Good"  then add modifier "craftsmanship" = 5\n}\nmechanic "Good Craftsmanship (melee)" {\n  on PARRY  when craftsmanship == "Good"  then add modifier "craftsmanship" = 5\n}\nmechanic "Best Craftsmanship (melee)" {\n  on MODIFIERS  when is_melee and craftsmanship == "Best"  then add modifier "craftsmanship" = 10\n}\nmechanic "Best Craftsmanship (melee)" {\n  on PARRY  when craftsmanship == "Best"  then add modifier "craftsmanship" = 10\n}\nmechanic "Best Craftsmanship (melee)" {\n  on DAMAGE_MODS  when is_melee and craftsmanship == "Best"  then add modifier "craftsmanship" = 1\n}\n\n# --- ranged: craftsmanship adjusts the jam threshold (priority 5, before the\n#     Reliable/Unreliable qualities at 10 and the base Jam mechanic at 50). ---\nmechanic "Poor Craftsmanship (ranged)" {\n  on POST_ROLL  priority 5  when is_ranged and craftsmanship == "Poor"  then set jam_threshold = 90\n}\nmechanic "Good Craftsmanship (ranged)" {\n  on POST_ROLL  priority 5  when is_ranged and craftsmanship == "Good"  then set jam_threshold = 99\n}\nmechanic "Best Craftsmanship (ranged)" {\n  on POST_ROLL  priority 5  when is_ranged and craftsmanship == "Best"  then set jam_threshold = 100\n}\n', "roll-tables.dsl": `dsl 3
+`, "mechanics.dsl": 'dsl 3\npackage "dh2.core.mechanics" {\n  system "dh2"\n  source "Dark Heresy 2e Core Rulebook"\n}\n\n# Weapon mechanics & craftsmanship \u2014 authored in the DSL.\n#\n# Jam is a base MECHANIC (not a weapon quality): a ranged weapon jams when the\n# attack roll exceeds the jam threshold (default 96 \u2192 jams on 97+). Qualities\n# (Reliable/Unreliable) and craftsmanship adjust `jam_threshold` BEFORE this\n# check runs (lower priority), so they compose. A threshold of 100 never jams.\n\nmechanic "Jam" {\n  on POST_ROLL\n  priority 50\n  when is_ranged and roll > jam_threshold\n  then emit "Jam", "The weapon jams!"; flag attack_failed\n}\n\n# ===== Weapon craftsmanship (DH2 core p.149) =================================\n# craftsmanship fact is "Poor" | "Common" | "Good" | "Best" (weapon.craftsmanship).\n\n# --- melee: WS modifier applies to every WS test made with the weapon, i.e.\n#     both attacks (MODIFIERS) and parries (PARRY). Best also adds +1 damage. ---\nmechanic "Poor Craftsmanship (melee)" {\n  on MODIFIERS  when is_melee and craftsmanship == "Poor"  then add modifier "craftsmanship" = -10\n}\nmechanic "Poor Craftsmanship (melee)" {\n  on PARRY  when craftsmanship == "Poor"  then add modifier "craftsmanship" = -10\n}\nmechanic "Good Craftsmanship (melee)" {\n  on MODIFIERS  when is_melee and craftsmanship == "Good"  then add modifier "craftsmanship" = 5\n}\nmechanic "Good Craftsmanship (melee)" {\n  on PARRY  when craftsmanship == "Good"  then add modifier "craftsmanship" = 5\n}\nmechanic "Best Craftsmanship (melee)" {\n  on MODIFIERS  when is_melee and craftsmanship == "Best"  then add modifier "craftsmanship" = 10\n}\nmechanic "Best Craftsmanship (melee)" {\n  on PARRY  when craftsmanship == "Best"  then add modifier "craftsmanship" = 10\n}\nmechanic "Best Craftsmanship (melee)" {\n  on DAMAGE_MODS  when is_melee and craftsmanship == "Best"  then add modifier "craftsmanship" = 1\n}\n\n# --- ranged: craftsmanship adjusts the jam threshold (priority 5, before the\n#     Reliable/Unreliable qualities at 10 and the base Jam mechanic at 50). ---\nmechanic "Poor Craftsmanship (ranged)" {\n  on POST_ROLL  priority 5  when is_ranged and craftsmanship == "Poor"  then set jam_threshold = 90\n}\nmechanic "Good Craftsmanship (ranged)" {\n  on POST_ROLL  priority 5  when is_ranged and craftsmanship == "Good"  then set jam_threshold = 99\n}\nmechanic "Best Craftsmanship (ranged)" {\n  on POST_ROLL  priority 5  when is_ranged and craftsmanship == "Best"  then set jam_threshold = 100\n}\n\n# --- auto-fire raises the jam chance: 94+ jams on Semi-Auto, Full Auto, and\n#     Suppressing Fire (p.223-224). Priority 15 (after craftsmanship at 5 and\n#     Reliable/Unreliable at 10): only ever LOWERS the threshold (a Poor weapon\n#     keeps its 90), and defers to Best craftsmanship ("never jams") and\n#     Reliable (jams only on very high rolls) rather than stomping them. ---\nmechanic "Auto-Fire Jam" {\n  meta { page 223 }\n  on POST_ROLL\n  priority 15\n  when is_ranged and jam_threshold > 93 and craftsmanship != "Best" and not has_quality("Reliable")\n   and (is_action("Semi-Auto Burst") or is_action("Full Auto Burst")\n        or is_action("Suppressing Fire (Semi)") or is_action("Suppressing Fire (Full)"))\n  then set jam_threshold = 93\n}\n', "roll-tables.dsl": `dsl 3
 package "dh2.core.roll-tables" {
   system "dh2"
   source "Dark Heresy 2e Core Rulebook"
@@ -2297,7 +2302,7 @@ roll_table "Power Field Destruction" {
   1-25:   "The blow is turned aside; the attacker's weapon survives."
   26-100: "The power field shears clean through \u2014 the attacker's weapon is DESTROYED."
 }
-`, "actions.dsl": 'dsl 3\npackage "dh2.core.actions" {\n  system "dh2"\n  source "Dark Heresy 2e Core Rulebook"\n}\n\n# Actions \u2014 every action a character can take (DH2 core p.219+). Each declares a\n# `type` (Half | Full | Reaction | Free) and zero or more `subtype` designations;\n# `attack` is sugar for `subtype attack` \u2014 the KEY subtype many rules read (via\n# is_attack / action_subtype("\u2026")), e.g. Defensive\'s -10 to attacks. Compiled once\n# into the actions registry at load ("checked at server startup"); other rules\n# hook on the current action via is_action("\u2026"), action_type, is_reaction(),\n# is_attack and action_subtype("\u2026"). To-hit modifiers for the attack actions still\n# live in the engine (combat-actions); these declarations own the taxonomy.\n\naction "Standard Attack"  { type Half  attack }\naction "Semi-Auto Burst"  { type Half  attack }\naction "Full Auto Burst"  { type Half  attack }\naction "All Out Attack"   { type Full  attack }\naction "Charge"           { type Full  attack }\naction "Called Shot"      { type Full  attack }\naction "Swift Attack"     { type Full  attack }\naction "Lightning Attack" { type Full  attack }\naction "Defensive Stance" { type Full }\naction "Aim"              { type Half }\n\n# Reactions \u2014 gate talents/qualities with is_reaction() or is_action("Parry").\naction "Parry"            { type Reaction }\naction "Dodge"            { type Reaction }\n' };
+`, "actions.dsl": 'dsl 3\npackage "dh2.core.actions" {\n  system "dh2"\n  source "Dark Heresy 2e Core Rulebook"\n}\n\n# Actions \u2014 every action a character can take (DH2 core p.219+). Each declares a\n# `type` (Half | Full | Reaction | Free) and zero or more `subtype` designations;\n# `attack` is sugar for `subtype attack` \u2014 the KEY subtype many rules read (via\n# is_attack / action_subtype("\u2026")), e.g. Defensive\'s -10 to attacks. Compiled once\n# into the actions registry at load ("checked at server startup"); other rules\n# hook on the current action via is_action("\u2026"), action_type, is_reaction(),\n# is_attack and action_subtype("\u2026"). To-hit modifiers for the attack actions still\n# live in the engine (combat-actions); these declarations own the taxonomy.\n\naction "Standard Attack"  { type Half  attack }\naction "Semi-Auto Burst"  { type Half  attack  subtype ranged }\naction "Full Auto Burst"  { type Half  attack  subtype ranged }\naction "All Out Attack"   { type Full  attack  subtype melee }\naction "Charge"           { type Full  attack  subtype melee }\naction "Called Shot"      { type Full  attack }\n# Swift Attack (p.225) and Lightning Attack (p.223) are HALF Actions in DH2 2e\n# (Table 7-1, p.222) \u2014 the melee multi-attacks, gated by their talents below.\naction "Swift Attack"     { type Half  attack  subtype melee }\naction "Lightning Attack" { type Half  attack  subtype melee }\n# Suppressing Fire (p.224): Full Action, needs a weapon capable of semi- or\n# full-automatic fire; the mode picks the kill-zone arc, hit cap, and the\n# Pinning difficulty (see the rules below).\naction "Suppressing Fire (Semi)" { type Full  attack  subtype ranged }\naction "Suppressing Fire (Full)" { type Full  attack  subtype ranged }\naction "Defensive Stance" { type Full }\naction "Aim"              { type Half }\n\n# Reactions \u2014 gate talents/qualities with is_reaction() or is_action("Parry").\naction "Parry"            { type Reaction }\naction "Dodge"            { type Reaction }\n\n# --- action legality (advisory) ------------------------------------------------\n# "This action may only be taken if the attacker has the \u2026 talent." The engine\n# resolves the roll anyway (the GM may house-rule); these surface the RAW gate\n# as a warning effect when the talent is missing.\nmechanic "Swift Attack (talent gate)" {\n  meta { page 225 }\n  on MODIFIERS\n  priority 5\n  when is_action("Swift Attack") and not has_talent("Swift Attack")\n  then emit "Swift Attack", "RAW this action may only be taken if the attacker has the Swift Attack talent (p.131)"\n}\n\nmechanic "Lightning Attack (talent gate)" {\n  meta { page 223 }\n  on MODIFIERS\n  priority 5\n  when is_action("Lightning Attack") and not has_talent("Lightning Attack")\n  then emit "Lightning Attack", "RAW this action may only be taken if the attacker has the Lightning Attack talent (p.129)"\n}\n\n# "Unbalanced or Unwieldy melee weapons cannot be used to make a Lightning\n# Attack." (p.223)\nmechanic "Lightning Attack (weapon restriction)" {\n  meta { page 223 }\n  on MODIFIERS\n  priority 5\n  when is_action("Lightning Attack") and (has_quality("Unbalanced") or has_quality("Unwieldy"))\n  then emit "Lightning Attack", "Unbalanced or Unwieldy melee weapons cannot be used to make a Lightning Attack"\n}\n\n# --- Suppressing Fire (DH2 core p.224) -------------------------------------------\n# Full Action: establish a kill zone (30\xB0 semi / 45\xB0 full arc), fire a burst,\n# and force every target in the zone to test Pinning \u2014 Difficult (-10) for\n# semi-auto, Hard (-20) for full auto \u2014 REGARDLESS of whether the Hard (-20)\n# BS test hits (the -20 is the action modifier; hits land on random targets,\n# one extra per two extra DoS, capped at the mode\'s rate of fire). The BS test\n# jams on 94+ (the Auto-Fire Jam mechanic) and cannot be voluntarily failed.\nmechanic "Suppressing Fire" {\n  meta { page 224 }\n  on POST_ROLL\n  priority 40\n  when is_action("Suppressing Fire (Semi)")\n    then emit "Suppressing Fire", "all targets in the 30 degree kill zone must pass a Difficult (-10) Pinning test or become Pinned (p.230); hits are assigned to RANDOM targets in the zone (the attacker cannot choose to fail the BS test)"\n  when is_action("Suppressing Fire (Full)")\n    then emit "Suppressing Fire", "all targets in the 45 degree kill zone must pass a Hard (-20) Pinning test or become Pinned (p.230); hits are assigned to RANDOM targets in the zone (the attacker cannot choose to fail the BS test)"\n}\n' };
 
 // api/lib/rules/index.mjs
 var readRule = (name) => ruleSources[name];
@@ -2319,6 +2324,7 @@ var conditionEffects = compile(conditionsSrc);
 var circumstanceEffects = compile(circumstancesSrc);
 var configurationEffects = compile(configurationsSrc);
 var mechanicEffects = compile(mechanicsSrc);
+var actionRuleEffects = compile(actionsSrc);
 var rollTables = compileTables(rollTablesSrc);
 var availableTables = rollTables.map((t) => ({ name: t.name, die: `${t.die.count}d${t.die.sides}`, rows: t.rows.length }));
 var availableQualities = referencedNames(
@@ -2367,7 +2373,7 @@ var GROUP_ORDER = [
   "Miscellaneous"
 ];
 var builtinRules = (() => {
-  const all = [...weaponQualityEffects, ...talentEffects, ...traitEffects, ...conditionEffects, ...circumstanceEffects, ...configurationEffects, ...mechanicEffects];
+  const all = [...weaponQualityEffects, ...talentEffects, ...traitEffects, ...conditionEffects, ...circumstanceEffects, ...configurationEffects, ...mechanicEffects, ...actionRuleEffects];
   const seen = /* @__PURE__ */ new Set();
   const out = [];
   for (const e of all) {
@@ -2398,7 +2404,7 @@ function buildRegistry(customRules, disabledIds = []) {
   const custom = customRules && String(customRules).trim() ? compile(customRules) : [];
   const replaced = new Set(custom.flatMap((e) => e.replaces ?? []));
   const keep = (effects) => effects.filter((e) => !disabled.has(e.ruleId) && !disabled.has(e.id) && !replaced.has(e.qualifiedId) && !replaced.has(e.ruleId));
-  const registry = new Registry().addAll(combatActionEffects).addAll(qualityConflictEffects).addAll(keep(weaponQualityEffects)).addAll(keep(talentEffects)).addAll(keep(traitEffects)).addAll(keep(conditionEffects)).addAll(keep(circumstanceEffects)).addAll(keep(configurationEffects)).addAll(keep(mechanicEffects)).addTables(rollTables);
+  const registry = new Registry().addAll(combatActionEffects).addAll(qualityConflictEffects).addAll(keep(weaponQualityEffects)).addAll(keep(talentEffects)).addAll(keep(traitEffects)).addAll(keep(conditionEffects)).addAll(keep(circumstanceEffects)).addAll(keep(configurationEffects)).addAll(keep(mechanicEffects)).addAll(keep(actionRuleEffects)).addTables(rollTables);
   if (custom.length) {
     registry.addAll(custom);
     registry.addTables(compileTables(customRules));
@@ -2693,13 +2699,15 @@ function runToHit(input, rng, registry) {
     }
     return { ctx, base, success: false, scatter, hitMeta: null };
   }
-  const fireRate = actionInfo.rate === "semi" ? weapon.rof?.burst ?? 1 : actionInfo.rate === "full" ? weapon.rof?.full ?? 1 : 1;
-  if (actionInfo.rate === "semi") ctx.additionalHits = Math.floor((test.dos - 1) / 2);
-  else if (actionInfo.rate === "full") ctx.additionalHits = test.dos - 1;
+  const accrual = actionInfo.hitAccrual ?? actionInfo.rate;
+  const fireRate = actionInfo.cap === "wsb" ? Math.max(1, Math.floor((characteristics.ws ?? 0) / 10) + (Number(unnatural.ws) || 0)) : actionInfo.rate === "semi" ? Math.max(1, weapon.rof?.burst ?? 1) : actionInfo.rate === "full" ? Math.max(1, weapon.rof?.full ?? 1) : 1;
+  if (accrual === "semi") ctx.additionalHits = Math.floor((test.dos - 1) / 2);
+  else if (accrual === "full") ctx.additionalHits = test.dos - 1;
   else ctx.additionalHits = 0;
   ctx.fireRate = fireRate;
   runCheckpoint(registry, CHECKPOINTS.HIT_COUNT_MULT, ctx);
   if (actionInfo.rate !== "single" && ctx.additionalHits > fireRate - 1) ctx.additionalHits = fireRate - 1;
+  if (ctx.additionalHits < 0) ctx.additionalHits = 0;
   runCheckpoint(registry, CHECKPOINTS.HIT_COUNT_BONUS, ctx);
   const additionalHits = ctx.additionalHits;
   const sb = Math.floor((characteristics.s ?? 0) / 10) + unnaturalStrength;

@@ -354,15 +354,23 @@ function runToHit(input, rng, registry) {
         return { ctx, base, success: false, scatter, hitMeta: null };
     }
 
-    // hit count
-    const fireRate = actionInfo.rate === 'semi' ? (weapon.rof?.burst ?? 1)
-        : actionInfo.rate === 'full' ? (weapon.rof?.full ?? 1) : 1;
-    if (actionInfo.rate === 'semi') ctx.additionalHits = Math.floor((test.dos - 1) / 2);
-    else if (actionInfo.rate === 'full') ctx.additionalHits = test.dos - 1;
+    // hit count. Accrual (how DoS become extra hits) and cap (how many hits at
+    // most) are separate axes: Semi-Auto/Swift accrue per 2 DoS, Full Auto/
+    // Lightning per DoS; ranged actions cap at the weapon's RoF while the melee
+    // multi-attacks cap at the attacker's WS BONUS (p.223/225) — `cap: 'wsb'`.
+    // Suppressing Fire (Full) mixes them: per-2-DoS accrual, full-RoF cap (p.224).
+    const accrual = actionInfo.hitAccrual ?? actionInfo.rate;
+    const fireRate = actionInfo.cap === 'wsb'
+        ? Math.max(1, Math.floor((characteristics.ws ?? 0) / 10) + (Number(unnatural.ws) || 0))
+        : actionInfo.rate === 'semi' ? Math.max(1, weapon.rof?.burst ?? 1)
+        : actionInfo.rate === 'full' ? Math.max(1, weapon.rof?.full ?? 1) : 1;
+    if (accrual === 'semi') ctx.additionalHits = Math.floor((test.dos - 1) / 2);
+    else if (accrual === 'full') ctx.additionalHits = test.dos - 1;
     else ctx.additionalHits = 0;
     ctx.fireRate = fireRate;
     runCheckpoint(registry, CHECKPOINTS.HIT_COUNT_MULT, ctx);
     if (actionInfo.rate !== 'single' && ctx.additionalHits > fireRate - 1) ctx.additionalHits = fireRate - 1;
+    if (ctx.additionalHits < 0) ctx.additionalHits = 0;
     runCheckpoint(registry, CHECKPOINTS.HIT_COUNT_BONUS, ctx);
     const additionalHits = ctx.additionalHits;
 

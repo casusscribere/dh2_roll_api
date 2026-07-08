@@ -9,16 +9,24 @@
  */
 import { CHECKPOINTS } from '../pipeline.mjs';
 
-/** Attack-action modifiers (combat-actions.mjs allCombatActions). */
+/** Attack-action modifiers (combat-actions.mjs allCombatActions).
+ *  `rate` drives the hit CAP (single / weapon semi RoF / weapon full RoF);
+ *  `hitAccrual` overrides how DoS become extra hits when it differs from the
+ *  rate (Suppressing Fire (Full): per-2-DoS accrual, full-RoF cap — p.224);
+ *  `cap: 'wsb'` caps at the attacker's WS bonus instead of RoF (the melee
+ *  multi-attacks, p.223/225); `talent` names the talent that gates the action
+ *  (surfaced by the UI and the action-legality rules in actions.dsl). */
 export const COMBAT_ACTIONS = {
     'Standard Attack':  { modifier: 10,  rate: 'single', melee: true, ranged: true },
     'All Out Attack':   { modifier: 30,  rate: 'single', melee: true, ranged: false },
     'Charge':           { modifier: 20,  rate: 'single', melee: true, ranged: false },
     'Called Shot':      { modifier: -20, rate: 'single', melee: true, ranged: true },
-    'Swift Attack':     { modifier: 0,   rate: 'semi',   melee: true, ranged: false },
-    'Lightning Attack': { modifier: -10, rate: 'full',   melee: true, ranged: false },
+    'Swift Attack':     { modifier: 0,   rate: 'semi',   melee: true, ranged: false, cap: 'wsb', talent: 'Swift Attack' },
+    'Lightning Attack': { modifier: -10, rate: 'full',   melee: true, ranged: false, cap: 'wsb', talent: 'Lightning Attack' },
     'Semi-Auto Burst':  { modifier: 0,   rate: 'semi',   melee: false, ranged: true },
     'Full Auto Burst':  { modifier: -10, rate: 'full',   melee: false, ranged: true },
+    'Suppressing Fire (Semi)': { modifier: -20, rate: 'semi', melee: false, ranged: true },
+    'Suppressing Fire (Full)': { modifier: -20, rate: 'full', melee: false, ranged: true, hitAccrual: 'semi' },
 };
 
 export const RANGE_BANDS = {

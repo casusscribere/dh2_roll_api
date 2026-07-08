@@ -56,3 +56,18 @@ mechanic "Good Craftsmanship (ranged)" {
 mechanic "Best Craftsmanship (ranged)" {
   on POST_ROLL  priority 5  when is_ranged and craftsmanship == "Best"  then set jam_threshold = 100
 }
+
+# --- auto-fire raises the jam chance: 94+ jams on Semi-Auto, Full Auto, and
+#     Suppressing Fire (p.223-224). Priority 15 (after craftsmanship at 5 and
+#     Reliable/Unreliable at 10): only ever LOWERS the threshold (a Poor weapon
+#     keeps its 90), and defers to Best craftsmanship ("never jams") and
+#     Reliable (jams only on very high rolls) rather than stomping them. ---
+mechanic "Auto-Fire Jam" {
+  meta { page 223 }
+  on POST_ROLL
+  priority 15
+  when is_ranged and jam_threshold > 93 and craftsmanship != "Best" and not has_quality("Reliable")
+   and (is_action("Semi-Auto Burst") or is_action("Full Auto Burst")
+        or is_action("Suppressing Fire (Semi)") or is_action("Suppressing Fire (Full)"))
+  then set jam_threshold = 93
+}

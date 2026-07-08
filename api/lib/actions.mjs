@@ -8,13 +8,16 @@
  */
 export const ACTIONS = {
     'Standard Attack':  { type: 'Half',     subtypes: ['attack'] },
-    'Semi-Auto Burst':  { type: 'Half',     subtypes: ['attack'] },
-    'Full Auto Burst':  { type: 'Half',     subtypes: ['attack'] },
-    'All Out Attack':   { type: 'Full',     subtypes: ['attack'] },
-    'Charge':           { type: 'Full',     subtypes: ['attack'] },
+    'Semi-Auto Burst':  { type: 'Half',     subtypes: ['attack', 'ranged'] },
+    'Full Auto Burst':  { type: 'Half',     subtypes: ['attack', 'ranged'] },
+    'All Out Attack':   { type: 'Full',     subtypes: ['attack', 'melee'] },
+    'Charge':           { type: 'Full',     subtypes: ['attack', 'melee'] },
     'Called Shot':      { type: 'Full',     subtypes: ['attack'] },
-    'Swift Attack':     { type: 'Full',     subtypes: ['attack'] },
-    'Lightning Attack': { type: 'Full',     subtypes: ['attack'] },
+    // Half Actions in DH2 2e (Table 7-1 p.222; Swift p.225, Lightning p.223)
+    'Swift Attack':     { type: 'Half',     subtypes: ['attack', 'melee'] },
+    'Lightning Attack': { type: 'Half',     subtypes: ['attack', 'melee'] },
+    'Suppressing Fire (Semi)': { type: 'Full', subtypes: ['attack', 'ranged'] },
+    'Suppressing Fire (Full)': { type: 'Full', subtypes: ['attack', 'ranged'] },
     'Defensive Stance': { type: 'Full',     subtypes: [] },
     'Aim':              { type: 'Half',     subtypes: [] },
     'Parry':            { type: 'Reaction', subtypes: [] },

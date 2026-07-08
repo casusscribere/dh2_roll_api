@@ -44,8 +44,9 @@ test('GET /api/options returns actions, ranges, aim modes, locations', async () 
     const res = await fetch(`${base}/api/options`);
     assert.equal(res.status, 200);
     const body = await res.json();
-    assert.ok(Array.isArray(body.actions) && body.actions.length === 8);
+    assert.ok(Array.isArray(body.actions) && body.actions.length === 10);   // + Suppressing Fire (Semi)/(Full)
     assert.ok(body.actions[0].name && typeof body.actions[0].modifier === 'number');
+    assert.ok(body.actions.every((a) => typeof a.melee === 'boolean' && typeof a.ranged === 'boolean'), 'melee/ranged flags drive the UI radio filter');
     assert.equal(body.rangeBands['Point Blank'], 30);
     assert.equal(body.aimModes.Full, 20);
     assert.deepEqual(body.hitLocations, ['Head', 'Right Arm', 'Left Arm', 'Body', 'Right Leg', 'Left Leg']);
