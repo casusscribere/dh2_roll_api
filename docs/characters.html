@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="dh2-engine.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DH2 Roll Servitor — Characters</title>
+<link rel="stylesheet" href="style.css">
+<style>
+/* Character-sheet look, modeled on the dark-heresy-3rd-edition acolyte sheet:
+   header strip → tab bar → panel grid. Panels reuse the site theme. */
+.sheet-header { display:flex; flex-wrap:wrap; gap:1rem; align-items:end; border-bottom:1px solid var(--border); padding-bottom:.6rem; margin-bottom:.6rem; }
+.sheet-header .cname { font-size:1.4rem; color:var(--gold); font-variant:small-caps; letter-spacing:1px; }
+.sheet-header .cmeta { color:var(--dim); font-size:.8rem; }
+.pooltiles { display:flex; gap:.6rem; margin-left:auto; flex-wrap:wrap; }
+.pool { border:1px solid var(--border); border-radius:4px; padding:.3rem .7rem; text-align:center; background:#0e0c09; }
+.pool .pv { font-size:1.1rem; color:var(--gold); }
+.pool .pl { font-size:.65rem; color:var(--dim); text-transform:uppercase; letter-spacing:1px; }
+.tabbar { display:flex; gap:.25rem; border-bottom:1px solid var(--border); margin-bottom:.8rem; flex-wrap:wrap; }
+.tabbar button { background:none; border:1px solid var(--border); border-bottom:none; border-radius:4px 4px 0 0; color:var(--dim); padding:.35rem .9rem; cursor:pointer; font-family:var(--mono); font-size:.85rem; }
+.tabbar button.active { color:var(--gold); background:var(--panel); border-color:var(--gold); }
+.panelgrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:.8rem; align-items:start; }
+.dhpanel { border:1px solid var(--border); border-radius:4px; background:var(--panel); padding:.6rem .8rem; }
+.dhpanel h3 { margin:.1rem 0 .5rem; color:var(--gold); font-variant:small-caps; letter-spacing:1px; font-size:.95rem; border-bottom:1px solid var(--border); padding-bottom:.3rem; }
+.chartable { display:grid; grid-template-columns:auto repeat(3, 1fr); gap:1px; background:var(--border); border:1px solid var(--border); font-size:.85rem; }
+.chartable > div { background:#0e0c09; padding:.25rem .5rem; }
+.chartable .h { color:var(--dim); font-size:.7rem; text-transform:uppercase; }
+.chartable .k { color:var(--gold); }
+.chartable .hl { color:var(--gold); font-weight:bold; }
+.chartable .un { color:#7ec07e; }
+.loctable { display:grid; grid-template-columns:1fr auto; gap:1px; background:var(--border); border:1px solid var(--border); font-size:.85rem; }
+.loctable > div { background:#0e0c09; padding:.25rem .6rem; }
+.weapon-card { border:1px solid var(--border); border-radius:4px; padding:.5rem .7rem; margin-bottom:.6rem; background:#0e0c09; }
+.weapon-card .wname { color:var(--gold); font-variant:small-caps; letter-spacing:.5px; }
+.weapon-card .wline { font-size:.85rem; margin-top:.2rem; }
+.weapon-card .badge { border:1px solid var(--border); border-radius:3px; padding:0 .35rem; font-size:.7rem; color:var(--dim); margin-left:.4rem; }
+.chiplist { display:flex; flex-wrap:wrap; gap:.3rem; }
+.chip { border:1px solid var(--border); border-radius:3px; padding:.1rem .45rem; font-size:.78rem; background:#0e0c09; }
+.v2note { color:var(--dim); font-style:italic; font-size:.85rem; }
+.roster-entry { display:block; width:100%; text-align:left; background:none; border:1px solid transparent; color:var(--text); padding:.25rem .5rem; cursor:pointer; font-family:var(--mono); font-size:.85rem; border-radius:3px; }
+.roster-entry:hover { border-color:var(--border); }
+.roster-entry.active { border-color:var(--gold); color:var(--gold); }
+.roster-player { color:var(--dim); font-size:.7rem; text-transform:uppercase; letter-spacing:1px; margin-top:.5rem; }
+</style>
+</head>
+<body>
+<nav>
+  <a class="brand" href="index.html">DH2 Roll Servitor</a>
+  <div class="links">
+    <a href="index.html">Home</a>
+    <a href="roll.html">Roll</a>
+    <a href="characters.html" class="active">Characters</a>
+    <a href="rules.html">Rules</a>
+  </div>
+</nav>
+
+<h1>Characters</h1>
+<div class="sub">Campaign roster viewer — the sheet layout mirrors the Foundry <code>dark-heresy-3rd-edition</code> acolyte sheet (its tabs and panels). Sections the current schema does not carry yet are shown dimmed; they arrive with schema v2 (see CHARACTER_MODEL.md).</div>
+
+<div class="grid" style="grid-template-columns:270px 1fr">
+  <fieldset>
+    <legend>Roster</legend>
+    <div id="roster-list"><span class="dim">loading…</span></div>
+    <label style="margin-top:.8rem">…or view a character JSON file</label>
+    <input type="file" id="char-file" accept=".json,application/json">
+    <div class="result" id="file-status" style="display:none"></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Character Sheet</legend>
+    <div id="sheet"><p class="note">Pick a character from the roster (or load a JSON file).</p></div>
+  </fieldset>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const CHAR_LABELS = { ws: 'Weapon Skill', bs: 'Ballistic Skill', s: 'Strength', t: 'Toughness', ag: 'Agility', int: 'Intelligence', per: 'Perception', wp: 'Willpower', fel: 'Fellowship' };
+const LOC_LABELS = { head: 'Head', body: 'Body', rightArm: 'Right Arm', leftArm: 'Left Arm', rightLeg: 'Right Leg', leftLeg: 'Left Leg' };
+const nameOf = (x) => (x && typeof x === 'object') ? String(x.name ?? '') : String(x ?? '');
+
+let ROSTER = [];
+let CURRENT = null;   // { id?, player?, doc }
+let TAB = 'main';
+
+async function init() {
+  try {
+    const d = await fetch('/api/characters').then((r) => r.json());
+    ROSTER = d.characters ?? [];
+  } catch { ROSTER = []; }
+  renderRoster();
+  // deep link: characters.html?c=<id>
+  const want = new URLSearchParams(location.search).get('c');
+  const hit = ROSTER.find((c) => c.id === want) ?? null;
+  if (hit) select(hit);
+  $('char-file').onchange = async () => {
+    const f = $('char-file').files[0];
+    if (!f) return;
+    try {
+      const doc = JSON.parse(await f.text());
+      $('file-status').style.display = 'none';
+      CURRENT = { id: null, player: doc.source?.player ?? null, doc };
+      renderRoster(); renderSheet();
+    } catch {
+      $('file-status').style.display = 'block';
+      $('file-status').innerHTML = '<span class="bad">Not valid JSON.</span>';
+    }
+  };
+}
+
+function renderRoster() {
+  const box = $('roster-list');
+  if (!ROSTER.length) { box.innerHTML = '<span class="dim">no roster (run npm run import:campaign)</span>'; return; }
+  const byPlayer = {};
+  for (const c of ROSTER) (byPlayer[c.player] ??= []).push(c);
+  let h = '';
+  for (const [player, list] of Object.entries(byPlayer)) {
+    h += `<div class="roster-player">${esc(player)}</div>`;
+    for (const c of list) h += `<button class="roster-entry${CURRENT?.id === c.id ? ' active' : ''}" data-id="${esc(c.id)}">${esc(c.name)}</button>`;
+  }
+  box.innerHTML = h;
+  box.querySelectorAll('.roster-entry').forEach((b) => { b.onclick = () => select(ROSTER.find((c) => c.id === b.dataset.id)); });
+}
+
+function select(entry) {
+  CURRENT = entry;
+  history.replaceState(null, '', `characters.html?c=${encodeURIComponent(entry.id)}`);
+  renderRoster(); renderSheet();
+}
+
+const bonus = (doc, k) => Math.floor((doc.characteristics?.[k] ?? 0) / 10) + (doc.unnatural?.[k] ?? 0);
+
+// --- panels (each mirrors a Foundry acolyte-sheet panel) -----------------------
+function characteristicsPanel(doc) {
+  let h = '<div class="dhpanel"><h3>Characteristics</h3><div class="chartable">';
+  h += '<div class="h"></div><div class="h">Current</div><div class="h">Unnatural</div><div class="h">Bonus</div>';
+  for (const [k, label] of Object.entries(CHAR_LABELS)) {
+    const un = doc.unnatural?.[k] ?? 0;
+    h += `<div class="k" title="${esc(label)}">${k.toUpperCase()}</div>` +
+      `<div class="hl">${doc.characteristics?.[k] ?? 0}</div>` +
+      `<div class="${un ? 'un' : ''}">${un || '—'}</div>` +
+      `<div class="hl">${bonus(doc, k)}</div>`;
+  }
+  h += '</div><div class="v2note" style="margin-top:.4rem">Initial / Advances / Modifier columns arrive with schema v2 (v1 carries totals).</div></div>';
+  return h;
+}
+function armourPanel(doc) {
+  let h = '<div class="dhpanel"><h3>Armour</h3><div class="loctable">';
+  for (const [k, label] of Object.entries(LOC_LABELS)) {
+    h += `<div>${esc(label)}</div><div class="hl">${doc.armour?.[k] ?? 0}</div>`;
+  }
+  h += '</div>';
+  const tb = Math.floor((doc.characteristics?.t ?? 0) / 10);
+  h += `<div class="v2note" style="margin-top:.4rem">Soak/location = AP + Toughness Bonus (${tb}).</div></div>`;
+  return h;
+}
+function fieldPanel(doc) {
+  const f = doc.field ?? {};
+  return `<div class="dhpanel"><h3>Force Field</h3>` +
+    (f.rating ? `<div>Rating <span class="hl">${f.rating}</span> — absorbs on a roll ≤ rating${f.overloadMax ? `; overloads on ≤ ${f.overloadMax}` : ''}</div>`
+              : '<div class="v2note">none</div>') + '</div>';
+}
+function talentsPanel(doc) {
+  const t = doc.talents ?? [];
+  return `<div class="dhpanel"><h3>Talents (${t.length})</h3>` +
+    (t.length ? `<div class="chiplist">${t.map((x) => `<span class="chip">${esc(nameOf(x))}</span>`).join('')}</div>` : '<div class="v2note">none recorded</div>') + '</div>';
+}
+function traitsPanel(doc) {
+  const t = doc.traits ?? [];
+  return `<div class="dhpanel"><h3>Traits (${t.length})</h3>` +
+    (t.length ? `<div class="chiplist">${t.map((x) => `<span class="chip">${esc(nameOf(x))}</span>`).join('')}</div>` : '<div class="v2note">none recorded</div>') + '</div>';
+}
+function weaponsPanel(doc) {
+  const ws = doc.weapons ?? [];
+  let h = `<div class="dhpanel" style="grid-column:1/-1"><h3>Weapons (${ws.length})</h3>`;
+  if (!ws.length) h += '<div class="v2note">none recorded</div>';
+  for (const w of ws) {
+    const rof = w.rof ? `${w.rof.single ? 'S' : '–'}/${w.rof.burst || '–'}/${w.rof.full || '–'}` : '—';
+    h += `<div class="weapon-card"><span class="wname">${esc(w.name)}</span>` +
+      `<span class="badge">${esc(w.class ?? 'basic')}</span>` +
+      (w.craftsmanship && w.craftsmanship !== 'Common' ? `<span class="badge">${esc(w.craftsmanship)}</span>` : '') +
+      `<div class="wline">Damage <span class="hl">${esc(w.damage)}</span> ${esc(w.damageType ?? '')} · Pen <span class="hl">${w.pen ?? 0}</span> · RoF <span class="hl">${rof}</span>` +
+      (w.sbMultiplier ? ` · SB×${w.sbMultiplier}` : '') + `</div>` +
+      ((w.qualities ?? []).length ? `<div class="wline chiplist" style="margin-top:.3rem">${w.qualities.map((q) => `<span class="chip">${esc(nameOf(q))}</span>`).join('')}</div>` : '');
+    h += '</div>';
+  }
+  return h + '</div>';
+}
+function v2Panel(title, items, doc) {
+  const un = (doc.source?.unmapped ?? []).filter((u) => items.some((i) => u.toLowerCase().includes(i)));
+  return `<div class="dhpanel" style="grid-column:1/-1"><h3>${esc(title)}</h3>` +
+    `<div class="v2note">Not carried by schema v1 — arrives with schema v2 (CHARACTER_MODEL.md).` +
+    (un.length ? `<br>Recorded as unmapped on import: ${esc(un.join('; '))}` : '') + '</div></div>';
+}
+function bioPanel(entry) {
+  const doc = entry.doc, src = doc.source ?? {};
+  let h = `<div class="dhpanel" style="grid-column:1/-1"><h3>Provenance</h3>` +
+    `<div>Player: <span class="hl">${esc(entry.player ?? '—')}</span></div>` +
+    (src.file ? `<div>Imported from: <span class="hl">${esc(src.file)}</span> <span class="dim">(${esc(src.adapter ?? '')}, ${esc((src.importedAt ?? '').slice(0, 10))})</span></div>` : '<div class="dim">no import provenance</div>');
+  if ((src.unmapped ?? []).length) h += `<div style="margin-top:.4rem" class="v2note">Not carried by schema v1: ${esc(src.unmapped.join('; '))}</div>`;
+  h += `<details style="margin-top:.6rem"><summary class="toggle">Raw JSON</summary><pre class="tmpl">${esc(JSON.stringify(doc, null, 2))}</pre></details></div>`;
+  return h;
+}
+
+const TABS = {
+  main:    (e) => characteristicsPanel(e.doc) + armourPanel(e.doc) + fieldPanel(e.doc) + talentsPanel(e.doc) + traitsPanel(e.doc),
+  combat:  (e) => weaponsPanel(e.doc) + armourPanel(e.doc) + fieldPanel(e.doc),
+  gear:    (e) => v2Panel('Gear & Cybernetics', ['gear', 'clip'], e.doc),
+  advances: (e) => v2Panel('Experience, Aptitudes & Skills', ['xp', 'aptitude', 'skills'], e.doc),
+  psychic: (e) => v2Panel('Psychic Powers', ['psy'], e.doc),
+  bio:     (e) => bioPanel(e),
+};
+
+function renderSheet() {
+  if (!CURRENT) return;
+  const doc = CURRENT.doc;
+  const w = doc.wounds ?? {}, f = doc.fate ?? {};
+  let h = `<div class="sheet-header">` +
+    `<div><div class="cname">${esc(doc.name)}</div>` +
+    `<div class="cmeta">${esc(CURRENT.player ? `${CURRENT.player} · ` : '')}${esc(doc.kind)} v${doc.schemaVersion}</div></div>` +
+    `<div class="pooltiles">` +
+    `<div class="pool"><div class="pv">${w.current ?? '—'}/${w.max ?? '—'}</div><div class="pl">Wounds</div></div>` +
+    `<div class="pool"><div class="pv">${f.current ?? '—'}/${f.max ?? '—'}</div><div class="pl">Fate</div></div>` +
+    `<div class="pool"><div class="pv">${bonus(doc, 'ag')}</div><div class="pl">Ag Bonus</div></div>` +
+    (CURRENT.id ? `<button class="minibtn" style="align-self:center" onclick="location.href='roll.html?preset=${encodeURIComponent(CURRENT.id)}'">→ load on Roll page</button>` : '') +
+    `</div></div>`;
+  h += `<div class="tabbar">` + Object.keys(TABS).map((t) =>
+    `<button class="${TAB === t ? 'active' : ''}" data-tab="${t}">${t[0].toUpperCase() + t.slice(1)}</button>`).join('') + `</div>`;
+  h += `<div class="panelgrid">${TABS[TAB](CURRENT)}</div>`;
+  $('sheet').innerHTML = h;
+  $('sheet').querySelectorAll('.tabbar button').forEach((b) => { b.onclick = () => { TAB = b.dataset.tab; renderSheet(); }; });
+}
+
+init();
+</script>
+</body>
+</html>

@@ -12,6 +12,7 @@
   <div class="links">
     <a href="index.html">Home</a>
     <a href="roll.html" class="active">Roll</a>
+    <a href="characters.html">Characters</a>
     <a href="rules.html">Rules</a>
   </div>
 </nav>
@@ -510,6 +511,13 @@ async function loadPresets() {
     }
   };
   $('char-file').addEventListener('change', () => { sel.value = ''; });
+  // deep link from the Characters page: roll.html?preset=<id> pre-selects it
+  const want = new URLSearchParams(location.search).get('preset');
+  if (want && PRESET_DOCS[want]) {
+    sel.value = want;
+    sel.onchange();
+    sel.closest('details')?.setAttribute('open', '');   // reveal the import panel
+  }
 }
 async function readCharFile() {
   const preset = $('char-preset')?.value;
