@@ -1,8 +1,12 @@
 # Character object model v2 — planning document
 
-*Session: 2026-07-08. Status: PLAN (no implementation yet). Companion to
-[TBD.md](TBD.md) §4; supersedes-in-scope the Phase 2 schema v1 notes in
-[api/lib/character-schema.mjs](api/lib/character-schema.mjs).*
+*Session: 2026-07-08. Status: **schema v2 SHIPPED** (characteristics as
+base/advances/modifiers, skills incl. specialist categories, modifiers-by-
+source, XP ledger, aptitudes, Emperor's Tarot — see character-schema.mjs and
+schema-v2.test.mjs; roster regenerated; Characters page renders it). Still
+open: §6b Delta 2 remainder (Roll-page skill/psy/clip plumbing), Foundry
+importer v2, and the §7 decisions not yet exercised. Companion to
+[TBD.md](TBD.md) §4.*
 
 ## 1. Goal
 

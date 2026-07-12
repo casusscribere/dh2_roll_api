@@ -127,9 +127,16 @@
           <div><label>RoF full</label><select id="w-full"></select></div>
           <div><label>SB &times; (melee)</label><input type="number" id="w-sbx" value="1" min="0" max="2"></div>
         </div>
-        <div class="row">
+        <div class="row" title="Ammo (p.144): each attack expends 1 round (single) / semi RoF / full RoF (Maximal ×3). Rounds tick down as you roll; 0/0 = not tracked (melee, unknown clip).">
           <div><label>Craft</label><select id="w-craft"><option>Poor</option><option selected>Common</option><option>Good</option><option>Best</option></select></div>
-          <div></div>
+          <div><label>Clip (rounds / max)</label>
+            <div style="display:flex;gap:.3rem;align-items:center">
+              <input type="number" id="w-clip" value="0" min="0" style="width:4.5rem">
+              <span class="dim">/</span>
+              <input type="number" id="w-clip-max" value="0" min="0" style="width:4.5rem">
+              <button type="button" class="minibtn" style="margin:0" onclick="reloadClip()" title="Reload action: refill to max">⟳ reload</button>
+            </div>
+          </div>
         </div>
         <label>Qualities (comma separated — e.g. Tearing, Accurate, Concussive (2), Blast (3), Razor Sharp)</label>
         <input id="w-qualities" value="Tearing" oninput="syncFiringModes()">
@@ -315,6 +322,26 @@ function renderActionRadios() {
   checkConfig();                                           // warnings react to the same inputs
 }
 
+// --- ammo tracking (p.144: shots fired = 1 / semi RoF / full RoF; Maximal ×3) ----
+// The clip fields link the Roll page to a loaded character's weapon.clip; the
+// engine reports ammoUsed per attack and the counter ticks down here.
+const clipTracked = () => (+$('w-clip-max').value || 0) > 0 && $('w-melee').value !== 'yes';
+function reloadClip() { $('w-clip').value = $('w-clip-max').value; checkConfig(); }
+function spendAmmo(n) {
+  if (!clipTracked() || !n) return;
+  $('w-clip').value = Math.max(0, (+$('w-clip').value || 0) - n);
+  checkConfig();
+}
+/** Rounds the currently selected action would expend. */
+function ammoNeeded() {
+  if ($('w-melee').value === 'yes') return 0;
+  const a = ACTION_DEFS.find((x) => x.name === $('a-action').value);
+  if (!a) return 1;
+  const base = a.rate === 'semi' ? (+$('w-burst').value || 1) : a.rate === 'full' ? (+$('w-full').value || 1) : 1;
+  const maximal = [...document.querySelectorAll('#w-firingmodes input:checked')].some((c) => /maximal/i.test(c.value));
+  return base * (maximal ? 3 : 1);
+}
+
 // --- Warnings / errors log -------------------------------------------------------
 // Live configuration sanity: RAW prerequisite violations among the toggled
 // talents/traits (POST /api/config/check — prerequisites outside the DSL and
@@ -329,6 +356,11 @@ async function checkConfig() {
   const melee = $('w-melee').value === 'yes';
   if (!melee && !$('w-single').checked && !(+$('w-burst').value) && !(+$('w-full').value)) {
     local.push('the ranged weapon has NO fire mode (Single unticked, semi and full RoF 0) — it cannot attack');
+  }
+  if (clipTracked()) {
+    const cur = +$('w-clip').value || 0, need = ammoNeeded();
+    if (cur === 0) local.push('the clip is EMPTY — reload before firing');
+    else if (cur < need) local.push(`insufficient ammo: ${$('a-action').value} expends ${need} rounds, only ${cur} remain`);
   }
   const sides = [
     ['attacker', 'a', { ws: +$('a-ws').value, bs: +$('a-bs').value, s: +$('a-s').value, t: +$('a-t').value }],
@@ -536,11 +568,14 @@ async function applyCharacter(side) {
     return;
   }
   const c = r.character;
+  // schema v2 characteristics are { base, advances, modifiers } — the combatant
+  // preview carries the DERIVED totals the panels need.
+  const stats = r.combatant?.characteristics ?? c.characteristics;
   const set = (id, v) => { const el = $(id); if (el && v !== undefined) el.value = v; };
   const unmatched = [];
   if (side === 'a') {
-    set('a-ws', c.characteristics.ws); set('a-bs', c.characteristics.bs);
-    set('a-s', c.characteristics.s); set('a-t', c.characteristics.t);
+    set('a-ws', stats.ws); set('a-bs', stats.bs);
+    set('a-s', stats.s); set('a-t', stats.t);
     set('a-un-ws', c.unnatural?.ws ?? 0); set('a-un-bs', c.unnatural?.bs ?? 0); set('a-un-s', c.unnatural?.s ?? 0);
     const w = (c.weapons ?? [])[0];
     if (w) {
@@ -551,6 +586,8 @@ async function applyCharacter(side) {
       $('w-single').checked = w.rof?.single !== false;
       set('w-sbx', w.sbMultiplier ?? (w.class === 'melee' ? 1 : 0));
       set('w-craft', w.craftsmanship ?? 'Common');
+      // ammo link: the character's clip drives the tracker (0/0 = untracked)
+      set('w-clip', w.clip?.value ?? w.clip?.max ?? 0); set('w-clip-max', w.clip?.max ?? 0);
       $('w-qualities').value = (w.qualities ?? []).map(q => nameLevel(q).level != null ? `${nameLevel(q).name} (${nameLevel(q).level})` : nameLevel(q).name).join(', ');
       syncFiringModes();
       renderActionRadios();
@@ -558,11 +595,11 @@ async function applyCharacter(side) {
     for (const [cat, list] of [['talents', c.talents], ['traits', c.traits], ['conditions', c.conditions], ['circumstances', c.circumstances]])
       unmatched.push(...setRulePanel('a', cat, list));
   } else {
-    set('d-ws', c.characteristics.ws); set('d-ag', c.characteristics.ag);
-    set('d-t', c.characteristics.t); set('d-s', c.characteristics.s);
+    set('d-ws', stats.ws); set('d-ag', stats.ag);
+    set('d-t', stats.t); set('d-s', stats.s);
     set('d-un-ws', c.unnatural?.ws ?? 0); set('d-un-ag', c.unnatural?.ag ?? 0);
     set('d-armour', c.armour?.body ?? 0);
-    set('d-tb', Math.floor((c.characteristics.t ?? 0) / 10));
+    set('d-tb', Math.floor((stats.t ?? 0) / 10));
     set('d-unnatural-tough', c.unnatural?.t ?? 0);
     set('d-field', c.field?.rating ?? 0); set('d-overload', c.field?.overloadMax ?? 0);
     const w = (c.weapons ?? []).find(x => x.class === 'melee');
@@ -675,6 +712,7 @@ async function init() {
     $('w-melee').value = w.isMelee ? 'yes' : 'no';
     $('w-burst').value = String(Math.min(10, w.rof.burst ?? 0)); $('w-full').value = String(Math.min(10, w.rof.full ?? 0));
     $('w-single').checked = w.rof.single !== false;
+    $('w-clip').value = w.clip?.max ?? 0; $('w-clip-max').value = w.clip?.max ?? 0;
     $('w-sbx').value = w.sbMultiplier || (w.isMelee ? 1 : 0);
     $('w-qualities').value = (w.qualities || []).join(', ');
     syncSbField();
@@ -691,6 +729,8 @@ async function init() {
   $('w-single').onchange = renderActionRadios;
   $('w-burst').onchange = renderActionRadios;
   $('w-full').onchange = renderActionRadios;
+  $('w-clip').oninput = checkConfig;
+  $('w-clip-max').oninput = checkConfig;
   // attacker/defender stats feed the prerequisite checks (WS 40 etc.)
   for (const id of ['a-ws', 'a-bs', 'a-s', 'a-t', 'd-ws', 'd-ag', 'd-t', 'd-s']) $(id).oninput = checkConfig;
   $('d-rules').addEventListener('change', (e) => {
@@ -911,7 +951,11 @@ async function engRerollAll() {
 }
 
 function engApply(phase, r) {
-  if (phase === 'attack') ENG.state.attack = r;
+  if (phase === 'attack') {
+    ENG.state.attack = r;
+    // ammo ticks down once per attack (debug rerolls don't re-spend)
+    if (!ENG.ammoCharged) { spendAmmo(r.ammoUsed ?? 0); ENG.ammoCharged = true; }
+  }
   else if (phase === 'damage') ENG.state.attack.hits = r.hits;
   else if (phase === 'evasion') { ENG.state.reaction = r.reaction; ENG.state.evaded = Math.min(r.evaded, ENG.state.attack.hits.length); }
   else if (phase === 'onhit') {
@@ -963,6 +1007,7 @@ function renderEngagement(eng) {
     `  ${t.characteristic} roll <span class="gold">${t.roll}</span> vs <span class="gold">${t.modifiedTarget}</span>` +
     (v ? ` <span class="dim">(${t.target} ${Object.entries(t.modifiers).map(([k, mv]) => `${sign(mv)} ${k}`).join(' ')})</span>` : '') + ` — ` +
     (t.success ? `<span class="ok">HIT</span> ${t.dos} DoS${v && t.bonusDos ? ` <span class="dim">(+${t.bonusDos} Unnatural)</span>` : ''} → ${a.hits.length} hit${a.hits.length !== 1 ? 's' : ''}` : `<span class="bad">MISS</span> ${t.dof} DoF`);
+  if (a.ammoUsed) s += `\n  <span class="dim">🔻 ammo −${a.ammoUsed} round${a.ammoUsed !== 1 ? 's' : ''}${clipTracked() ? ` (${$('w-clip').value} left in the clip)` : ''}</span>`;
   // named effects (Jam, Overheats, Maximal, …) are events — shown even in terse (name only)
   for (const e of a.effects) s += `\n  <span class="rf">${e.name}${v ? ':' : ''}</span>${v ? ` <span class="dim">${e.effect}</span>` : ''}`;
   if (a.scatter) {

@@ -2426,10 +2426,10 @@ roll_table "Power Field Destruction" {
 
   // api/lib/engine.mjs
   function rollTest({ target = 0, modifiers = {}, label = "test", unnatural = 0 }, rng = Math.random, forcedRoll = null) {
-    let modifierTotal = Object.values(modifiers).reduce((a, b) => a + (Number(b) || 0), 0);
-    if (modifierTotal > 60) modifierTotal = 60;
-    if (modifierTotal < -60) modifierTotal = -60;
-    const modifiedTarget = Number(target) + modifierTotal;
+    let modifierTotal2 = Object.values(modifiers).reduce((a, b) => a + (Number(b) || 0), 0);
+    if (modifierTotal2 > 60) modifierTotal2 = 60;
+    if (modifierTotal2 < -60) modifierTotal2 = -60;
+    const modifiedTarget = Number(target) + modifierTotal2;
     const roll = forcedRoll ?? d(100, rng, label);
     const success = roll === 1 || roll <= modifiedTarget && roll !== 100;
     const unnaturalValue = Number(unnatural) || 0;
@@ -2438,7 +2438,7 @@ roll_table "Power Field Destruction" {
       roll,
       target: Number(target),
       modifiers,
-      modifierTotal,
+      modifierTotal: modifierTotal2,
       modifiedTarget,
       success,
       dos: success ? 1 + getDegree(modifiedTarget, roll) + bonusDos : 0,
@@ -2692,10 +2692,12 @@ roll_table "Power Field Destruction" {
       ctx.effects.push({ name: "Spray", effect: "no attack roll \u2014 everyone in the 30\xB0 cone is struck unless they pass a Challenging (+0) Agility test; always hits the Body; cannot make Called Shots" });
     }
     runCheckpoint(registry, CHECKPOINTS.POST_ROLL, ctx);
+    const ammoUsed = isMelee ? 0 : (actionInfo.rate === "semi" ? weapon.rof?.burst || 1 : actionInfo.rate === "full" ? weapon.rof?.full || 1 : 1) * (hasQuality(input.configs ?? input.firingModes, "Maximal") ? 3 : 1);
     const base = {
       weapon: weapon.name ?? "Unnamed weapon",
       action,
       rangeBand,
+      ammoUsed,
       test: { ...test, success: ctx.success },
       effects: ctx.effects,
       log: ctx.log,
@@ -3223,20 +3225,56 @@ roll_table "Power Field Destruction" {
       "player": "Chris",
       "name": '"Jack" "Balvdin?" (First Officer)',
       "doc": {
-        "schemaVersion": 1,
+        "schemaVersion": 3,
         "kind": "dh2.character",
         "system": "dh2",
         "name": '"Jack" "Balvdin?" (First Officer)',
         "characteristics": {
-          "ws": 36,
-          "bs": 64,
-          "s": 33,
-          "t": 41,
-          "ag": 61,
-          "int": 34,
-          "per": 41,
-          "wp": 40,
-          "fel": 51
+          "ws": {
+            "base": 36,
+            "advances": 0,
+            "modifiers": []
+          },
+          "bs": {
+            "base": 39,
+            "advances": 5,
+            "modifiers": []
+          },
+          "s": {
+            "base": 23,
+            "advances": 2,
+            "modifiers": []
+          },
+          "t": {
+            "base": 26,
+            "advances": 3,
+            "modifiers": []
+          },
+          "ag": {
+            "base": 56,
+            "advances": 1,
+            "modifiers": []
+          },
+          "int": {
+            "base": 34,
+            "advances": 0,
+            "modifiers": []
+          },
+          "per": {
+            "base": 41,
+            "advances": 0,
+            "modifiers": []
+          },
+          "wp": {
+            "base": 40,
+            "advances": 0,
+            "modifiers": []
+          },
+          "fel": {
+            "base": 46,
+            "advances": 1,
+            "modifiers": []
+          }
         },
         "unnatural": {},
         "armour": {
@@ -3248,6 +3286,7 @@ roll_table "Power Field Destruction" {
           "rightLeg": 0
         },
         "wounds": {
+          "critical": 0,
           "current": 1,
           "max": 13
         },
@@ -3255,6 +3294,485 @@ roll_table "Power Field Destruction" {
           "current": 1,
           "max": 2
         },
+        "fatigue": {
+          "current": 0
+        },
+        "skills": {
+          "Acrobatics": {
+            "advances": 1
+          },
+          "Athletics": {
+            "advances": 1
+          },
+          "Awareness": {
+            "advances": 1
+          },
+          "Charm": {
+            "advances": 1
+          },
+          "Command": {
+            "advances": 1
+          },
+          "Commerce": {
+            "advances": 0
+          },
+          "Common Lore": {
+            "specialities": {
+              "Underworld": {
+                "advances": 1
+              }
+            }
+          },
+          "Deceive": {
+            "advances": 1
+          },
+          "Dodge": {
+            "advances": 4
+          },
+          "Forbidden Lore": {
+            "specialities": {}
+          },
+          "Inquiry": {
+            "advances": 1
+          },
+          "Interrogation": {
+            "advances": 0
+          },
+          "Intimidate": {
+            "advances": 0
+          },
+          "Linguistics": {
+            "specialities": {}
+          },
+          "Logic": {
+            "advances": 0
+          },
+          "Medicae": {
+            "advances": 0
+          },
+          "Navigate": {
+            "specialities": {
+              "Surface": {
+                "advances": 1
+              }
+            }
+          },
+          "Operate": {
+            "specialities": {
+              "Aeronautica": {
+                "advances": 1
+              },
+              "Surface": {
+                "advances": 1
+              },
+              "Voidship": {
+                "advances": 0
+              }
+            }
+          },
+          "Parry": {
+            "advances": 0
+          },
+          "Psyniscience": {
+            "advances": 0
+          },
+          "Scholastic Lore": {
+            "specialities": {
+              "All": {
+                "advances": 0
+              }
+            }
+          },
+          "Scrutiny": {
+            "advances": 1
+          },
+          "Security": {
+            "advances": 0
+          },
+          "Sleight of Hand": {
+            "advances": 0
+          },
+          "Stealth": {
+            "advances": 1
+          },
+          "Survival": {
+            "advances": 0
+          },
+          "Tech-Use": {
+            "advances": 0
+          },
+          "Trade": {
+            "specialities": {
+              "NA": {
+                "advances": 0
+              }
+            }
+          }
+        },
+        "xp": {
+          "total": 18500,
+          "ledger": [
+            {
+              "name": "Agility Rank 1",
+              "cost": 100,
+              "source": "Creation"
+            },
+            {
+              "name": "Step Aside",
+              "cost": 400,
+              "source": "Creation"
+            },
+            {
+              "name": "Ambidextrous",
+              "cost": 300,
+              "source": "Creation"
+            },
+            {
+              "name": "Rapid Reload",
+              "cost": 300,
+              "source": "Creation"
+            },
+            {
+              "name": "Two-Weapon Wielder",
+              "cost": 300,
+              "source": "Creation"
+            },
+            {
+              "name": "Ballistic Skill Rank 1",
+              "cost": 100,
+              "source": "Creation"
+            },
+            {
+              "name": "Ballistic Skill Rank 2",
+              "cost": 250,
+              "source": "Creation"
+            },
+            {
+              "name": "Ballistic Skill Rank 3",
+              "cost": 500,
+              "source": "Creation"
+            },
+            {
+              "name": "Dodge Rank 2",
+              "cost": 200,
+              "source": "Creation"
+            },
+            {
+              "name": "Charm Rank 1",
+              "cost": 100,
+              "source": "Creation"
+            },
+            {
+              "name": "Agility Rank 2",
+              "cost": 250,
+              "source": "Creation"
+            },
+            {
+              "name": "Jaded",
+              "cost": 300,
+              "source": "11/19/2017"
+            },
+            {
+              "name": "Awareness 1",
+              "cost": 200,
+              "source": "11/19/2017"
+            },
+            {
+              "name": "Two-Weapon Master",
+              "cost": 600,
+              "source": "11/19/2017"
+            },
+            {
+              "name": "Scrutiny 1",
+              "cost": 100,
+              "source": "11/19/2017"
+            },
+            {
+              "name": "Ballistics 4",
+              "cost": 750,
+              "source": "/2019"
+            },
+            {
+              "name": "Fellowship 1",
+              "cost": 100,
+              "source": "/2019"
+            },
+            {
+              "name": "Deceive Rank 1",
+              "cost": 100,
+              "source": "/2019"
+            },
+            {
+              "name": "Acrobatics Rank 1",
+              "cost": 100,
+              "source": "/2019"
+            },
+            {
+              "name": "Dodge Rank 3",
+              "cost": 300,
+              "source": "/2019"
+            },
+            {
+              "name": "Dodge Rank 4",
+              "cost": 400,
+              "source": "/2019"
+            },
+            {
+              "name": "Operate: Surface",
+              "cost": 200,
+              "source": "Skills we have 2"
+            },
+            {
+              "name": "Fellowship 2",
+              "cost": 250,
+              "source": "Acro"
+            },
+            {
+              "name": "Agility 3",
+              "cost": 500,
+              "source": "Charm"
+            },
+            {
+              "name": "Double Tap",
+              "cost": 450,
+              "source": "Deceive"
+            },
+            {
+              "name": "Hard Target",
+              "cost": 300,
+              "source": "Dodge"
+            },
+            {
+              "name": "Operate Aeronautica 1",
+              "cost": 200,
+              "source": "Slight of Hand"
+            },
+            {
+              "name": "Operate Aeronautica 2",
+              "cost": 400,
+              "source": "Slight of Hand"
+            },
+            {
+              "name": "Operate Aeronautica 3",
+              "cost": 600,
+              "source": "Slight of Hand"
+            },
+            {
+              "name": "Ballistics Skill 5",
+              "cost": 1250,
+              "source": "Slight of Hand"
+            },
+            {
+              "name": "Inquiry 1",
+              "cost": 100,
+              "source": "4/5/2020"
+            },
+            {
+              "name": "Weapon Training: Mass Driver",
+              "cost": 200,
+              "source": "4/5/2020"
+            },
+            {
+              "name": "Toughness 1",
+              "cost": 250,
+              "source": "4/5/2020"
+            },
+            {
+              "name": "Resistance: Fear",
+              "cost": 300,
+              "source": "8/2/2020"
+            },
+            {
+              "name": "Agility 4",
+              "cost": 750,
+              "source": "8/2/2020"
+            },
+            {
+              "name": "Mighty Shot",
+              "cost": 600,
+              "source": "8/2/2020"
+            },
+            {
+              "name": "Athletics 1",
+              "cost": 200,
+              "source": "8/2/2020"
+            },
+            {
+              "name": "Deceive 2",
+              "cost": 200,
+              "source": "5/2/2021"
+            },
+            {
+              "name": "Command 1",
+              "cost": 200,
+              "source": "11/21/2021"
+            },
+            {
+              "name": "Fellowship 3",
+              "cost": 500,
+              "source": "11/21/2021"
+            },
+            {
+              "name": "Command 2",
+              "cost": 400,
+              "source": "11/21/2021"
+            },
+            {
+              "name": "Charm 2",
+              "cost": 200,
+              "source": "11/21/2021"
+            },
+            {
+              "name": "Inquiry 2",
+              "cost": 200,
+              "source": "11/21/2021"
+            },
+            {
+              "name": "Weapon Training: Needle-Pistol",
+              "cost": 200,
+              "source": "11/21/2021"
+            },
+            {
+              "name": "Sleight Of Hand 1",
+              "cost": 200,
+              "source": "11/21/2021"
+            },
+            {
+              "name": "Target Selection",
+              "cost": 400,
+              "source": "11/21/2021"
+            },
+            {
+              "name": "Marksman",
+              "cost": 300,
+              "source": "11/21/2021"
+            },
+            {
+              "name": "Navigate Surface",
+              "cost": 300,
+              "source": "11/21/2021"
+            },
+            {
+              "name": "Willpower 1",
+              "cost": 500,
+              "source": "11/21/2021"
+            },
+            {
+              "name": "Willpower 2",
+              "cost": 750,
+              "source": "11/21/2021"
+            },
+            {
+              "name": "Ballistics Skill 5",
+              "cost": 1250,
+              "source": "1/28/2023"
+            },
+            {
+              "name": "Resistance: Psychic Powers",
+              "cost": 300,
+              "source": "10/15/2023"
+            },
+            {
+              "name": "Exotic Weapon Training: Radium",
+              "cost": 450,
+              "source": "10/15/2023"
+            },
+            {
+              "name": "Syndicate Scab Brawler",
+              "cost": 300,
+              "source": "12/15/2024"
+            },
+            {
+              "name": "Inescapable Attack",
+              "cost": 300,
+              "source": "12/15/2024"
+            },
+            {
+              "name": "Independent Targetting",
+              "cost": 300,
+              "source": "12/15/2024"
+            },
+            {
+              "name": "Able Gunman",
+              "cost": 300,
+              "source": "12/15/2024"
+            },
+            {
+              "name": "Exotic Weapon Training: Volkite Disruptor",
+              "cost": 450,
+              "source": "12/15/2024"
+            },
+            {
+              "name": "Track The Target",
+              "cost": 300,
+              "source": "10/2/2025"
+            },
+            {
+              "name": "Weapon Skill 1",
+              "cost": 500,
+              "source": "10/2/2025"
+            },
+            {
+              "name": "Unarmed Specialist",
+              "cost": 900,
+              "source": "10/2/2025"
+            },
+            {
+              "name": "This'll Do",
+              "cost": 600,
+              "source": "10/2/2025"
+            }
+          ],
+          "spent": 18500
+        },
+        "aptitudes": [
+          {
+            "name": "Perception",
+            "source": "Homeworld"
+          },
+          {
+            "name": "Social",
+            "source": "Background"
+          },
+          {
+            "name": "Fellowship",
+            "source": "Role"
+          },
+          {
+            "name": "Agility",
+            "source": "Role"
+          },
+          {
+            "name": "Ballistic Skill",
+            "source": "Role"
+          },
+          {
+            "name": "Defense",
+            "source": "Role"
+          },
+          {
+            "name": "Finesse",
+            "source": "Role"
+          }
+        ],
+        "tarot": {},
+        "psy": {
+          "rating": 0,
+          "class": "none",
+          "sustained": 0
+        },
+        "psychicPowers": [],
+        "insanity": {
+          "points": 3,
+          "disorders": []
+        },
+        "corruption": {
+          "points": 1,
+          "malignancies": [],
+          "mutations": []
+        },
+        "criticalInjuries": [],
+        "amputations": [],
         "talents": [
           "Step Aside",
           "Quick Draw",
@@ -3297,6 +3815,10 @@ roll_table "Power Field Destruction" {
               "single": true,
               "burst": 2,
               "full": 0
+            },
+            "clip": {
+              "max": 8,
+              "value": 8
             }
           },
           {
@@ -3313,6 +3835,10 @@ roll_table "Power Field Destruction" {
               "single": true,
               "burst": 3,
               "full": 0
+            },
+            "clip": {
+              "max": 6,
+              "value": 6
             }
           },
           {
@@ -3332,6 +3858,10 @@ roll_table "Power Field Destruction" {
               "single": true,
               "burst": 0,
               "full": 0
+            },
+            "clip": {
+              "max": 9,
+              "value": 9
             }
           },
           {
@@ -3351,7 +3881,140 @@ roll_table "Power Field Destruction" {
               "single": true,
               "burst": 0,
               "full": 0
+            },
+            "clip": {
+              "max": 6,
+              "value": 6
             }
+          }
+        ],
+        "armourItems": [],
+        "gear": [
+          {
+            "name": "Stone Badge",
+            "equipped": true
+          },
+          {
+            "name": "Volkite Disruptor",
+            "equipped": true,
+            "weight": 5
+          },
+          {
+            "name": "Needle Pistol",
+            "equipped": true,
+            "weight": 1.5
+          },
+          {
+            "name": "Best Quality Imperial Guard Flak Armor",
+            "equipped": true,
+            "weight": 11
+          },
+          {
+            "name": "Clip and Drop Harness",
+            "equipped": true,
+            "weight": 2
+          },
+          {
+            "name": "stablight",
+            "equipped": true,
+            "weight": 0.5
+          },
+          {
+            "name": "Microbead",
+            "equipped": true
+          },
+          {
+            "name": "Radium Pistol (Good)",
+            "equipped": true,
+            "weight": 2.5
+          },
+          {
+            "name": "Voidsuit",
+            "equipped": true
+          },
+          {
+            "name": "Grappnel & Line",
+            "equipped": true,
+            "weight": 2
+          },
+          {
+            "name": "Everstone",
+            "equipped": true
+          },
+          {
+            "name": "Good Respirator",
+            "equipped": true,
+            "weight": 1
+          },
+          {
+            "name": "injector, 2 doses of obscura or slaught",
+            "equipped": true
+          },
+          {
+            "name": "Hoenn League Pin Case + Id",
+            "equipped": true
+          },
+          {
+            "name": "Backpack",
+            "equipped": true,
+            "weight": 2
+          },
+          {
+            "name": "2x Smoke Grenade",
+            "equipped": true,
+            "weight": 1
+          },
+          {
+            "name": "stake (vamp stabber)",
+            "equipped": true
+          },
+          {
+            "name": "Magnoculars",
+            "equipped": true,
+            "weight": 0.5
+          },
+          {
+            "name": "Manacles",
+            "equipped": true,
+            "weight": 1
+          },
+          {
+            "name": "Pict Recorder",
+            "equipped": true,
+            "weight": 1
+          },
+          {
+            "name": "Super Potion",
+            "equipped": true
+          },
+          {
+            "name": "Recaf",
+            "equipped": true
+          },
+          {
+            "name": "Cameleoline Cloak",
+            "equipped": true,
+            "weight": 0.5
+          },
+          {
+            "name": "Necron Ambassador Disc",
+            "equipped": true
+          },
+          {
+            "name": "Lairon, Mudkip Prisms",
+            "equipped": true,
+            "weight": 1
+          },
+          {
+            "name": "1 Immolator Grenades",
+            "equipped": true,
+            "quantity": 1,
+            "weight": 0.5
+          },
+          {
+            "name": "chrono",
+            "equipped": true,
+            "weight": 0
           }
         ],
         "field": {
@@ -3359,15 +4022,14 @@ roll_table "Power Field Destruction" {
           "overloadMax": 0
         },
         "source": {
-          "adapter": "xlsx-campaign-v1",
+          "adapter": "xlsx-campaign-v3",
           "file": "_Jack_.xlsx",
           "player": "Chris",
-          "importedAt": "2026-07-08T17:46:33.508Z",
+          "importedAt": "2026-07-12T00:26:59.186Z",
           "unmapped": [
-            "skills (schema v2)",
-            "weapon clip (schema v2)",
-            "weapon trainings (schema v2)",
-            "xp / aptitudes / gear / house content (schema v2)"
+            "armour worn as items (the STATS AP scalar is the flat armour block)",
+            "house content (Dramatic Moments, custom traits)",
+            "weapon trainings"
           ]
         }
       }
@@ -3377,20 +4039,56 @@ roll_table "Power Field Destruction" {
       "player": "Chris",
       "name": "Augustine Haake",
       "doc": {
-        "schemaVersion": 1,
+        "schemaVersion": 3,
         "kind": "dh2.character",
         "system": "dh2",
         "name": "Augustine Haake",
         "characteristics": {
-          "ws": 31,
-          "bs": 68,
-          "s": 34,
-          "t": 57,
-          "ag": 52,
-          "int": 70,
-          "per": 53,
-          "wp": 61,
-          "fel": 29
+          "ws": {
+            "base": 31,
+            "advances": 0,
+            "modifiers": []
+          },
+          "bs": {
+            "base": 43,
+            "advances": 5,
+            "modifiers": []
+          },
+          "s": {
+            "base": 14,
+            "advances": 4,
+            "modifiers": []
+          },
+          "t": {
+            "base": 57,
+            "advances": 0,
+            "modifiers": []
+          },
+          "ag": {
+            "base": 52,
+            "advances": 0,
+            "modifiers": []
+          },
+          "int": {
+            "base": 45,
+            "advances": 5,
+            "modifiers": []
+          },
+          "per": {
+            "base": 43,
+            "advances": 2,
+            "modifiers": []
+          },
+          "wp": {
+            "base": 61,
+            "advances": 0,
+            "modifiers": []
+          },
+          "fel": {
+            "base": 9,
+            "advances": 4,
+            "modifiers": []
+          }
         },
         "unnatural": {},
         "armour": {
@@ -3402,6 +4100,7 @@ roll_table "Power Field Destruction" {
           "rightLeg": 6
         },
         "wounds": {
+          "critical": 0,
           "current": 10,
           "max": 10
         },
@@ -3409,6 +4108,716 @@ roll_table "Power Field Destruction" {
           "current": 1,
           "max": 4
         },
+        "fatigue": {
+          "current": 0
+        },
+        "skills": {
+          "Acrobatics": {
+            "advances": 0
+          },
+          "Athletics": {
+            "advances": 2
+          },
+          "Awareness": {
+            "advances": 2
+          },
+          "Charm": {
+            "advances": 0
+          },
+          "Command": {
+            "advances": 0
+          },
+          "Commerce": {
+            "advances": 1
+          },
+          "Common Lore": {
+            "specialities": {
+              "All": {
+                "advances": 1
+              }
+            }
+          },
+          "Deceive": {
+            "advances": 1
+          },
+          "Dodge": {
+            "advances": 4
+          },
+          "Forbidden Lore": {
+            "specialities": {
+              "Archaeotech": {
+                "advances": 1
+              },
+              "Heresy": {
+                "advances": 1
+              },
+              "Inquisition": {
+                "advances": 1
+              },
+              "Horus Heresy": {
+                "advances": 1
+              },
+              "Eldar": {
+                "advances": 1
+              },
+              "Daemonology": {
+                "advances": 1
+              },
+              "Skaaldir Clans": {
+                "advances": 1
+              },
+              "Machine Cult": {
+                "advances": 1
+              },
+              "Vision of the Sixth Eye": {
+                "advances": 1
+              },
+              "Geometry of the Right Hand": {
+                "advances": 1
+              }
+            }
+          },
+          "Inquiry": {
+            "advances": 0
+          },
+          "Interrogation": {
+            "advances": 0
+          },
+          "Intimidate": {
+            "advances": 0
+          },
+          "Linguistics": {
+            "specialities": {
+              "Binary": {
+                "advances": 1
+              },
+              "Eldar": {
+                "advances": 2
+              },
+              "Egarian": {
+                "advances": 2
+              }
+            }
+          },
+          "Logic": {
+            "advances": 1
+          },
+          "Medicae": {
+            "advances": 1
+          },
+          "Navigate": {
+            "specialities": {
+              "Surface": {
+                "advances": 1
+              },
+              "Stellar": {
+                "advances": 2
+              },
+              "Warp": {
+                "advances": 1
+              }
+            }
+          },
+          "Operate": {
+            "specialities": {
+              "Surface": {
+                "advances": 1
+              }
+            }
+          },
+          "Parry": {
+            "advances": 0
+          },
+          "Psyniscience": {
+            "advances": 0
+          },
+          "Scholastic Lore": {
+            "specialities": {
+              "Numerology": {
+                "advances": 2
+              },
+              "Occult": {
+                "advances": 2
+              },
+              "Archaic": {
+                "advances": 2
+              },
+              "Legend": {
+                "advances": 2
+              },
+              "Myths of the Reach": {
+                "advances": 2
+              },
+              "All Others": {
+                "advances": 1
+              }
+            }
+          },
+          "Scrutiny": {
+            "advances": 1
+          },
+          "Security": {
+            "advances": 4
+          },
+          "Sleight of Hand": {
+            "advances": 0
+          },
+          "Stealth": {
+            "advances": 1
+          },
+          "Survival": {
+            "advances": 1
+          },
+          "Tech-Use": {
+            "advances": 4
+          },
+          "Trade": {
+            "specialities": {
+              "Linguist": {
+                "advances": 2
+              }
+            }
+          }
+        },
+        "xp": {
+          "total": 37e3,
+          "ledger": [
+            {
+              "name": "Mighty Shot",
+              "cost": 600,
+              "source": "Creation"
+            },
+            {
+              "name": "Target Selection",
+              "cost": 400,
+              "source": "Creation"
+            },
+            {
+              "name": "Subversive Programming",
+              "cost": 200,
+              "source": "Creation"
+            },
+            {
+              "name": "Whispers of Samadhi",
+              "cost": 450,
+              "source": "Creation"
+            },
+            {
+              "name": "Cogs Within Cogs",
+              "cost": 400,
+              "source": "Creation"
+            },
+            {
+              "name": "Ballistics 1",
+              "cost": 100,
+              "source": "Creation"
+            },
+            {
+              "name": "Ballistics 2",
+              "cost": 250,
+              "source": "Creation"
+            },
+            {
+              "name": "Ballistics 3",
+              "cost": 500,
+              "source": "Creation"
+            },
+            {
+              "name": "Toughness 1",
+              "cost": 500,
+              "source": "Creation"
+            },
+            {
+              "name": "Agility 1",
+              "cost": 250,
+              "source": "Creation"
+            },
+            {
+              "name": "Intelligence 1",
+              "cost": 100,
+              "source": "Creation"
+            },
+            {
+              "name": "Willpower 1",
+              "cost": 250,
+              "source": "Creation"
+            },
+            {
+              "name": "Awareness 1",
+              "cost": 200,
+              "source": "Creation"
+            },
+            {
+              "name": "Tech Use 1",
+              "cost": 100,
+              "source": "Creation"
+            },
+            {
+              "name": "Tech Use 2",
+              "cost": 250,
+              "source": "Creation"
+            },
+            {
+              "name": "Deceive 1",
+              "cost": 300,
+              "source": "Creation"
+            },
+            {
+              "name": "Dodge 1",
+              "cost": 300,
+              "source": "Creation"
+            },
+            {
+              "name": "Linguistics: Binary 1",
+              "cost": 100,
+              "source": "Creation"
+            },
+            {
+              "name": "Linguistics: Eldar 1",
+              "cost": 100,
+              "source": "Creation"
+            },
+            {
+              "name": "Security 1",
+              "cost": 100,
+              "source": "Creation"
+            },
+            {
+              "name": "Scholastic: Legend",
+              "cost": 250,
+              "source": "Creation"
+            },
+            {
+              "name": "Scholastic:Occult",
+              "cost": 250,
+              "source": "Creation"
+            },
+            {
+              "name": "Scholastic: Archaic",
+              "cost": 250,
+              "source": "Creation"
+            },
+            {
+              "name": "Deathdealer",
+              "cost": 400,
+              "source": "Recent"
+            },
+            {
+              "name": "Quickdraw",
+              "cost": 300,
+              "source": "Recent"
+            },
+            {
+              "name": "Jaded",
+              "cost": 300,
+              "source": "Recent"
+            },
+            {
+              "name": "Weapon Tech",
+              "cost": 200,
+              "source": "Recent"
+            },
+            {
+              "name": "Tech Use 3",
+              "cost": 300,
+              "source": "Recent"
+            },
+            {
+              "name": "Logic 1",
+              "cost": 100,
+              "source": "Recent"
+            },
+            {
+              "name": "Forbidden Lore Eldar",
+              "cost": 100,
+              "source": "5/12/2018"
+            },
+            {
+              "name": "Agility 2",
+              "cost": 500,
+              "source": "5/12/2018"
+            },
+            {
+              "name": "Tech Use 4",
+              "cost": 400,
+              "source": "5/12/2018"
+            },
+            {
+              "name": "Linguistics Eldar 2",
+              "cost": 300,
+              "source": "5/12/2018"
+            },
+            {
+              "name": "Dodge 2",
+              "cost": 600,
+              "source": "12/31/2018"
+            },
+            {
+              "name": "Constant Vigilance",
+              "cost": 450,
+              "source": "12/31/2018"
+            },
+            {
+              "name": "Awareness 2",
+              "cost": 400,
+              "source": "12/31/2018"
+            },
+            {
+              "name": "Mechadendrite Use?",
+              "cost": 300,
+              "source": "12/31/2018"
+            },
+            {
+              "name": "Deny the Witch",
+              "cost": 450,
+              "source": "12/31/2018"
+            },
+            {
+              "name": "Intelligence 2",
+              "cost": 250,
+              "source": "12/31/2018"
+            },
+            {
+              "name": "Intelligence 3",
+              "cost": 500,
+              "source": "12/31/2018"
+            },
+            {
+              "name": "Navigate Stellar",
+              "cost": 200,
+              "source": "12/31/2018"
+            },
+            {
+              "name": "Perception 1",
+              "cost": 250,
+              "source": "12/31/2018"
+            },
+            {
+              "name": "Hard Target",
+              "cost": 600,
+              "source": "12/31/2018"
+            },
+            {
+              "name": "Ballistics 4",
+              "cost": 750,
+              "source": "12/31/2018"
+            },
+            {
+              "name": "Intelligence 4",
+              "cost": 750,
+              "source": "Proposed 6/28/19"
+            },
+            {
+              "name": "Linguistics Egarian 1",
+              "cost": 100,
+              "source": "Proposed 6/28/19"
+            },
+            {
+              "name": "Navigate Surface 1",
+              "cost": 200,
+              "source": "Proposed 6/28/19"
+            },
+            {
+              "name": "Navigate Warp 1",
+              "cost": 200,
+              "source": "Proposed 6/28/19"
+            },
+            {
+              "name": "Stealth 1",
+              "cost": 300,
+              "source": "Proposed 6/28/19"
+            },
+            {
+              "name": "Athletics 1",
+              "cost": 200,
+              "source": "Proposed 6/28/19"
+            },
+            {
+              "name": "Commerce 1",
+              "cost": 100,
+              "source": "Proposed 6/28/19"
+            },
+            {
+              "name": "Dodge 3",
+              "cost": 900,
+              "source": "Proposed 6/28/19"
+            },
+            {
+              "name": "Trade Linguist 2",
+              "cost": 200,
+              "source": "Proposed 6/28/19"
+            },
+            {
+              "name": "Willpower 2",
+              "cost": 500,
+              "source": "Proposed 6/28/19"
+            },
+            {
+              "name": "Scholastic Lore Numerology 2",
+              "cost": 200,
+              "source": "Proposed 6/28/19"
+            },
+            {
+              "name": "Forbidden Lore Daemonology 1",
+              "cost": 0,
+              "source": "Proposed 6/28/19"
+            },
+            {
+              "name": "Luminen Shield",
+              "cost": 450,
+              "source": "Proposed 6/28/19"
+            },
+            {
+              "name": "Luminen Barrier",
+              "cost": 600,
+              "source": "Proposed 6/28/19"
+            },
+            {
+              "name": "Resistance: Psychic Powers",
+              "cost": 600,
+              "source": "Proposed 6/28/19"
+            },
+            {
+              "name": "Strong Minded",
+              "cost": 450,
+              "source": "3/29/2020"
+            },
+            {
+              "name": "Scrutiny 1",
+              "cost": 100,
+              "source": "4/19/2020"
+            },
+            {
+              "name": "Intelligence 5",
+              "cost": 1250,
+              "source": "4/19/2020"
+            },
+            {
+              "name": "Navigate: Stellar 2",
+              "cost": 400,
+              "source": "8/4/2020"
+            },
+            {
+              "name": "Scholastic Lore: Anatomy unto Forbidden Lore: Mutants",
+              "cost": 200,
+              "source": "8/4/2020"
+            },
+            {
+              "name": "Dodge 4",
+              "cost": 1200,
+              "source": "11/15/2020"
+            },
+            {
+              "name": "Toughness 2 & 3",
+              "cost": 1750,
+              "source": "5/2/2021"
+            },
+            {
+              "name": "FL: Machine Cult 1",
+              "cost": 100,
+              "source": "5/2/2021"
+            },
+            {
+              "name": "Security 2",
+              "cost": 200,
+              "source": "5/2/2021"
+            },
+            {
+              "name": "Sound Const",
+              "cost": 300,
+              "source": "5/2/2021"
+            },
+            {
+              "name": "Operate Surface 1",
+              "cost": 300,
+              "source": "5/2/2021"
+            },
+            {
+              "name": "Heavy Weapon Training",
+              "cost": 200,
+              "source": "5/2/2021"
+            },
+            {
+              "name": "Scholastic Lore: Myths of the Reach 2 unto FL Skaaldir Clans 1",
+              "cost": 200,
+              "source": "5/2/2021"
+            },
+            {
+              "name": "Linguistics Egarian 2",
+              "cost": 200,
+              "source": "5/2/2021"
+            },
+            {
+              "name": "Security 3",
+              "cost": 300,
+              "source": "5/2/2021"
+            },
+            {
+              "name": "Operate Surface 1",
+              "cost": 300,
+              "source": "10/16/2022"
+            },
+            {
+              "name": "Linguistics Egarian 2",
+              "cost": 200,
+              "source": "10/16/2022"
+            },
+            {
+              "name": "Security 3",
+              "cost": 300,
+              "source": "10/16/2022"
+            },
+            {
+              "name": "Security 4",
+              "cost": 400,
+              "source": "10/16/2022"
+            },
+            {
+              "name": "Ballistics 5",
+              "cost": 1250,
+              "source": "12/29/2022"
+            },
+            {
+              "name": "Willpower 3",
+              "cost": 750,
+              "source": "12/29/2022"
+            },
+            {
+              "name": "Egarian Mentat",
+              "cost": 100,
+              "source": "8/4/2024"
+            },
+            {
+              "name": "Slip the Bounded Realm",
+              "cost": 200,
+              "source": "8/4/2024"
+            },
+            {
+              "name": "See the Unseen Worlds",
+              "cost": 200,
+              "source": "8/4/2024"
+            },
+            {
+              "name": "Rapid Reload",
+              "cost": 600,
+              "source": "8/4/2024"
+            },
+            {
+              "name": "Survical 1",
+              "cost": 200,
+              "source": "8/4/2024"
+            },
+            {
+              "name": "Athletics 2",
+              "cost": 400,
+              "source": "8/4/2024"
+            },
+            {
+              "name": "Medicae 1",
+              "cost": 200,
+              "source": "12/16/2024"
+            },
+            {
+              "name": "Inescapable Attack",
+              "cost": 300,
+              "source": "12/16/2024"
+            },
+            {
+              "name": "Perception 2",
+              "cost": 500,
+              "source": "12/16/2024"
+            },
+            {
+              "name": "Agility 3",
+              "cost": 750,
+              "source": "12/16/2024"
+            },
+            {
+              "name": "FL: Path of the Left Hand",
+              "cost": 0,
+              "source": "12/16/2024"
+            },
+            {
+              "name": "Willpower 4",
+              "cost": 1e3,
+              "source": "10/5/2025"
+            },
+            {
+              "name": "Toughness 4",
+              "cost": 1500,
+              "source": "10/5/2025"
+            },
+            {
+              "name": "FL: Knights of Titan",
+              "cost": 100,
+              "source": "10/5/2025"
+            },
+            {
+              "name": "FL: Eldar 2",
+              "cost": 200,
+              "source": "10/5/2025"
+            },
+            {
+              "name": "FL: Drukhari",
+              "cost": 100,
+              "source": "10/5/2025"
+            },
+            {
+              "name": "FL: Egarian Artifice",
+              "cost": 100,
+              "source": "10/5/2025"
+            }
+          ],
+          "spent": 35950
+        },
+        "aptitudes": [
+          {
+            "name": "Knowledge",
+            "source": "Homeworld"
+          },
+          {
+            "name": "Finesse",
+            "source": "BG"
+          },
+          {
+            "name": "Intelligence",
+            "source": "Role"
+          },
+          {
+            "name": "Ballistic Skill*",
+            "source": "Role"
+          },
+          {
+            "name": "Perception",
+            "source": "Role"
+          },
+          {
+            "name": "Tech",
+            "source": "Role"
+          },
+          {
+            "name": "Willpower",
+            "source": "Role"
+          }
+        ],
+        "tarot": {},
+        "psy": {
+          "rating": 0,
+          "class": "none",
+          "sustained": 0
+        },
+        "psychicPowers": [],
+        "insanity": {
+          "points": 40,
+          "disorders": []
+        },
+        "corruption": {
+          "points": 9,
+          "malignancies": [],
+          "mutations": []
+        },
+        "criticalInjuries": [],
+        "amputations": [],
         "talents": [
           "Clues from Crowds",
           "Enemy(Ordos Xenos)",
@@ -3460,6 +4869,10 @@ roll_table "Power Field Destruction" {
               "single": true,
               "burst": 3,
               "full": 10
+            },
+            "clip": {
+              "max": 120,
+              "value": 120
             }
           },
           {
@@ -3479,6 +4892,10 @@ roll_table "Power Field Destruction" {
               "single": true,
               "burst": 2,
               "full": 0
+            },
+            "clip": {
+              "max": 10,
+              "value": 10
             }
           },
           {
@@ -3497,7 +4914,172 @@ roll_table "Power Field Destruction" {
               "single": true,
               "burst": 0,
               "full": 8
+            },
+            "clip": {
+              "max": 80,
+              "value": 80
             }
+          }
+        ],
+        "armourItems": [],
+        "gear": [
+          {
+            "name": "3 Smoke Grenades",
+            "equipped": true,
+            "quantity": 3,
+            "weight": 0.5
+          },
+          {
+            "name": "Bionic Arm (Right)",
+            "equipped": true
+          },
+          {
+            "name": "Voidstalker Cloak",
+            "equipped": true
+          },
+          {
+            "name": "Praetor Armour",
+            "equipped": true,
+            "weight": 16
+          },
+          {
+            "name": "Badass Crystal Servo Skull",
+            "equipped": true
+          },
+          {
+            "name": "Filtration Plugs",
+            "equipped": true
+          },
+          {
+            "name": "Dataslate(s)",
+            "equipped": true
+          },
+          {
+            "name": "Stablight",
+            "equipped": true,
+            "weight": 0.5
+          },
+          {
+            "name": "Bionic Legs (Good)",
+            "equipped": true
+          },
+          {
+            "name": "Archaeotech Prey-Sense Goggles Best Quality, Potent",
+            "equipped": true,
+            "weight": 0.5
+          },
+          {
+            "name": "Sneasel, Bulbasaur, Heracross Prisons",
+            "equipped": true,
+            "weight": 3
+          },
+          {
+            "name": "Alien Multi-Key?",
+            "equipped": true
+          },
+          {
+            "name": "Grappnel and line",
+            "equipped": true,
+            "weight": 2
+          },
+          {
+            "name": "4 Krak Grenades",
+            "equipped": true,
+            "quantity": 4
+          },
+          {
+            "name": "Best Q Bionic Eyes",
+            "equipped": true
+          },
+          {
+            "name": "Clip and Drop Harness",
+            "equipped": true,
+            "weight": 2
+          },
+          {
+            "name": '"Welcome to Icetown" Keychain',
+            "equipped": true
+          },
+          {
+            "name": "Enclaver Armor",
+            "equipped": true
+          },
+          {
+            "name": "Pict Recorder",
+            "equipped": true
+          },
+          {
+            "name": "VOX Unit [Party]",
+            "equipped": true
+          },
+          {
+            "name": "Scroll in tube from Skaaldir dude",
+            "equipped": false
+          },
+          {
+            "name": "6 Eldar Books",
+            "equipped": false,
+            "quantity": 6
+          },
+          {
+            "name": "Eldar Staff",
+            "equipped": false
+          },
+          {
+            "name": "Eldar Wraithbone dirk",
+            "equipped": false
+          },
+          {
+            "name": "Eldar book Parchment notebook",
+            "equipped": false
+          },
+          {
+            "name": "V-old Bolt-Action Rifle",
+            "equipped": false
+          },
+          {
+            "name": 'AEGARYAN BOOK FROM "THE MOUNTAIN", "Loops 1: The Great Forging"',
+            "equipped": false
+          },
+          {
+            "name": "Eldar book Parchment notebook",
+            "equipped": false
+          },
+          {
+            "name": "Enforcer Light Carapace (5 all)",
+            "equipped": false
+          },
+          {
+            "name": "Pict Recorder",
+            "equipped": false
+          },
+          {
+            "name": 'Eldar Tarot Card "Indulgence"',
+            "equipped": false
+          },
+          {
+            "name": "dead inquisitor Stefan's ciphered notebook",
+            "equipped": false
+          },
+          {
+            "name": "Mineral Badge",
+            "equipped": false
+          },
+          {
+            "name": "Shuriken Catapult",
+            "equipped": false
+          },
+          {
+            "name": "Leaf Stone",
+            "equipped": false
+          },
+          {
+            "name": "Militarum Tempestus Carapace",
+            "equipped": false
+          },
+          {
+            "name": "Transparent Red crystal from archivist's workshop",
+            "equipped": false
           }
         ],
         "field": {
@@ -3505,17 +5087,15 @@ roll_table "Power Field Destruction" {
           "overloadMax": 0
         },
         "source": {
-          "adapter": "xlsx-campaign-v1",
+          "adapter": "xlsx-campaign-v3",
           "file": "Augustine Haake.xlsx",
           "player": "Chris",
-          "importedAt": "2026-07-08T17:46:33.463Z",
+          "importedAt": "2026-07-12T00:26:59.089Z",
           "unmapped": [
             "armour is the STATS scalar applied to all locations",
-            "psychic powers (schema v2)",
-            "skills (schema v2)",
-            "weapon clip (schema v2)",
-            "weapon trainings (schema v2)",
-            "xp / aptitudes / gear / house content (schema v2)"
+            "armour worn as items (the STATS AP scalar is the flat armour block)",
+            "house content (Dramatic Moments, custom traits)",
+            "weapon trainings"
           ]
         }
       }
@@ -3525,20 +5105,56 @@ roll_table "Power Field Destruction" {
       "player": "John",
       "name": "Gnaeus",
       "doc": {
-        "schemaVersion": 1,
+        "schemaVersion": 3,
         "kind": "dh2.character",
         "system": "dh2",
         "name": "Gnaeus",
         "characteristics": {
-          "ws": 27,
-          "bs": 45,
-          "s": 32,
-          "t": 31,
-          "ag": 55,
-          "int": 54,
-          "per": 42,
-          "wp": 36,
-          "fel": 34
+          "ws": {
+            "base": 27,
+            "advances": 0,
+            "modifiers": []
+          },
+          "bs": {
+            "base": 35,
+            "advances": 2,
+            "modifiers": []
+          },
+          "s": {
+            "base": 22,
+            "advances": 2,
+            "modifiers": []
+          },
+          "t": {
+            "base": 26,
+            "advances": 1,
+            "modifiers": []
+          },
+          "ag": {
+            "base": 55,
+            "advances": 0,
+            "modifiers": []
+          },
+          "int": {
+            "base": 34,
+            "advances": 4,
+            "modifiers": []
+          },
+          "per": {
+            "base": 37,
+            "advances": 1,
+            "modifiers": []
+          },
+          "wp": {
+            "base": 36,
+            "advances": 0,
+            "modifiers": []
+          },
+          "fel": {
+            "base": 34,
+            "advances": 0,
+            "modifiers": []
+          }
         },
         "unnatural": {},
         "armour": {
@@ -3550,6 +5166,7 @@ roll_table "Power Field Destruction" {
           "rightLeg": 0
         },
         "wounds": {
+          "critical": 0,
           "current": 13,
           "max": 13
         },
@@ -3557,6 +5174,283 @@ roll_table "Power Field Destruction" {
           "current": 3,
           "max": 3
         },
+        "fatigue": {
+          "current": 0
+        },
+        "skills": {
+          "Acrobatics": {
+            "advances": 1
+          },
+          "Athletics": {
+            "advances": 1
+          },
+          "Awareness": {
+            "advances": 2,
+            "modifiers": [
+              {
+                "value": 30,
+                "source": "sheet Misc column"
+              }
+            ]
+          },
+          "Charm": {
+            "advances": 1
+          },
+          "Command": {
+            "advances": 0
+          },
+          "Commerce": {
+            "advances": 1
+          },
+          "Common Lore": {
+            "specialities": {
+              "Mech-Corps": {
+                "advances": 1,
+                "modifiers": [
+                  {
+                    "value": 20,
+                    "source": "sheet Misc column"
+                  }
+                ]
+              },
+              "Marian CN": {
+                "advances": 2,
+                "modifiers": [
+                  {
+                    "value": 20,
+                    "source": "sheet Misc column"
+                  }
+                ]
+              },
+              "All": {
+                "advances": 1,
+                "modifiers": [
+                  {
+                    "value": 20,
+                    "source": "sheet Misc column"
+                  }
+                ]
+              }
+            }
+          },
+          "Deceive": {
+            "advances": 0
+          },
+          "Dodge": {
+            "advances": 2
+          },
+          "Forbidden Lore": {
+            "specialities": {
+              "Orks": {
+                "advances": 2,
+                "modifiers": [
+                  {
+                    "value": 20,
+                    "source": "sheet Misc column"
+                  }
+                ]
+              },
+              "Eldar": {
+                "advances": 1,
+                "modifiers": [
+                  {
+                    "value": 20,
+                    "source": "sheet Misc column"
+                  }
+                ]
+              },
+              "Egarian Artifice": {
+                "advances": 1,
+                "modifiers": [
+                  {
+                    "value": 20,
+                    "source": "sheet Misc column"
+                  }
+                ]
+              }
+            }
+          },
+          "Inquiry": {
+            "advances": 0
+          },
+          "Interrogation": {
+            "advances": 0
+          },
+          "Intimidate": {
+            "advances": 0,
+            "characteristic": "wp"
+          },
+          "Linguistics": {
+            "specialities": {}
+          },
+          "Logic": {
+            "advances": 1,
+            "modifiers": [
+              {
+                "value": 30,
+                "source": "sheet Misc column"
+              }
+            ]
+          },
+          "Medicae": {
+            "advances": 1,
+            "modifiers": [
+              {
+                "value": 10,
+                "source": "sheet Misc column"
+              }
+            ]
+          },
+          "Navigate": {
+            "specialities": {
+              "Surface": {
+                "advances": 1
+              },
+              "Stellar": {
+                "advances": 1
+              },
+              "Warp": {
+                "advances": 0
+              }
+            }
+          },
+          "Operate": {
+            "specialities": {
+              "Aeronautica": {
+                "advances": 0
+              },
+              "Surface": {
+                "advances": 1
+              },
+              "Voidship": {
+                "advances": 2
+              }
+            }
+          },
+          "Parry": {
+            "advances": 0
+          },
+          "Psyniscience": {
+            "advances": 0
+          },
+          "Scholastic Lore": {
+            "specialities": {
+              "All": {
+                "advances": 1,
+                "modifiers": [
+                  {
+                    "value": 30,
+                    "source": "sheet Misc column"
+                  }
+                ]
+              },
+              "Marian Houses": {
+                "advances": 2,
+                "modifiers": [
+                  {
+                    "value": 20,
+                    "source": "sheet Misc column"
+                  }
+                ]
+              }
+            }
+          },
+          "Scrutiny": {
+            "advances": 1
+          },
+          "Security": {
+            "advances": 2,
+            "modifiers": [
+              {
+                "value": 30,
+                "source": "sheet Misc column"
+              }
+            ]
+          },
+          "Sleight of Hand": {
+            "advances": 0
+          },
+          "Stealth": {
+            "advances": 1,
+            "modifiers": [
+              {
+                "value": 20,
+                "source": "sheet Misc column"
+              }
+            ]
+          },
+          "Survival": {
+            "advances": 1
+          },
+          "Tech-Use": {
+            "advances": 4,
+            "modifiers": [
+              {
+                "value": 10,
+                "source": "sheet Misc column"
+              }
+            ]
+          }
+        },
+        "xp": {
+          "total": 18500,
+          "ledger": [
+            {
+              "name": "0",
+              "cost": 1,
+              "source": "Remaining"
+            }
+          ],
+          "spent": 18500
+        },
+        "aptitudes": [
+          {
+            "name": "Perception",
+            "source": "Homeworld"
+          },
+          {
+            "name": "Tech",
+            "source": "Background"
+          },
+          {
+            "name": "Intelligence",
+            "source": "Role"
+          },
+          {
+            "name": "Knowledge",
+            "source": "Role"
+          },
+          {
+            "name": "Willpower",
+            "source": "Role"
+          },
+          {
+            "name": "Agility",
+            "source": "Role (Dup)"
+          },
+          {
+            "name": "Finesse",
+            "source": "Role (Dup)"
+          }
+        ],
+        "tarot": {},
+        "psy": {
+          "rating": 0,
+          "class": "none",
+          "sustained": 0
+        },
+        "psychicPowers": [],
+        "insanity": {
+          "points": 3,
+          "disorders": []
+        },
+        "corruption": {
+          "points": 0,
+          "malignancies": [],
+          "mutations": []
+        },
+        "criticalInjuries": [],
+        "amputations": [],
         "talents": [
           "Clues from the Crowds",
           "Infused Knowledge",
@@ -3595,6 +5489,10 @@ roll_table "Power Field Destruction" {
               "single": true,
               "burst": 0,
               "full": 0
+            },
+            "clip": {
+              "max": 2,
+              "value": 2
             }
           },
           {
@@ -3612,6 +5510,10 @@ roll_table "Power Field Destruction" {
               "single": true,
               "burst": 0,
               "full": 0
+            },
+            "clip": {
+              "max": 20,
+              "value": 20
             }
           },
           {
@@ -3629,6 +5531,10 @@ roll_table "Power Field Destruction" {
               "single": false,
               "burst": 0,
               "full": 0
+            },
+            "clip": {
+              "max": 80,
+              "value": 80
             }
           },
           {
@@ -3645,7 +5551,122 @@ roll_table "Power Field Destruction" {
               "single": true,
               "burst": 0,
               "full": 0
+            },
+            "clip": {
+              "max": 5,
+              "value": 5
             }
+          }
+        ],
+        "armourItems": [],
+        "gear": [
+          {
+            "name": "Exterminator x2",
+            "equipped": true
+          },
+          {
+            "name": "Lascutter",
+            "equipped": true
+          },
+          {
+            "name": "Midnight Essense",
+            "equipped": true
+          },
+          {
+            "name": "Darloth Chain Cannon",
+            "equipped": true
+          },
+          {
+            "name": "Militarium Tempestus Carapace",
+            "equipped": true
+          },
+          {
+            "name": "Micro-bead",
+            "equipped": true
+          },
+          {
+            "name": "Photo-Visor",
+            "equipped": true
+          },
+          {
+            "name": "Chrono",
+            "equipped": true
+          },
+          {
+            "name": "Chamoleoline Cloak",
+            "equipped": true
+          },
+          {
+            "name": "Rebreather",
+            "equipped": true
+          },
+          {
+            "name": "Magboots",
+            "equipped": true
+          },
+          {
+            "name": "Filtration Plugs",
+            "equipped": true
+          },
+          {
+            "name": "Void Suit",
+            "equipped": true
+          },
+          {
+            "name": "Demolition Kit",
+            "equipped": true
+          },
+          {
+            "name": "Breachman's Kit",
+            "equipped": true
+          },
+          {
+            "name": "Medi-Kit",
+            "equipped": true
+          },
+          {
+            "name": "Dataslate",
+            "equipped": true
+          },
+          {
+            "name": "Signal Jammer",
+            "equipped": true
+          },
+          {
+            "name": "Comm Leech",
+            "equipped": true
+          },
+          {
+            "name": "Pict Recorder",
+            "equipped": true
+          },
+          {
+            "name": "Combi-Tool",
+            "equipped": true
+          },
+          {
+            "name": "Multikey",
+            "equipped": true
+          },
+          {
+            "name": "Clip/Drop-Harness",
+            "equipped": true
+          },
+          {
+            "name": "Grapnel & Line",
+            "equipped": true
+          },
+          {
+            "name": "Recaf",
+            "equipped": true
+          },
+          {
+            "name": "Stimm (6; in Medkit)",
+            "equipped": true
+          },
+          {
+            "name": "Glow-Globe",
+            "equipped": true
           }
         ],
         "field": {
@@ -3653,15 +5674,14 @@ roll_table "Power Field Destruction" {
           "overloadMax": 0
         },
         "source": {
-          "adapter": "xlsx-campaign-v1",
+          "adapter": "xlsx-campaign-v3",
           "file": "Gnaeus (John).xlsx",
           "player": "John",
-          "importedAt": "2026-07-08T17:46:33.688Z",
+          "importedAt": "2026-07-12T00:26:59.436Z",
           "unmapped": [
-            "skills (schema v2)",
-            "weapon clip (schema v2)",
-            "weapon trainings (schema v2)",
-            "xp / aptitudes / gear / house content (schema v2)"
+            "armour worn as items (the STATS AP scalar is the flat armour block)",
+            "house content (Dramatic Moments, custom traits)",
+            "weapon trainings"
           ]
         }
       }
@@ -3671,20 +5691,56 @@ roll_table "Power Field Destruction" {
       "player": "John",
       "name": "Harys Abaoth",
       "doc": {
-        "schemaVersion": 1,
+        "schemaVersion": 3,
         "kind": "dh2.character",
         "system": "dh2",
         "name": "Harys Abaoth",
         "characteristics": {
-          "ws": 48,
-          "bs": 32,
-          "s": 30,
-          "t": 33,
-          "ag": 43,
-          "int": 52,
-          "per": 48,
-          "wp": 57,
-          "fel": 60
+          "ws": {
+            "base": 48,
+            "advances": 0,
+            "modifiers": []
+          },
+          "bs": {
+            "base": 32,
+            "advances": 0,
+            "modifiers": []
+          },
+          "s": {
+            "base": 20,
+            "advances": 2,
+            "modifiers": []
+          },
+          "t": {
+            "base": 13,
+            "advances": 4,
+            "modifiers": []
+          },
+          "ag": {
+            "base": 28,
+            "advances": 3,
+            "modifiers": []
+          },
+          "int": {
+            "base": 42,
+            "advances": 2,
+            "modifiers": []
+          },
+          "per": {
+            "base": 38,
+            "advances": 2,
+            "modifiers": []
+          },
+          "wp": {
+            "base": 57,
+            "advances": 0,
+            "modifiers": []
+          },
+          "fel": {
+            "base": 60,
+            "advances": 0,
+            "modifiers": []
+          }
         },
         "unnatural": {},
         "armour": {
@@ -3696,6 +5752,7 @@ roll_table "Power Field Destruction" {
           "rightLeg": 0
         },
         "wounds": {
+          "critical": 0,
           "current": 11,
           "max": 11
         },
@@ -3703,6 +5760,716 @@ roll_table "Power Field Destruction" {
           "current": 7,
           "max": 7
         },
+        "fatigue": {
+          "current": 2
+        },
+        "skills": {
+          "Acrobatics": {
+            "advances": 1
+          },
+          "Athletics": {
+            "advances": 1
+          },
+          "Awareness": {
+            "advances": 2
+          },
+          "Charm": {
+            "advances": 3
+          },
+          "Command": {
+            "advances": 4
+          },
+          "Commerce": {
+            "advances": 3
+          },
+          "Common Lore": {
+            "specialities": {
+              "All": {
+                "advances": 1,
+                "modifiers": [
+                  {
+                    "value": 10,
+                    "source": "sheet Misc column"
+                  }
+                ]
+              }
+            }
+          },
+          "Deceive": {
+            "advances": 1
+          },
+          "Dodge": {
+            "advances": 1
+          },
+          "Forbidden Lore": {
+            "specialities": {
+              "Eldar": {
+                "advances": 1
+              },
+              "Guild": {
+                "advances": 1
+              },
+              "Inquisition": {
+                "advances": 1,
+                "modifiers": [
+                  {
+                    "value": 10,
+                    "source": "sheet Misc column"
+                  }
+                ]
+              }
+            }
+          },
+          "Inquiry": {
+            "advances": 1
+          },
+          "Interrogation": {
+            "advances": 1
+          },
+          "Intimidate": {
+            "advances": 1,
+            "characteristic": "wp"
+          },
+          "Linguistics": {
+            "specialities": {}
+          },
+          "Logic": {
+            "advances": 0
+          },
+          "Medicae": {
+            "advances": 3,
+            "modifiers": [
+              {
+                "value": 40,
+                "source": "sheet Misc column"
+              }
+            ]
+          },
+          "Navigate": {
+            "specialities": {
+              "Surface": {
+                "advances": 1
+              }
+            }
+          },
+          "Operate": {
+            "specialities": {}
+          },
+          "Parry": {
+            "advances": 2,
+            "modifiers": [
+              {
+                "value": 15,
+                "source": "sheet Misc column"
+              }
+            ]
+          },
+          "Psyniscience": {
+            "advances": 1
+          },
+          "Scholastic Lore": {
+            "specialities": {
+              "All": {
+                "advances": 1,
+                "modifiers": [
+                  {
+                    "value": 10,
+                    "source": "sheet Misc column"
+                  }
+                ]
+              },
+              "Anatomy": {
+                "advances": 3,
+                "modifiers": [
+                  {
+                    "value": 10,
+                    "source": "sheet Misc column"
+                  }
+                ]
+              }
+            }
+          },
+          "Scrutiny": {
+            "advances": 1
+          },
+          "Security": {
+            "advances": 0
+          },
+          "Sleight of Hand": {
+            "advances": 0
+          },
+          "Stealth": {
+            "advances": 0
+          },
+          "Survival": {
+            "advances": 3
+          },
+          "Tech-Use": {
+            "advances": 2,
+            "modifiers": [
+              {
+                "value": 10,
+                "source": "sheet Misc column"
+              }
+            ]
+          },
+          "Trade": {
+            "specialities": {
+              "Chymist": {
+                "advances": 1
+              }
+            }
+          }
+        },
+        "xp": {
+          "total": 37e3,
+          "ledger": [
+            {
+              "name": "EA: Warrant of trade",
+              "cost": 750,
+              "source": "Creation"
+            },
+            {
+              "name": "Rank 1 Medicae",
+              "cost": 100,
+              "source": "Creation"
+            },
+            {
+              "name": "Rank 1 Scrutiny",
+              "cost": 100,
+              "source": "Creation"
+            },
+            {
+              "name": "Rank 1 Navigate Surface",
+              "cost": 100,
+              "source": "+1500 after prologue"
+            },
+            {
+              "name": "Rank 2 Medicae",
+              "cost": 200,
+              "source": "+1500 after prologue"
+            },
+            {
+              "name": "Rank 1 Charm",
+              "cost": 100,
+              "source": "+1500 after prologue"
+            },
+            {
+              "name": "Rank 1 Commerce",
+              "cost": 100,
+              "source": "+1500 after prologue"
+            },
+            {
+              "name": "Simple Fellowship",
+              "cost": 100,
+              "source": "+1500 after prologue"
+            },
+            {
+              "name": "Intermediate Fellowship",
+              "cost": 250,
+              "source": "+1500 after prologue"
+            },
+            {
+              "name": "Rank 2 Command",
+              "cost": 200,
+              "source": "+1500 after prologue"
+            },
+            {
+              "name": "Simple Perception",
+              "cost": 100,
+              "source": "+1500 after prologue"
+            },
+            {
+              "name": "Simple Intelligence",
+              "cost": 100,
+              "source": "+1500 after prologue"
+            },
+            {
+              "name": "Simple Willpower",
+              "cost": 250,
+              "source": "+1500 after prologue"
+            },
+            {
+              "name": "Rank 1 Decieve",
+              "cost": 100,
+              "source": "+1500 after prologue"
+            },
+            {
+              "name": "Peer (Ostrakis Polity)",
+              "cost": 200,
+              "source": "+1500 after prologue"
+            },
+            {
+              "name": "Rank 1 Inquiry",
+              "cost": 100,
+              "source": "+1500 after prologue"
+            },
+            {
+              "name": "Rank 1 Parry",
+              "cost": 300,
+              "source": "+2500 after Daemon"
+            },
+            {
+              "name": "Superior Chirugeon",
+              "cost": 400,
+              "source": "+2500 after Daemon"
+            },
+            {
+              "name": "Renowned Warrant",
+              "cost": 200,
+              "source": "+2500 after Daemon"
+            },
+            {
+              "name": "Legendary",
+              "cost": 400,
+              "source": "+2500 after Daemon"
+            },
+            {
+              "name": "Infused Knowledge",
+              "cost": 400,
+              "source": "+2500 after Daemon"
+            },
+            {
+              "name": "Jaded",
+              "cost": 300,
+              "source": "+2500 after Daemon"
+            },
+            {
+              "name": "Rank 1 Tech-Use",
+              "cost": 200,
+              "source": "+2500 after Daemon"
+            },
+            {
+              "name": "Intermediate Intelligence",
+              "cost": 250,
+              "source": "+2500 after Daemon"
+            },
+            {
+              "name": "Trade: Chemist",
+              "cost": 100,
+              "source": "+2500 after Daemon"
+            },
+            {
+              "name": "Weapon Training (Power)",
+              "cost": 300,
+              "source": "+1000 after Teleportarium Affair"
+            },
+            {
+              "name": "Rank 2 Commerce",
+              "cost": 200,
+              "source": "+1000 after Teleportarium Affair"
+            },
+            {
+              "name": "Rank 3 Commerce",
+              "cost": 300,
+              "source": "+1000 after Teleportarium Affair"
+            },
+            {
+              "name": "Keen Intuition",
+              "cost": 200,
+              "source": "+1000 after Teleportarium Affair"
+            },
+            {
+              "name": "Sprint",
+              "cost": 600,
+              "source": "+1500 after Garmr Mine Clearing"
+            },
+            {
+              "name": "Rank 1 Dodge",
+              "cost": 300,
+              "source": "+1500 after Garmr Mine Clearing"
+            },
+            {
+              "name": "Rank 2 Charm",
+              "cost": 200,
+              "source": "+1500 after Garmr Mine Clearing"
+            },
+            {
+              "name": "Simple Weapon Skill",
+              "cost": 500,
+              "source": "+1500 after Garmr Mine Clearing"
+            },
+            {
+              "name": "Forbidden Lore: Eldar",
+              "cost": 100,
+              "source": "+1500 after Eldar Tower, Station 128"
+            },
+            {
+              "name": "Rank 1 Intimidation",
+              "cost": 200,
+              "source": "+1500 after Eldar Tower, Station 128"
+            },
+            {
+              "name": "Resistance (Fear)",
+              "cost": 600,
+              "source": "+1500 after Eldar Tower, Station 128"
+            },
+            {
+              "name": "Adamantium Faith",
+              "cost": 600,
+              "source": "+1500 after Eldar Tower, Station 128"
+            },
+            {
+              "name": "Intermediate Weapon Skill",
+              "cost": 750,
+              "source": "+5000 After Junkrat Escape"
+            },
+            {
+              "name": "Field Vivisection - Human",
+              "cost": 450,
+              "source": "+5000 After Junkrat Escape"
+            },
+            {
+              "name": "Precision Killer (if above)",
+              "cost": 900,
+              "source": "+5000 After Junkrat Escape"
+            },
+            {
+              "name": "Iron Resolve",
+              "cost": 450,
+              "source": "+5000 After Junkrat Escape"
+            },
+            {
+              "name": "Iron Faith",
+              "cost": 600,
+              "source": "+5000 After Junkrat Escape"
+            },
+            {
+              "name": "Inspiring Aura",
+              "cost": 300,
+              "source": "+5000 After Junkrat Escape"
+            },
+            {
+              "name": "Bulwark of Faith",
+              "cost": 450,
+              "source": "+5000 After Junkrat Escape"
+            },
+            {
+              "name": "Rank 1 Awareness",
+              "cost": 100,
+              "source": "+5000 After Junkrat Escape"
+            },
+            {
+              "name": "Rank 2 Parry",
+              "cost": 600,
+              "source": "+5000 After Junkrat Escape"
+            },
+            {
+              "name": "Rank 3 Command",
+              "cost": 300,
+              "source": "+5000 After Junkrat Escape"
+            },
+            {
+              "name": "Rank 1 Scholastic Lore (Anatomy)",
+              "cost": 100,
+              "source": "+5000 After Junkrat Escape"
+            },
+            {
+              "name": "Rank 2 Scholastic Lore (Anatomy)",
+              "cost": 200,
+              "source": "+5000 After Junkrat Escape"
+            },
+            {
+              "name": "Rank 3 Scholastic Lore (Anatomy)",
+              "cost": 300,
+              "source": "+5000 After Junkrat Escape"
+            },
+            {
+              "name": "Instrument of His Will",
+              "cost": 600,
+              "source": "+1800 After Mountain, Bulwark, Tarot Card"
+            },
+            {
+              "name": "Personal Equipment",
+              "cost": 600,
+              "source": "+1800 After Mountain, Bulwark, Tarot Card"
+            },
+            {
+              "name": "Rank 3 Medicae",
+              "cost": 300,
+              "source": "+1800 After Mountain, Bulwark, Tarot Card"
+            },
+            {
+              "name": "Rank 2 Awareness",
+              "cost": 200,
+              "source": "+1800 After Mountain, Bulwark, Tarot Card"
+            },
+            {
+              "name": "Deny the Witch",
+              "cost": 450,
+              "source": "+3000 After Pokemon"
+            },
+            {
+              "name": "Sprint",
+              "cost": 600,
+              "source": "600"
+            },
+            {
+              "name": "Purity of Hatred",
+              "cost": 450,
+              "source": "450"
+            },
+            {
+              "name": "Witch Hunter",
+              "cost": 300,
+              "source": "300"
+            },
+            {
+              "name": "Unfaultering Redemption",
+              "cost": 450,
+              "source": "450"
+            },
+            {
+              "name": "Firebrand's Call",
+              "cost": 600,
+              "source": "600"
+            },
+            {
+              "name": "Mind Sight",
+              "cost": 200,
+              "source": "200"
+            },
+            {
+              "name": "Mind Trap",
+              "cost": 300,
+              "source": "300"
+            },
+            {
+              "name": "Cleanse and Purify",
+              "cost": 600,
+              "source": "600"
+            },
+            {
+              "name": "Weapon Training (Flamer)",
+              "cost": 300,
+              "source": "300"
+            },
+            {
+              "name": "Inescapable Attack",
+              "cost": 900,
+              "source": "900"
+            },
+            {
+              "name": "House Honors",
+              "cost": 200,
+              "source": "200"
+            },
+            {
+              "name": "House Marksman\u2019s Honors",
+              "cost": 450,
+              "source": "450"
+            },
+            {
+              "name": "Simple Agility",
+              "cost": 500,
+              "source": "+X While Abroad"
+            },
+            {
+              "name": "Step Aside",
+              "cost": 1200,
+              "source": "+X While Abroad"
+            },
+            {
+              "name": "Trained Weapon Skill",
+              "cost": 750,
+              "source": "+X While Abroad"
+            },
+            {
+              "name": "Rank 3 Charm",
+              "cost": 300,
+              "source": "+X While Abroad"
+            },
+            {
+              "name": "Rank 1 Survival",
+              "cost": 100,
+              "source": "+X While Abroad"
+            },
+            {
+              "name": "Rank 2 Survival",
+              "cost": 200,
+              "source": "+X While Abroad"
+            },
+            {
+              "name": "Improved Initiative",
+              "cost": 300,
+              "source": "+X While Abroad"
+            },
+            {
+              "name": "Trained Fellowship",
+              "cost": 500,
+              "source": "+X While Abroad"
+            },
+            {
+              "name": "Proficient Fellowship",
+              "cost": 750,
+              "source": "+X While Abroad"
+            },
+            {
+              "name": "Intermediate Perception",
+              "cost": 250,
+              "source": "+X While Abroad"
+            },
+            {
+              "name": "Rank 4 Command",
+              "cost": 400,
+              "source": "+X While Abroad"
+            },
+            {
+              "name": "Rank 2 Tech Use",
+              "cost": 200,
+              "source": "+X While Abroad"
+            },
+            {
+              "name": "Rank 1 Interrogation",
+              "cost": 100,
+              "source": "+X While Abroad"
+            },
+            {
+              "name": "Rank 1 Forbidden Lore: Guild",
+              "cost": 100,
+              "source": "+X While Abroad"
+            },
+            {
+              "name": "Master and Commander",
+              "cost": 400,
+              "source": "+X While Abroad"
+            },
+            {
+              "name": "Rank 1 Acrobatics",
+              "cost": 200,
+              "source": "+X While Abroad"
+            },
+            {
+              "name": "Rank 1 Athletics",
+              "cost": 200,
+              "source": "+X While Abroad"
+            },
+            {
+              "name": "Resistance (Psychic)",
+              "cost": 600,
+              "source": "+600 post Ork planet"
+            },
+            {
+              "name": "Intermediate Agility",
+              "cost": 750,
+              "source": "+600 post Ork planet"
+            },
+            {
+              "name": "Bodyguard",
+              "cost": 600,
+              "source": "+600 post Ork planet"
+            },
+            {
+              "name": "Swift Attack",
+              "cost": 600,
+              "source": "+600 post Ork planet"
+            },
+            {
+              "name": "Rank 1 Forbidden Lore: Inquisition",
+              "cost": 100,
+              "source": "+600 post Ork planet"
+            },
+            {
+              "name": "Rank 3 Survival",
+              "cost": 300,
+              "source": "+600 post Ork planet"
+            },
+            {
+              "name": "Lightning Attack",
+              "cost": 1200,
+              "source": "1200"
+            },
+            {
+              "name": "One-on-One",
+              "cost": 900,
+              "source": "900"
+            },
+            {
+              "name": "FL (Hereticus)",
+              "cost": 100,
+              "source": "100"
+            },
+            {
+              "name": "FL (Egarian Artifice)",
+              "cost": 100,
+              "source": "100"
+            },
+            {
+              "name": "FL (Astartes)",
+              "cost": 100,
+              "source": "100"
+            },
+            {
+              "name": "FL (Malleus)",
+              "cost": 100,
+              "source": "100"
+            },
+            {
+              "name": "FL (Daemonology)",
+              "cost": 100,
+              "source": "100"
+            },
+            {
+              "name": "FL (Yu'vath)",
+              "cost": 100,
+              "source": "100"
+            },
+            {
+              "name": "FL (Skaaldir Clans)",
+              "cost": 100,
+              "source": "100"
+            },
+            {
+              "name": "Mounted Warrior",
+              "cost": 600,
+              "source": "600"
+            },
+            {
+              "name": "Intermediate Willpower",
+              "cost": 500,
+              "source": "500"
+            },
+            {
+              "name": "Counter Attack",
+              "cost": 900,
+              "source": "900"
+            },
+            {
+              "name": "The Grey Hand (Rex)",
+              "cost": 300,
+              "source": "300"
+            }
+          ],
+          "spent": 37e3
+        },
+        "aptitudes": [
+          "Fellowship",
+          "Intelligence",
+          "Perception",
+          "Willpower",
+          "Fieldcraft",
+          "Social",
+          "Knowledge",
+          "Leadership"
+        ],
+        "tarot": {},
+        "psy": {
+          "rating": 0,
+          "class": "none",
+          "sustained": 0
+        },
+        "psychicPowers": [],
+        "insanity": {
+          "points": 0,
+          "disorders": []
+        },
+        "corruption": {
+          "points": 1,
+          "malignancies": [],
+          "mutations": []
+        },
+        "criticalInjuries": [],
+        "amputations": [],
         "talents": [
           "Contact Network",
           "Light Sleeper",
@@ -3823,6 +6590,10 @@ roll_table "Power Field Destruction" {
               "single": true,
               "burst": 0,
               "full": 0
+            },
+            "clip": {
+              "max": 5,
+              "value": 5
             }
           },
           {
@@ -3841,6 +6612,10 @@ roll_table "Power Field Destruction" {
               "single": true,
               "burst": 0,
               "full": 0
+            },
+            "clip": {
+              "max": 6,
+              "value": 6
             }
           },
           {
@@ -3859,6 +6634,10 @@ roll_table "Power Field Destruction" {
               "single": true,
               "burst": 0,
               "full": 0
+            },
+            "clip": {
+              "max": 2,
+              "value": 2
             }
           },
           {
@@ -3899,20 +6678,142 @@ roll_table "Power Field Destruction" {
             "sbMultiplier": 1
           }
         ],
+        "armourItems": [],
+        "gear": [
+          {
+            "name": "Microbead",
+            "equipped": true,
+            "weight": 0
+          },
+          {
+            "name": "Fine Clothes",
+            "equipped": true,
+            "weight": 0
+          },
+          {
+            "name": "Ancestral Seal (Heirloom)",
+            "equipped": true,
+            "weight": 2
+          },
+          {
+            "name": "Suppression Shield",
+            "equipped": true,
+            "weight": 5
+          },
+          {
+            "name": "Tempestuous Armor",
+            "equipped": true,
+            "weight": 15
+          },
+          {
+            "name": "Advanced Medikit",
+            "equipped": true,
+            "weight": 5
+          },
+          {
+            "name": "Aether Blade",
+            "equipped": true,
+            "weight": 3
+          },
+          {
+            "name": "Smoke Grenades",
+            "equipped": true,
+            "weight": 0.5
+          },
+          {
+            "name": "Bleeder Rounds (2 Clips)",
+            "equipped": true
+          },
+          {
+            "name": "Hand of Retribution",
+            "equipped": true
+          },
+          {
+            "name": "Cyber-Implant Tools",
+            "equipped": true
+          },
+          {
+            "name": "Hand Cannon",
+            "equipped": true
+          },
+          {
+            "name": "Brazier of St Roberto",
+            "equipped": true
+          },
+          {
+            "name": "Cameleoline Cloak",
+            "equipped": true,
+            "weight": 0
+          },
+          {
+            "name": "Exterminator Pistol (2x)",
+            "equipped": true,
+            "weight": 2
+          },
+          {
+            "name": "Rebreather",
+            "equipped": true,
+            "weight": 0
+          },
+          {
+            "name": "Deadspace Earpieces",
+            "equipped": true
+          },
+          {
+            "name": "Filtration Plugs",
+            "equipped": true
+          },
+          {
+            "name": "Krys the Charron Servitor",
+            "equipped": true
+          },
+          {
+            "name": "Bell the Servitor Drone",
+            "equipped": true
+          },
+          {
+            "name": "Astor the Augur Skull",
+            "equipped": true
+          },
+          {
+            "name": "Comm Leech",
+            "equipped": true
+          },
+          {
+            "name": "Alpha Legionare Bolter",
+            "equipped": true
+          },
+          {
+            "name": "Voidblade",
+            "equipped": true,
+            "weight": 1
+          },
+          {
+            "name": "Clip Drop Harness",
+            "equipped": true
+          },
+          {
+            "name": "Wraithbone Chunk",
+            "equipped": true
+          },
+          {
+            "name": "Iridescent Metal",
+            "equipped": true
+          }
+        ],
         "field": {
           "rating": 30,
           "overloadMax": 0
         },
         "source": {
-          "adapter": "xlsx-campaign-v1",
+          "adapter": "xlsx-campaign-v3",
           "file": "Harys Abaoth (John).xlsx",
           "player": "John",
-          "importedAt": "2026-07-08T17:46:33.900Z",
+          "importedAt": "2026-07-12T00:26:59.666Z",
           "unmapped": [
-            "skills (schema v2)",
-            "weapon clip (schema v2)",
-            "weapon trainings (schema v2)",
-            "xp / aptitudes / gear / house content (schema v2)"
+            "armour worn as items (the STATS AP scalar is the flat armour block)",
+            "house content (Dramatic Moments, custom traits)",
+            "weapon trainings"
           ]
         }
       }
@@ -3922,20 +6823,56 @@ roll_table "Power Field Destruction" {
       "player": "Matt",
       "name": "Ogg",
       "doc": {
-        "schemaVersion": 1,
+        "schemaVersion": 3,
         "kind": "dh2.character",
         "system": "dh2",
         "name": "Ogg",
         "characteristics": {
-          "ws": 62,
-          "bs": 38,
-          "s": 50,
-          "t": 60,
-          "ag": 45,
-          "int": 21,
-          "per": 38,
-          "wp": 50,
-          "fel": 32
+          "ws": {
+            "base": 62,
+            "advances": 0,
+            "modifiers": []
+          },
+          "bs": {
+            "base": 38,
+            "advances": 0,
+            "modifiers": []
+          },
+          "s": {
+            "base": 40,
+            "advances": 2,
+            "modifiers": []
+          },
+          "t": {
+            "base": 60,
+            "advances": 0,
+            "modifiers": []
+          },
+          "ag": {
+            "base": 25,
+            "advances": 4,
+            "modifiers": []
+          },
+          "int": {
+            "base": 21,
+            "advances": 0,
+            "modifiers": []
+          },
+          "per": {
+            "base": 38,
+            "advances": 0,
+            "modifiers": []
+          },
+          "wp": {
+            "base": 50,
+            "advances": 0,
+            "modifiers": []
+          },
+          "fel": {
+            "base": 17,
+            "advances": 3,
+            "modifiers": []
+          }
         },
         "unnatural": {
           "s": 2,
@@ -3950,6 +6887,7 @@ roll_table "Power Field Destruction" {
           "rightLeg": 0
         },
         "wounds": {
+          "critical": 0,
           "current": 19,
           "max": 19
         },
@@ -3957,6 +6895,139 @@ roll_table "Power Field Destruction" {
           "current": 1,
           "max": 1
         },
+        "fatigue": {
+          "current": 0
+        },
+        "skills": {
+          "Acrobatics": {
+            "advances": 0
+          },
+          "Athletics": {
+            "advances": 3
+          },
+          "Awareness": {
+            "advances": 1
+          },
+          "Charm": {
+            "advances": 0
+          },
+          "Command": {
+            "advances": 0
+          },
+          "Commerce": {
+            "advances": 0
+          },
+          "Common Lore": {
+            "specialities": {
+              "Tau": {
+                "advances": 1
+              }
+            }
+          },
+          "Deceive": {
+            "advances": 0
+          },
+          "Dodge": {
+            "advances": 4
+          },
+          "Forbidden Lore": {
+            "specialities": {
+              "Warp": {
+                "advances": 1
+              }
+            }
+          },
+          "Inquiry": {
+            "advances": 0
+          },
+          "Interrogation": {
+            "advances": 0
+          },
+          "Intimidate": {
+            "advances": 1
+          },
+          "Linguistics": {
+            "specialities": {
+              "Tau": {
+                "advances": 1
+              }
+            }
+          },
+          "Logic": {
+            "advances": 0
+          },
+          "Medicae": {
+            "advances": 0
+          },
+          "Navigate": {
+            "specialities": {}
+          },
+          "Operate": {
+            "specialities": {}
+          },
+          "Parry": {
+            "advances": 4
+          },
+          "Psyniscience": {
+            "advances": 0
+          },
+          "Scholastic Lore": {
+            "specialities": {}
+          }
+        },
+        "xp": {
+          "total": 18500,
+          "ledger": [],
+          "spent": 18350
+        },
+        "aptitudes": [
+          {
+            "name": "Tech",
+            "source": "Background"
+          },
+          {
+            "name": "Toughness",
+            "source": "Homeworld"
+          },
+          {
+            "name": "BS",
+            "source": "Role"
+          },
+          {
+            "name": "Defense",
+            "source": "Role"
+          },
+          {
+            "name": "Offense",
+            "source": "Role"
+          },
+          {
+            "name": "Strength",
+            "source": "Role"
+          },
+          {
+            "name": "WS",
+            "source": "Role"
+          }
+        ],
+        "tarot": {},
+        "psy": {
+          "rating": 0,
+          "class": "none",
+          "sustained": 0
+        },
+        "psychicPowers": [],
+        "insanity": {
+          "points": 6,
+          "disorders": []
+        },
+        "corruption": {
+          "points": 7,
+          "malignancies": [],
+          "mutations": []
+        },
+        "criticalInjuries": [],
+        "amputations": [],
         "talents": [
           "Iron Jaw",
           "Weapon Training (Power)",
@@ -4028,21 +7099,51 @@ roll_table "Power Field Destruction" {
             "sbMultiplier": 1
           }
         ],
+        "armourItems": [],
+        "gear": [
+          {
+            "name": "Power Shield",
+            "equipped": true
+          },
+          {
+            "name": "(B) Flail of Chastisement, Mono, Custom Grip",
+            "equipped": true
+          },
+          {
+            "name": "(G) Legionary Armor",
+            "equipped": true
+          },
+          {
+            "name": "Tau Pulse Pistol",
+            "equipped": true
+          },
+          {
+            "name": "Karelian Repulsor",
+            "equipped": true
+          },
+          {
+            "name": "Anuvver Wun",
+            "equipped": true
+          },
+          {
+            "name": "Git Vision Goggles",
+            "equipped": true
+          }
+        ],
         "field": {
           "rating": 0,
           "overloadMax": 0
         },
         "source": {
-          "adapter": "xlsx-campaign-v1",
+          "adapter": "xlsx-campaign-v3",
           "file": "Ogg.xlsx",
           "player": "Matt",
-          "importedAt": "2026-07-08T17:46:34.020Z",
+          "importedAt": "2026-07-12T00:26:59.827Z",
           "unmapped": [
             "armour is the STATS scalar applied to all locations",
-            "psychic powers (schema v2)",
-            "skills (schema v2)",
-            "weapon trainings (schema v2)",
-            "xp / aptitudes / gear / house content (schema v2)"
+            "armour worn as items (the STATS AP scalar is the flat armour block)",
+            "house content (Dramatic Moments, custom traits)",
+            "weapon trainings"
           ]
         }
       }
@@ -4052,20 +7153,56 @@ roll_table "Power Field Destruction" {
       "player": "Matt",
       "name": "Shas\u2019ui Kai ta ran Y\u2019eldi",
       "doc": {
-        "schemaVersion": 1,
+        "schemaVersion": 3,
         "kind": "dh2.character",
         "system": "dh2",
         "name": "Shas\u2019ui Kai ta ran Y\u2019eldi",
         "characteristics": {
-          "ws": 32,
-          "bs": 70,
-          "s": 33,
-          "t": 44,
-          "ag": 70,
-          "int": 58,
-          "per": 62,
-          "wp": 63,
-          "fel": 34
+          "ws": {
+            "base": 32,
+            "advances": 0,
+            "modifiers": []
+          },
+          "bs": {
+            "base": 45,
+            "advances": 5,
+            "modifiers": []
+          },
+          "s": {
+            "base": 8,
+            "advances": 5,
+            "modifiers": []
+          },
+          "t": {
+            "base": 44,
+            "advances": 0,
+            "modifiers": []
+          },
+          "ag": {
+            "base": 70,
+            "advances": 0,
+            "modifiers": []
+          },
+          "int": {
+            "base": 38,
+            "advances": 4,
+            "modifiers": []
+          },
+          "per": {
+            "base": 42,
+            "advances": 4,
+            "modifiers": []
+          },
+          "wp": {
+            "base": 63,
+            "advances": 0,
+            "modifiers": []
+          },
+          "fel": {
+            "base": 29,
+            "advances": 1,
+            "modifiers": []
+          }
         },
         "unnatural": {},
         "armour": {
@@ -4077,6 +7214,7 @@ roll_table "Power Field Destruction" {
           "rightLeg": 4
         },
         "wounds": {
+          "critical": 0,
           "current": 14,
           "max": 14
         },
@@ -4084,6 +7222,208 @@ roll_table "Power Field Destruction" {
           "current": 4,
           "max": 7
         },
+        "fatigue": {
+          "current": 0
+        },
+        "skills": {
+          "Acrobatics": {
+            "advances": 3
+          },
+          "Athletics": {
+            "advances": 2
+          },
+          "Awareness": {
+            "advances": 4
+          },
+          "Charm": {
+            "advances": 0
+          },
+          "Command": {
+            "advances": 0
+          },
+          "Commerce": {
+            "advances": 0
+          },
+          "Common Lore": {
+            "specialities": {
+              "Tau Empire": {
+                "advances": 1
+              }
+            }
+          },
+          "Deceive": {
+            "advances": 0
+          },
+          "Dodge": {
+            "advances": 4
+          },
+          "Forbidden Lore": {
+            "specialities": {
+              "Tau": {
+                "advances": 1,
+                "modifiers": [
+                  {
+                    "value": 3,
+                    "source": "sheet Misc column"
+                  }
+                ]
+              },
+              "Farsight Enclave": {
+                "advances": 1
+              }
+            }
+          },
+          "Inquiry": {
+            "advances": 0
+          },
+          "Interrogation": {
+            "advances": 0
+          },
+          "Intimidate": {
+            "advances": 0
+          },
+          "Linguistics": {
+            "specialities": {
+              "Tau": {
+                "advances": 1
+              }
+            }
+          },
+          "Logic": {
+            "advances": 1
+          },
+          "Medicae": {
+            "advances": 0
+          },
+          "Navigate": {
+            "specialities": {
+              "Surface": {
+                "advances": 1
+              },
+              "Stellar": {
+                "advances": 1
+              },
+              "Warp": {
+                "advances": 0
+              }
+            }
+          },
+          "Operate": {
+            "specialities": {
+              "Voidship": {
+                "advances": 3
+              },
+              "Surface": {
+                "advances": 1
+              },
+              "Aeronautica": {
+                "advances": 1
+              }
+            }
+          },
+          "Parry": {
+            "advances": 0
+          },
+          "Psyniscience": {
+            "advances": 0
+          },
+          "Scholastic Lore": {
+            "specialities": {
+              "Tau Empire": {
+                "advances": 2
+              }
+            }
+          },
+          "Scrutiny": {
+            "advances": 1
+          },
+          "Security": {
+            "advances": 1
+          },
+          "Sleight of Hand": {
+            "advances": 1
+          },
+          "Stealth": {
+            "advances": 1,
+            "modifiers": [
+              {
+                "value": 30,
+                "source": "sheet Misc column"
+              }
+            ]
+          },
+          "Survival": {
+            "advances": 1
+          },
+          "Tech-Use": {
+            "advances": 3,
+            "modifiers": [
+              {
+                "value": 10,
+                "source": "sheet Misc column"
+              }
+            ]
+          }
+        },
+        "xp": {
+          "total": 37e3,
+          "ledger": [],
+          "spent": 37e3
+        },
+        "aptitudes": [
+          {
+            "name": "Intelligence",
+            "source": "Homeworld"
+          },
+          {
+            "name": "Finesse",
+            "source": "Background"
+          },
+          {
+            "name": "BS",
+            "source": "Void-Master"
+          },
+          {
+            "name": "Fieldcraft (Fin Dupe)",
+            "source": "Role"
+          },
+          {
+            "name": "Agility",
+            "source": "Role"
+          },
+          {
+            "name": "Willpower",
+            "source": "Role"
+          },
+          {
+            "name": "Tech",
+            "source": "Role"
+          },
+          {
+            "name": "Perception",
+            "source": "Role"
+          }
+        ],
+        "tarot": {},
+        "psy": {
+          "rating": 0,
+          "class": "none",
+          "sustained": 0
+        },
+        "psychicPowers": [],
+        "insanity": {
+          "points": 13,
+          "disorders": [
+            "Mind-shaped (+30 to resist ethereals)"
+          ]
+        },
+        "corruption": {
+          "points": 0,
+          "malignancies": [],
+          "mutations": []
+        },
+        "criticalInjuries": [],
+        "amputations": [],
         "talents": [
           "Hotshot Pilot",
           "Windstrider",
@@ -4149,6 +7489,10 @@ roll_table "Power Field Destruction" {
               "single": true,
               "burst": 2,
               "full": 4
+            },
+            "clip": {
+              "max": 36,
+              "value": 36
             }
           },
           {
@@ -4165,7 +7509,75 @@ roll_table "Power Field Destruction" {
               "single": true,
               "burst": 2,
               "full": 0
+            },
+            "clip": {
+              "max": 16,
+              "value": 16
             }
+          }
+        ],
+        "armourItems": [],
+        "gear": [
+          {
+            "name": "[G] Pulse Rifle",
+            "equipped": true,
+            "weight": 8
+          },
+          {
+            "name": "Tau Photon Grenade x 3",
+            "equipped": true,
+            "weight": 1.5
+          },
+          {
+            "name": "Tau Recon Armor",
+            "equipped": true,
+            "weight": 12
+          },
+          {
+            "name": "* Microbead",
+            "equipped": true
+          },
+          {
+            "name": "* Translator Unit",
+            "equipped": true
+          },
+          {
+            "name": "* Blacksun Filter",
+            "equipped": true
+          },
+          {
+            "name": "[B] Pulse Pistol",
+            "equipped": true,
+            "weight": 3
+          },
+          {
+            "name": "[C] Tau Longshot Pulse Rifle",
+            "equipped": true
+          },
+          {
+            "name": "Combitool",
+            "equipped": true
+          },
+          {
+            "name": "Vial of powder from Deadalus",
+            "equipped": true
+          },
+          {
+            "name": "3000 poke bucks",
+            "equipped": true,
+            "quantity": 3e3
+          },
+          {
+            "name": "fishing rod (G)",
+            "equipped": true
+          },
+          {
+            "name": "spray bottle",
+            "equipped": true
+          },
+          {
+            "name": "poke shotgun",
+            "equipped": true
           }
         ],
         "field": {
@@ -4173,17 +7585,15 @@ roll_table "Power Field Destruction" {
           "overloadMax": 0
         },
         "source": {
-          "adapter": "xlsx-campaign-v1",
+          "adapter": "xlsx-campaign-v3",
           "file": "Shas\u2019ui Kai_ta_ran Y\u2019eldi (La_y_eldi) (Matt).xlsx",
           "player": "Matt",
-          "importedAt": "2026-07-08T17:46:34.136Z",
+          "importedAt": "2026-07-12T00:26:59.980Z",
           "unmapped": [
             "armour is the STATS scalar applied to all locations",
-            "psychic powers (schema v2)",
-            "skills (schema v2)",
-            "weapon clip (schema v2)",
-            "weapon trainings (schema v2)",
-            "xp / aptitudes / gear / house content (schema v2)"
+            "armour worn as items (the STATS AP scalar is the flat armour block)",
+            "house content (Dramatic Moments, custom traits)",
+            "weapon trainings"
           ]
         }
       }
@@ -4193,20 +7603,56 @@ roll_table "Power Field Destruction" {
       "player": "Ryan",
       "name": "Baron Talvdin Hourace Horp",
       "doc": {
-        "schemaVersion": 1,
+        "schemaVersion": 3,
         "kind": "dh2.character",
         "system": "dh2",
         "name": "Baron Talvdin Hourace Horp",
         "characteristics": {
-          "ws": 66,
-          "bs": 40,
-          "s": 50,
-          "t": 61,
-          "ag": 43,
-          "int": 36,
-          "per": 66,
-          "wp": 62,
-          "fel": 44
+          "ws": {
+            "base": 66,
+            "advances": 0,
+            "modifiers": []
+          },
+          "bs": {
+            "base": 40,
+            "advances": 0,
+            "modifiers": []
+          },
+          "s": {
+            "base": 30,
+            "advances": 4,
+            "modifiers": []
+          },
+          "t": {
+            "base": 56,
+            "advances": 1,
+            "modifiers": []
+          },
+          "ag": {
+            "base": 18,
+            "advances": 5,
+            "modifiers": []
+          },
+          "int": {
+            "base": 36,
+            "advances": 0,
+            "modifiers": []
+          },
+          "per": {
+            "base": 46,
+            "advances": 4,
+            "modifiers": []
+          },
+          "wp": {
+            "base": 62,
+            "advances": 0,
+            "modifiers": []
+          },
+          "fel": {
+            "base": 24,
+            "advances": 4,
+            "modifiers": []
+          }
         },
         "unnatural": {},
         "armour": {
@@ -4218,6 +7664,7 @@ roll_table "Power Field Destruction" {
           "rightLeg": 6
         },
         "wounds": {
+          "critical": 0,
           "current": 10,
           "max": 10
         },
@@ -4225,6 +7672,296 @@ roll_table "Power Field Destruction" {
           "current": 5,
           "max": 6
         },
+        "fatigue": {
+          "current": 0
+        },
+        "skills": {
+          "Acrobatics": {
+            "advances": 0
+          },
+          "Athletics": {
+            "advances": 0
+          },
+          "Awareness": {
+            "advances": 0
+          },
+          "Charm": {
+            "advances": 4
+          },
+          "Command": {
+            "advances": 0
+          },
+          "Commerce": {
+            "advances": 0
+          },
+          "Common Lore": {
+            "specialities": {
+              "Underworld": {
+                "advances": 0
+              }
+            }
+          },
+          "Deceive": {
+            "advances": 1
+          },
+          "Dodge": {
+            "advances": 2
+          },
+          "Forbidden Lore": {
+            "specialities": {
+              "The Warp": {
+                "advances": 1,
+                "modifiers": [
+                  {
+                    "value": 5,
+                    "source": "sheet Misc column"
+                  }
+                ]
+              },
+              "Daemonology": {
+                "advances": 0
+              }
+            }
+          },
+          "Inquiry": {
+            "advances": 0
+          },
+          "Interrogation": {
+            "advances": 0
+          },
+          "Intimidate": {
+            "advances": 0
+          },
+          "Linguistics": {
+            "specialities": {}
+          },
+          "Logic": {
+            "advances": 0
+          },
+          "Medicae": {
+            "advances": 0
+          },
+          "Navigate": {
+            "specialities": {}
+          },
+          "Operate": {
+            "specialities": {}
+          },
+          "Parry": {
+            "advances": 0
+          },
+          "Psyniscience": {
+            "advances": 4
+          },
+          "Scholastic Lore": {
+            "specialities": {}
+          },
+          "Scrutiny": {
+            "advances": 0
+          },
+          "Security": {
+            "advances": 0
+          },
+          "Sleight of Hand": {
+            "advances": 1
+          },
+          "Stealth": {
+            "advances": 1,
+            "modifiers": [
+              {
+                "value": 30,
+                "source": "sheet Misc column"
+              }
+            ]
+          },
+          "Survival": {
+            "advances": 0
+          },
+          "Tech-Use": {
+            "advances": 0
+          }
+        },
+        "xp": {
+          "total": 3e4,
+          "ledger": [],
+          "spent": 29900
+        },
+        "aptitudes": [
+          {
+            "name": "Weapon Skill",
+            "source": "Homeworld"
+          },
+          {
+            "name": "Psyker",
+            "source": "BG*"
+          },
+          {
+            "name": "Defense",
+            "source": "Role"
+          },
+          {
+            "name": "Intelligence",
+            "source": "Role"
+          },
+          {
+            "name": "Knowledge",
+            "source": "Role"
+          },
+          {
+            "name": "Perception",
+            "source": "Role"
+          },
+          {
+            "name": "Willpower",
+            "source": "Role"
+          }
+        ],
+        "tarot": {},
+        "psy": {
+          "rating": 8,
+          "class": "bound",
+          "sustained": 0
+        },
+        "psychicPowers": [
+          {
+            "name": "Warp Perception",
+            "equipped": true,
+            "discipline": "Div"
+          },
+          {
+            "name": "Prescience",
+            "equipped": true,
+            "discipline": "Div"
+          },
+          {
+            "name": "Forboding",
+            "equipped": true,
+            "discipline": "Div"
+          },
+          {
+            "name": "Forewarning",
+            "equipped": true,
+            "discipline": "Div"
+          },
+          {
+            "name": "Scrier's Gaze",
+            "equipped": true,
+            "discipline": "Div"
+          },
+          {
+            "name": "Precognition",
+            "equipped": true,
+            "discipline": "Div"
+          },
+          {
+            "name": "Winding Fate",
+            "equipped": true,
+            "discipline": "Div"
+          },
+          {
+            "name": "Perfect Timing",
+            "equipped": true,
+            "discipline": "Div"
+          },
+          {
+            "name": "Erasure",
+            "equipped": true,
+            "discipline": "Telepath"
+          },
+          {
+            "name": "Hallucination",
+            "equipped": true,
+            "discipline": "Telepath"
+          },
+          {
+            "name": "Dominate",
+            "equipped": true,
+            "discipline": "Telepath"
+          },
+          {
+            "name": "Telepathic Link",
+            "equipped": true,
+            "discipline": "Telepath"
+          },
+          {
+            "name": "Invisibility",
+            "equipped": true,
+            "discipline": "Telepath"
+          },
+          {
+            "name": "Terrify",
+            "equipped": true,
+            "discipline": "Telepath"
+          },
+          {
+            "name": "Psychic Shriek",
+            "equipped": true,
+            "discipline": "Telepath"
+          },
+          {
+            "name": "Puppet Master",
+            "equipped": true,
+            "discipline": "Telepath"
+          },
+          {
+            "name": "Invigorate",
+            "equipped": true,
+            "discipline": "Biomancy"
+          },
+          {
+            "name": "Smite",
+            "equipped": true,
+            "discipline": "Biomancy"
+          },
+          {
+            "name": "Shape Flesh",
+            "equipped": true,
+            "discipline": "Biomancy"
+          },
+          {
+            "name": "Iron Arm",
+            "equipped": true,
+            "discipline": "Biomancy"
+          },
+          {
+            "name": "Warp Speed",
+            "equipped": true,
+            "discipline": "Biomancy"
+          },
+          {
+            "name": "Enfeeble",
+            "equipped": true,
+            "discipline": "Biomancy"
+          },
+          {
+            "name": "Life Leech",
+            "equipped": true,
+            "discipline": "Biomancy"
+          },
+          {
+            "name": "Hemmorage",
+            "equipped": true,
+            "discipline": "Biomancy"
+          },
+          {
+            "name": "Endurance",
+            "equipped": true,
+            "discipline": "Biomancy"
+          }
+        ],
+        "insanity": {
+          "points": 9,
+          "disorders": [
+            "Phobia (Daemons)"
+          ]
+        },
+        "corruption": {
+          "points": 10,
+          "malignancies": [],
+          "mutations": []
+        },
+        "criticalInjuries": [],
+        "amputations": [],
         "talents": [
           "Enemy Slaanesh"
         ],
@@ -4246,6 +7983,10 @@ roll_table "Power Field Destruction" {
               "single": true,
               "burst": 2,
               "full": 0
+            },
+            "clip": {
+              "max": 30,
+              "value": 30
             }
           },
           {
@@ -4266,22 +8007,80 @@ roll_table "Power Field Destruction" {
             "sbMultiplier": 1
           }
         ],
+        "armourItems": [],
+        "gear": [
+          {
+            "name": "Laspistol",
+            "equipped": true
+          },
+          {
+            "name": "Collapsable Staff",
+            "equipped": true
+          },
+          {
+            "name": "Holo-guard Armor",
+            "equipped": true
+          },
+          {
+            "name": "Iron Lantern - Psy Focus (+10 Psy)",
+            "equipped": true
+          },
+          {
+            "name": "Lho-Sticks",
+            "equipped": true
+          },
+          {
+            "name": "1 Black Fast Suit",
+            "equipped": true,
+            "quantity": 1
+          },
+          {
+            "name": "Armament Belts (6 cylinder clips 3 grenades)",
+            "equipped": true
+          },
+          {
+            "name": "Battered Hilt",
+            "equipped": true
+          },
+          {
+            "name": "Red Dawn the Fhaisorr",
+            "equipped": true
+          },
+          {
+            "name": "Eye of Lokhir (Spyglass)",
+            "equipped": true
+          },
+          {
+            "name": "Nightsky Robe +30 to Stealth tests.",
+            "equipped": true
+          },
+          {
+            "name": "Corpse Starch Ration",
+            "equipped": true
+          },
+          {
+            "name": "Coppa' Channeling Rod",
+            "equipped": true
+          },
+          {
+            "name": "Void Suit",
+            "equipped": true
+          }
+        ],
         "field": {
           "rating": 0,
           "overloadMax": 0
         },
         "source": {
-          "adapter": "xlsx-campaign-v1",
+          "adapter": "xlsx-campaign-v3",
           "file": "Baron Talvdin Horp of Grizdek.xlsx",
           "player": "Ryan",
-          "importedAt": "2026-07-08T17:46:34.245Z",
+          "importedAt": "2026-07-12T00:27:00.146Z",
           "unmapped": [
             "armour is the STATS scalar applied to all locations",
-            "psychic powers (schema v2)",
-            "skills (schema v2)",
-            "weapon clip (schema v2)",
-            "weapon trainings (schema v2)",
-            "xp / aptitudes / gear / house content (schema v2)"
+            "armour worn as items (the STATS AP scalar is the flat armour block)",
+            "house content (Dramatic Moments, custom traits)",
+            "weapon trainings"
           ]
         }
       }
@@ -4291,20 +8090,56 @@ roll_table "Power Field Destruction" {
       "player": "Ryan",
       "name": "Sgt. Reco Tamarin of the 401st Trailblaizer Unit",
       "doc": {
-        "schemaVersion": 1,
+        "schemaVersion": 3,
         "kind": "dh2.character",
         "system": "dh2",
         "name": "Sgt. Reco Tamarin of the 401st Trailblaizer Unit",
         "characteristics": {
-          "ws": 34,
-          "bs": 59,
-          "s": 30,
-          "t": 36,
-          "ag": 44,
-          "int": 38,
-          "per": 63,
-          "wp": 33,
-          "fel": 35
+          "ws": {
+            "base": 34,
+            "advances": 0,
+            "modifiers": []
+          },
+          "bs": {
+            "base": 39,
+            "advances": 4,
+            "modifiers": []
+          },
+          "s": {
+            "base": 30,
+            "advances": 0,
+            "modifiers": []
+          },
+          "t": {
+            "base": 36,
+            "advances": 0,
+            "modifiers": []
+          },
+          "ag": {
+            "base": 44,
+            "advances": 0,
+            "modifiers": []
+          },
+          "int": {
+            "base": 38,
+            "advances": 0,
+            "modifiers": []
+          },
+          "per": {
+            "base": 43,
+            "advances": 4,
+            "modifiers": []
+          },
+          "wp": {
+            "base": 33,
+            "advances": 0,
+            "modifiers": []
+          },
+          "fel": {
+            "base": 35,
+            "advances": 0,
+            "modifiers": []
+          }
         },
         "unnatural": {},
         "armour": {
@@ -4316,6 +8151,7 @@ roll_table "Power Field Destruction" {
           "rightLeg": 0
         },
         "wounds": {
+          "critical": 0,
           "current": 0,
           "max": 13
         },
@@ -4323,6 +8159,171 @@ roll_table "Power Field Destruction" {
           "current": 3,
           "max": 3
         },
+        "fatigue": {
+          "current": 0
+        },
+        "skills": {
+          "Acrobatics": {
+            "advances": 2
+          },
+          "Athletics": {
+            "advances": 1
+          },
+          "Awareness": {
+            "advances": 3
+          },
+          "Charm": {
+            "advances": 0
+          },
+          "Command": {
+            "advances": 0
+          },
+          "Commerce": {
+            "advances": 0
+          },
+          "Common Lore": {
+            "specialities": {
+              "Imperial Guard": {
+                "advances": 1
+              }
+            }
+          },
+          "Deceive": {
+            "advances": 0
+          },
+          "Dodge": {
+            "advances": 3
+          },
+          "Forbidden Lore": {
+            "specialities": {
+              "Xenos": {
+                "advances": 0
+              }
+            }
+          },
+          "Inquiry": {
+            "advances": 0
+          },
+          "Interrogation": {
+            "advances": 0
+          },
+          "Intimidate": {
+            "advances": 0
+          },
+          "Linguistics": {
+            "specialities": {}
+          },
+          "Logic": {
+            "advances": 0
+          },
+          "Medicae": {
+            "advances": 0
+          },
+          "Navigate": {
+            "specialities": {
+              "Surface": {
+                "advances": 4
+              }
+            }
+          },
+          "Operate": {
+            "specialities": {
+              "Surface": {
+                "advances": 4
+              }
+            }
+          },
+          "Parry": {
+            "advances": 0
+          },
+          "Psyniscience": {
+            "advances": 0
+          },
+          "Scholastic Lore": {
+            "specialities": {
+              "All": {
+                "advances": 0
+              }
+            }
+          },
+          "Scrutiny": {
+            "advances": 0
+          },
+          "Security": {
+            "advances": 0
+          },
+          "Sleight of Hand": {
+            "advances": 0
+          },
+          "Stealth": {
+            "advances": 4,
+            "modifiers": [
+              {
+                "value": 10,
+                "source": "sheet Misc column"
+              }
+            ]
+          },
+          "Survival": {
+            "advances": 2
+          },
+          "Tech-Use": {
+            "advances": 4
+          }
+        },
+        "xp": {
+          "total": 17e3,
+          "ledger": [],
+          "spent": 16850
+        },
+        "aptitudes": [
+          {
+            "name": "Agility",
+            "source": "HW"
+          },
+          {
+            "name": "Fieldcraft",
+            "source": "BG"
+          },
+          {
+            "name": "Fellowship",
+            "source": "Role"
+          },
+          {
+            "name": "Intelligence",
+            "source": "Role"
+          },
+          {
+            "name": "Perception",
+            "source": "Role"
+          },
+          {
+            "name": "Social",
+            "source": "Role"
+          },
+          {
+            "name": "Tech",
+            "source": "Role"
+          }
+        ],
+        "tarot": {},
+        "psy": {
+          "rating": 0,
+          "class": "none",
+          "sustained": 0
+        },
+        "psychicPowers": [],
+        "insanity": {
+          "points": 0,
+          "disorders": []
+        },
+        "corruption": {
+          "points": 0,
+          "malignancies": [],
+          "mutations": []
+        },
+        "criticalInjuries": [],
+        "amputations": [],
         "talents": [
           "Keen Intuition",
           "Inescapable Attack",
@@ -4350,6 +8351,10 @@ roll_table "Power Field Destruction" {
               "single": true,
               "burst": 0,
               "full": 0
+            },
+            "clip": {
+              "max": 40,
+              "value": 40
             }
           },
           {
@@ -4366,6 +8371,10 @@ roll_table "Power Field Destruction" {
               "single": true,
               "burst": 0,
               "full": 0
+            },
+            "clip": {
+              "max": 60,
+              "value": 60
             }
           },
           {
@@ -4382,6 +8391,10 @@ roll_table "Power Field Destruction" {
               "single": true,
               "burst": 0,
               "full": 0
+            },
+            "clip": {
+              "max": 60,
+              "value": 60
             }
           },
           {
@@ -4398,7 +8411,62 @@ roll_table "Power Field Destruction" {
               "single": true,
               "burst": 0,
               "full": 0
+            },
+            "clip": {
+              "max": 60,
+              "value": 60
             }
+          }
+        ],
+        "armourItems": [],
+        "gear": [
+          {
+            "name": "Long-Las",
+            "equipped": true
+          },
+          {
+            "name": "Coimbat Vest",
+            "equipped": true
+          },
+          {
+            "name": "Imperial Guard Flak Armor",
+            "equipped": true
+          },
+          {
+            "name": "Grapnel and Line",
+            "equipped": true
+          },
+          {
+            "name": "Lho Sticks",
+            "equipped": true
+          },
+          {
+            "name": "Magnoculars",
+            "equipped": true
+          },
+          {
+            "name": "Microbead",
+            "equipped": true
+          },
+          {
+            "name": "Backpack",
+            "equipped": true
+          },
+          {
+            "name": "Auspex",
+            "equipped": true
+          },
+          {
+            "name": "Photo-visor",
+            "equipped": true
+          },
+          {
+            "name": "Rotary Las Weapon",
+            "equipped": true
+          },
+          {
+            "name": "Necron Ambassador Disc",
+            "equipped": true
           }
         ],
         "field": {
@@ -4406,15 +8474,14 @@ roll_table "Power Field Destruction" {
           "overloadMax": 0
         },
         "source": {
-          "adapter": "xlsx-campaign-v1",
+          "adapter": "xlsx-campaign-v3",
           "file": "Reco Tamarin.xlsx",
           "player": "Ryan",
-          "importedAt": "2026-07-08T17:46:34.283Z",
+          "importedAt": "2026-07-12T00:27:00.252Z",
           "unmapped": [
-            "skills (schema v2)",
-            "weapon clip (schema v2)",
-            "weapon trainings (schema v2)",
-            "xp / aptitudes / gear / house content (schema v2)"
+            "armour worn as items (the STATS AP scalar is the flat armour block)",
+            "house content (Dramatic Moments, custom traits)",
+            "weapon trainings"
           ]
         }
       }
@@ -4424,20 +8491,56 @@ roll_table "Power Field Destruction" {
       "player": "Steve",
       "name": "Rex Hellerand",
       "doc": {
-        "schemaVersion": 1,
+        "schemaVersion": 3,
         "kind": "dh2.character",
         "system": "dh2",
         "name": "Rex Hellerand",
         "characteristics": {
-          "ws": 41,
-          "bs": 63,
-          "s": 34,
-          "t": 41,
-          "ag": 56,
-          "int": 54,
-          "per": 45,
-          "wp": 44,
-          "fel": 53
+          "ws": {
+            "base": 41,
+            "advances": 0,
+            "modifiers": []
+          },
+          "bs": {
+            "base": 43,
+            "advances": 4,
+            "modifiers": []
+          },
+          "s": {
+            "base": 24,
+            "advances": 2,
+            "modifiers": []
+          },
+          "t": {
+            "base": 31,
+            "advances": 2,
+            "modifiers": []
+          },
+          "ag": {
+            "base": 56,
+            "advances": 0,
+            "modifiers": []
+          },
+          "int": {
+            "base": 49,
+            "advances": 1,
+            "modifiers": []
+          },
+          "per": {
+            "base": 40,
+            "advances": 1,
+            "modifiers": []
+          },
+          "wp": {
+            "base": 44,
+            "advances": 0,
+            "modifiers": []
+          },
+          "fel": {
+            "base": 48,
+            "advances": 1,
+            "modifiers": []
+          }
         },
         "unnatural": {},
         "armour": {
@@ -4449,6 +8552,7 @@ roll_table "Power Field Destruction" {
           "rightLeg": 6
         },
         "wounds": {
+          "critical": 0,
           "current": 11,
           "max": 11
         },
@@ -4456,6 +8560,550 @@ roll_table "Power Field Destruction" {
           "current": 4,
           "max": 4
         },
+        "fatigue": {
+          "current": 0
+        },
+        "skills": {
+          "Acrobatics": {
+            "advances": 2
+          },
+          "Athletics": {
+            "advances": 2
+          },
+          "Awareness": {
+            "advances": 2
+          },
+          "Charm": {
+            "advances": 3
+          },
+          "Command": {
+            "advances": 3
+          },
+          "Commerce": {
+            "advances": 1
+          },
+          "Common Lore": {
+            "specialities": {
+              "Underworld": {
+                "advances": 2
+              },
+              "Reach": {
+                "advances": 2
+              }
+            }
+          },
+          "Deceive": {
+            "advances": 2
+          },
+          "Dodge": {
+            "advances": 4
+          },
+          "Forbidden Lore": {
+            "specialities": {
+              "Daemonology": {
+                "advances": 1
+              },
+              "Criminal Cartels and Smugglers": {
+                "advances": 1
+              },
+              "Ordo Malleus": {
+                "advances": 1
+              }
+            }
+          },
+          "Inquiry": {
+            "advances": 2
+          },
+          "Interrogation": {
+            "advances": 2
+          },
+          "Intimidate": {
+            "advances": 1
+          },
+          "Linguistics": {
+            "specialities": {
+              "Low Gothic": {
+                "advances": 0
+              },
+              "High Gothic": {
+                "advances": 1
+              },
+              "Underworld": {
+                "advances": 1
+              }
+            }
+          },
+          "Logic": {
+            "advances": 0
+          },
+          "Medicae": {
+            "advances": 2
+          },
+          "Navigate": {
+            "specialities": {
+              "Surface": {
+                "advances": 1
+              },
+              "Stellar": {
+                "advances": 1
+              },
+              "Warp": {
+                "advances": 1
+              }
+            }
+          },
+          "Operate": {
+            "specialities": {
+              "Aeronautica": {
+                "advances": 3
+              },
+              "Surface": {
+                "advances": 1
+              },
+              "Voidship": {
+                "advances": 1
+              }
+            }
+          },
+          "Parry": {
+            "advances": 0
+          },
+          "Psyniscience": {
+            "advances": 0
+          },
+          "Scholastic Lore": {
+            "specialities": {
+              "Myths of the Reach": {
+                "advances": 1
+              },
+              "Cryptography": {
+                "advances": 1
+              }
+            }
+          },
+          "Scrutiny": {
+            "advances": 2
+          },
+          "Security": {
+            "advances": 2
+          },
+          "Sleight of Hand": {
+            "advances": 1
+          },
+          "Stealth": {
+            "advances": 2
+          },
+          "Survival": {
+            "advances": 0
+          },
+          "Tech-Use": {
+            "advances": 2
+          }
+        },
+        "xp": {
+          "total": 37e3,
+          "ledger": [
+            {
+              "name": "S1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "S1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "S1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "S1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "S1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "S1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "C1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "C2",
+              "cost": 2,
+              "source": "Creation"
+            },
+            {
+              "name": "S2",
+              "cost": 2,
+              "source": "Creation"
+            },
+            {
+              "name": "S2",
+              "cost": 2,
+              "source": "Creation"
+            },
+            {
+              "name": "S2",
+              "cost": 2,
+              "source": "Creation"
+            },
+            {
+              "name": "C1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "S1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "T2",
+              "cost": 2,
+              "source": "Creation"
+            },
+            {
+              "name": "S2",
+              "cost": 2,
+              "source": "Creation"
+            },
+            {
+              "name": "C3",
+              "cost": 3,
+              "source": "Creation"
+            },
+            {
+              "name": "S2",
+              "cost": 2,
+              "source": "Creation"
+            },
+            {
+              "name": "S1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "S2",
+              "cost": 2,
+              "source": "Creation"
+            },
+            {
+              "name": "S2",
+              "cost": 2,
+              "source": "Creation"
+            },
+            {
+              "name": "S3",
+              "cost": 3,
+              "source": "Creation"
+            },
+            {
+              "name": "C4",
+              "cost": 4,
+              "source": "Creation"
+            },
+            {
+              "name": "C1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "S2",
+              "cost": 2,
+              "source": "Creation"
+            },
+            {
+              "name": "C1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "C2",
+              "cost": 2,
+              "source": "Creation"
+            },
+            {
+              "name": "C3",
+              "cost": 3,
+              "source": "Creation"
+            },
+            {
+              "name": "S1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "S2",
+              "cost": 2,
+              "source": "Creation"
+            },
+            {
+              "name": "S3",
+              "cost": 3,
+              "source": "Creation"
+            },
+            {
+              "name": "T1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "S1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "S4",
+              "cost": 4,
+              "source": "Creation"
+            },
+            {
+              "name": "S2",
+              "cost": 2,
+              "source": "Creation"
+            },
+            {
+              "name": "S1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "S1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "S2",
+              "cost": 2,
+              "source": "Creation"
+            },
+            {
+              "name": "T1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "C2",
+              "cost": 2,
+              "source": "Creation"
+            },
+            {
+              "name": "T1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "C1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "C2",
+              "cost": 2,
+              "source": "Creation"
+            },
+            {
+              "name": "C2",
+              "cost": 2,
+              "source": "Creation"
+            },
+            {
+              "name": "C1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "S1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "S2",
+              "cost": 2,
+              "source": "Creation"
+            },
+            {
+              "name": "S2-3",
+              "cost": 2,
+              "source": "Creation"
+            },
+            {
+              "name": "T2",
+              "cost": 5545,
+              "source": "Creation"
+            },
+            {
+              "name": "S3",
+              "cost": 3,
+              "source": "Creation"
+            },
+            {
+              "name": "S3",
+              "cost": 3,
+              "source": "Creation"
+            },
+            {
+              "name": "C1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "C4",
+              "cost": 4,
+              "source": "Creation"
+            },
+            {
+              "name": "C5",
+              "cost": 5,
+              "source": "Pox"
+            },
+            {
+              "name": "S3",
+              "cost": 3,
+              "source": "Trial of Sands"
+            },
+            {
+              "name": "C4",
+              "cost": 4,
+              "source": "Trial of Sands"
+            },
+            {
+              "name": "C3",
+              "cost": 3,
+              "source": "Trial of Sands"
+            },
+            {
+              "name": "C3",
+              "cost": 3,
+              "source": "Trial of Sands"
+            },
+            {
+              "name": "C2",
+              "cost": 2,
+              "source": "Trial of Sands"
+            },
+            {
+              "name": "T1",
+              "cost": 1,
+              "source": "Trial of Sands"
+            },
+            {
+              "name": "T1",
+              "cost": 1,
+              "source": "Trial of Sands"
+            },
+            {
+              "name": "S3",
+              "cost": 3,
+              "source": "Trial of Sands"
+            },
+            {
+              "name": "C5",
+              "cost": 5,
+              "source": "Trial of Sands"
+            },
+            {
+              "name": "T4",
+              "cost": 4,
+              "source": "Trial of Sands"
+            },
+            {
+              "name": "S3",
+              "cost": 3,
+              "source": "Trial of Sands"
+            },
+            {
+              "name": "C3",
+              "cost": 3,
+              "source": "Trial of Sands"
+            },
+            {
+              "name": "C2",
+              "cost": 2,
+              "source": "Trial of Sands"
+            },
+            {
+              "name": "S3",
+              "cost": 3,
+              "source": "Trial of Sands"
+            },
+            {
+              "name": "S4",
+              "cost": 4,
+              "source": "Trial of Sands"
+            },
+            {
+              "name": "S2",
+              "cost": 2,
+              "source": "Trial of Sands"
+            },
+            {
+              "name": "S2",
+              "cost": 2,
+              "source": "Trial of Sands"
+            }
+          ],
+          "spent": 36600
+        },
+        "aptitudes": [
+          {
+            "name": "Intelligence",
+            "source": "Homeworld"
+          },
+          {
+            "name": "Agility",
+            "source": "Role"
+          },
+          {
+            "name": "Ballistic Skill",
+            "source": "Role"
+          },
+          {
+            "name": "Defense",
+            "source": "Role"
+          },
+          {
+            "name": "Fellowship",
+            "source": "Role"
+          },
+          {
+            "name": "Finesse",
+            "source": "Role"
+          },
+          {
+            "name": "Social",
+            "source": "Background"
+          }
+        ],
+        "tarot": {},
+        "psy": {
+          "rating": 0,
+          "class": "none",
+          "sustained": 0
+        },
+        "psychicPowers": [],
+        "insanity": {
+          "points": 28,
+          "disorders": []
+        },
+        "corruption": {
+          "points": 13,
+          "malignancies": [],
+          "mutations": []
+        },
+        "criticalInjuries": [],
+        "amputations": [],
         "talents": [
           "Strong Minded",
           "Weapon Training (Las)",
@@ -4517,6 +9165,10 @@ roll_table "Power Field Destruction" {
               "single": false,
               "burst": 0,
               "full": 10
+            },
+            "clip": {
+              "max": 40,
+              "value": 40
             }
           },
           {
@@ -4534,6 +9186,10 @@ roll_table "Power Field Destruction" {
               "single": true,
               "burst": 3,
               "full": 0
+            },
+            "clip": {
+              "max": 60,
+              "value": 60
             }
           },
           {
@@ -4548,7 +9204,114 @@ roll_table "Power Field Destruction" {
               "single": true,
               "burst": 0,
               "full": 0
+            },
+            "clip": {
+              "max": 6,
+              "value": 6
             }
+          }
+        ],
+        "armourItems": [],
+        "gear": [
+          {
+            "name": "Sturm and Drang (Quarters)",
+            "equipped": true
+          },
+          {
+            "name": "Chamoleoline Cloak",
+            "equipped": true
+          },
+          {
+            "name": "Injector",
+            "equipped": true
+          },
+          {
+            "name": "Slaught x2",
+            "equipped": true
+          },
+          {
+            "name": "Multikey",
+            "equipped": true
+          },
+          {
+            "name": "Militarum Tempestus Carapace (good)",
+            "equipped": true
+          },
+          {
+            "name": "Microbead",
+            "equipped": true
+          },
+          {
+            "name": "Auspex",
+            "equipped": true
+          },
+          {
+            "name": "Archaeotech Preysense Goggles",
+            "equipped": true
+          },
+          {
+            "name": "Medi-kit",
+            "equipped": true
+          },
+          {
+            "name": "Lho Sticks",
+            "equipped": true
+          },
+          {
+            "name": "Stimm",
+            "equipped": true
+          },
+          {
+            "name": "Re-Caf",
+            "equipped": true
+          },
+          {
+            "name": "Chivalry",
+            "equipped": true
+          },
+          {
+            "name": "Enclaver Holo-Guard Armor (Implant)",
+            "equipped": true
+          },
+          {
+            "name": "Eldar flute I can't play (Quarters)",
+            "equipped": true
+          },
+          {
+            "name": "2x Custom Hot-Shot Las-Pistols (Quarters)",
+            "equipped": true
+          },
+          {
+            "name": "Austros' Liquor (quarters)",
+            "equipped": true
+          },
+          {
+            "name": "Bionic Leg (left)",
+            "equipped": true
+          },
+          {
+            "name": "Driver SMG",
+            "equipped": true
+          },
+          {
+            "name": "Shuriken Pistol",
+            "equipped": true
+          },
+          {
+            "name": "Cerberus",
+            "equipped": true
+          },
+          {
+            "name": "Bulldog",
+            "equipped": true
+          },
+          {
+            "name": "Adherence Grenades",
+            "equipped": true
+          },
+          {
+            "name": "Modified Inferno Pistol",
+            "equipped": true
           }
         ],
         "field": {
@@ -4556,17 +9319,15 @@ roll_table "Power Field Destruction" {
           "overloadMax": 0
         },
         "source": {
-          "adapter": "xlsx-campaign-v1",
+          "adapter": "xlsx-campaign-v3",
           "file": "Rex Hellerand - Sheet.xlsx",
           "player": "Steve",
-          "importedAt": "2026-07-08T17:46:34.401Z",
+          "importedAt": "2026-07-12T00:27:00.432Z",
           "unmapped": [
             "armour is the STATS scalar applied to all locations",
-            "psychic powers (schema v2)",
-            "skills (schema v2)",
-            "weapon clip (schema v2)",
-            "weapon trainings (schema v2)",
-            "xp / aptitudes / gear / house content (schema v2)"
+            "armour worn as items (the STATS AP scalar is the flat armour block)",
+            "house content (Dramatic Moments, custom traits)",
+            "weapon trainings"
           ]
         }
       }
@@ -4576,20 +9337,56 @@ roll_table "Power Field Destruction" {
       "player": "Steve",
       "name": 'Uriel "Yuri"',
       "doc": {
-        "schemaVersion": 1,
+        "schemaVersion": 3,
         "kind": "dh2.character",
         "system": "dh2",
         "name": 'Uriel "Yuri"',
         "characteristics": {
-          "ws": 30,
-          "bs": 32,
-          "s": 35,
-          "t": 44,
-          "ag": 41,
-          "int": 40,
-          "per": 61,
-          "wp": 69,
-          "fel": 40
+          "ws": {
+            "base": 30,
+            "advances": 0,
+            "modifiers": []
+          },
+          "bs": {
+            "base": 32,
+            "advances": 0,
+            "modifiers": []
+          },
+          "s": {
+            "base": 15,
+            "advances": 4,
+            "modifiers": []
+          },
+          "t": {
+            "base": 29,
+            "advances": 3,
+            "modifiers": []
+          },
+          "ag": {
+            "base": 41,
+            "advances": 0,
+            "modifiers": []
+          },
+          "int": {
+            "base": 35,
+            "advances": 1,
+            "modifiers": []
+          },
+          "per": {
+            "base": 46,
+            "advances": 3,
+            "modifiers": []
+          },
+          "wp": {
+            "base": 69,
+            "advances": 0,
+            "modifiers": []
+          },
+          "fel": {
+            "base": 35,
+            "advances": 1,
+            "modifiers": []
+          }
         },
         "unnatural": {},
         "armour": {
@@ -4601,6 +9398,7 @@ roll_table "Power Field Destruction" {
           "rightLeg": 0
         },
         "wounds": {
+          "critical": 0,
           "current": 11,
           "max": 11
         },
@@ -4608,6 +9406,479 @@ roll_table "Power Field Destruction" {
           "current": 4,
           "max": 4
         },
+        "fatigue": {
+          "current": 0
+        },
+        "skills": {
+          "Acrobatics": {
+            "advances": 1
+          },
+          "Athletics": {
+            "advances": 1
+          },
+          "Awareness": {
+            "advances": 1
+          },
+          "Charm": {
+            "advances": 0
+          },
+          "Command": {
+            "advances": 0
+          },
+          "Commerce": {
+            "advances": 0
+          },
+          "Common Lore": {
+            "specialities": {
+              "Adeptus Astra Telepathica": {
+                "advances": 1
+              }
+            }
+          },
+          "Deceive": {
+            "advances": 0
+          },
+          "Dodge": {
+            "advances": 1
+          },
+          "Forbidden Lore": {
+            "specialities": {
+              "Warp": {
+                "advances": 2
+              }
+            }
+          },
+          "Inquiry": {
+            "advances": 0
+          },
+          "Interrogation": {
+            "advances": 1
+          },
+          "Intimidate": {
+            "advances": 0
+          },
+          "Linguistics": {
+            "specialities": {}
+          },
+          "Logic": {
+            "advances": 0
+          },
+          "Medicae": {
+            "advances": 0
+          },
+          "Navigate": {
+            "specialities": {
+              "Warp": {
+                "advances": 0
+              },
+              "Stellar": {
+                "advances": 0
+              }
+            }
+          },
+          "Operate": {
+            "specialities": {
+              "Aeronautica": {
+                "advances": 0
+              },
+              "Void-Ship": {
+                "advances": 0
+              }
+            }
+          },
+          "Parry": {
+            "advances": 0
+          },
+          "Psyniscience": {
+            "advances": 3
+          },
+          "Scholastic Lore": {
+            "specialities": {
+              "All": {
+                "advances": 0
+              }
+            }
+          },
+          "Scrutiny": {
+            "advances": 1
+          },
+          "Security": {
+            "advances": 0
+          },
+          "Sleight of Hand": {
+            "advances": 0
+          },
+          "Stealth": {
+            "advances": 0
+          },
+          "Survival": {
+            "advances": 0
+          },
+          "Tech-Use": {
+            "advances": 0
+          }
+        },
+        "xp": {
+          "total": 18500,
+          "ledger": [
+            {
+              "name": "PR3",
+              "cost": 3,
+              "source": "Creation"
+            },
+            {
+              "name": "PR4",
+              "cost": 4,
+              "source": "Creation"
+            },
+            {
+              "name": "C1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "C2",
+              "cost": 2,
+              "source": "Creation"
+            },
+            {
+              "name": "C3",
+              "cost": 3,
+              "source": "Creation"
+            },
+            {
+              "name": "C4",
+              "cost": 4,
+              "source": "Creation"
+            },
+            {
+              "name": "PR5",
+              "cost": 5,
+              "source": "Creation"
+            },
+            {
+              "name": "C1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "S1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "S2",
+              "cost": 2,
+              "source": "Creation"
+            },
+            {
+              "name": "C3",
+              "cost": 3,
+              "source": "Creation"
+            },
+            {
+              "name": "C1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "S1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "S1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "S1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "S1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "S1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "PR2",
+              "cost": 2,
+              "source": "Creation"
+            },
+            {
+              "name": "S2",
+              "cost": 2,
+              "source": "Creation"
+            },
+            {
+              "name": "C1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "C2",
+              "cost": 2,
+              "source": "Creation"
+            },
+            {
+              "name": "C1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "S1",
+              "cost": 1,
+              "source": "Creation"
+            },
+            {
+              "name": "C3",
+              "cost": 3,
+              "source": "Respec"
+            },
+            {
+              "name": "S1",
+              "cost": 1,
+              "source": "Respec"
+            },
+            {
+              "name": "S1",
+              "cost": 1,
+              "source": "Respec"
+            },
+            {
+              "name": "S3",
+              "cost": 3,
+              "source": "Respec"
+            },
+            {
+              "name": "S1",
+              "cost": 1,
+              "source": "Respec"
+            },
+            {
+              "name": "S1",
+              "cost": 1,
+              "source": "Respec"
+            },
+            {
+              "name": "S4",
+              "cost": 4,
+              "source": "Respec"
+            },
+            {
+              "name": "C2",
+              "cost": 2,
+              "source": "Respec"
+            },
+            {
+              "name": "S1",
+              "cost": 1,
+              "source": "Respec"
+            },
+            {
+              "name": "C4",
+              "cost": 4,
+              "source": "Respec"
+            },
+            {
+              "name": "C5",
+              "cost": 5,
+              "source": "Respec"
+            },
+            {
+              "name": "C1",
+              "cost": 1,
+              "source": "Respec"
+            },
+            {
+              "name": "S3",
+              "cost": 3,
+              "source": "Respec"
+            },
+            {
+              "name": "C2",
+              "cost": 2,
+              "source": "Respec"
+            },
+            {
+              "name": "C3",
+              "cost": 3,
+              "source": "Respec"
+            },
+            {
+              "name": "PR6",
+              "cost": 6,
+              "source": "Respec"
+            },
+            {
+              "name": "S2",
+              "cost": 2,
+              "source": "Respec"
+            },
+            {
+              "name": "C4",
+              "cost": 4,
+              "source": "Respec"
+            }
+          ],
+          "spent": 16750
+        },
+        "aptitudes": [
+          {
+            "name": "Willpower",
+            "source": "Homeworld"
+          },
+          {
+            "name": "Psyker",
+            "source": "EA"
+          },
+          {
+            "name": "Defense",
+            "source": "Background"
+          },
+          {
+            "name": "Intelligence",
+            "source": "Role"
+          },
+          {
+            "name": "Knowledge",
+            "source": "Role"
+          },
+          {
+            "name": "Perception",
+            "source": "Role"
+          },
+          {
+            "name": "Toughness",
+            "source": "Choice"
+          },
+          {
+            "name": "Agility",
+            "source": "Choice"
+          },
+          "TALENTS and TRAITS",
+          {
+            "name": "Talent",
+            "source": "Source"
+          },
+          {
+            "name": "Resistance(Psychic Powers)",
+            "source": "Role"
+          },
+          {
+            "name": "Psyker (EA)",
+            "source": "Role"
+          },
+          {
+            "name": "Warp Sense",
+            "source": "XP"
+          },
+          {
+            "name": "Jaded",
+            "source": "XP"
+          },
+          {
+            "name": "Strong Minded",
+            "source": "XP"
+          },
+          {
+            "name": "Penitent Psyker",
+            "source": "XP"
+          },
+          {
+            "name": "Bastion of Iron Will",
+            "source": "XP"
+          },
+          {
+            "name": "Resistance (Fear)",
+            "source": "XP"
+          }
+        ],
+        "tarot": {},
+        "psy": {
+          "rating": 5,
+          "class": "bound",
+          "sustained": 0
+        },
+        "psychicPowers": [
+          {
+            "name": "Warp Perception",
+            "equipped": true,
+            "discipline": "Divination"
+          },
+          {
+            "name": "Foreboding",
+            "equipped": true,
+            "discipline": "Divination"
+          },
+          {
+            "name": "Manipulate Flame",
+            "equipped": true,
+            "discipline": "Pyromancy"
+          },
+          {
+            "name": "Invigourate",
+            "equipped": true,
+            "discipline": "Biomancy"
+          },
+          {
+            "name": "Smite",
+            "equipped": true,
+            "discipline": "Biomancy"
+          },
+          {
+            "name": "Fire Shield",
+            "equipped": true,
+            "discipline": "Pyromancy"
+          },
+          {
+            "name": "Telekinetic Control",
+            "equipped": true,
+            "discipline": "Telekinesis"
+          },
+          {
+            "name": "Assail",
+            "equipped": true,
+            "discipline": "Telekinesis"
+          },
+          {
+            "name": "Crush",
+            "equipped": true,
+            "discipline": "Telekinesis"
+          },
+          {
+            "name": "Objuration Mechanicum",
+            "equipped": true,
+            "discipline": "Telekinesis"
+          },
+          {
+            "name": "Shape Flesh",
+            "equipped": true,
+            "discipline": "Biomancy"
+          },
+          {
+            "name": "Enfeeble",
+            "equipped": true,
+            "discipline": "Biomancy"
+          }
+        ],
+        "insanity": {
+          "points": 1,
+          "disorders": []
+        },
+        "corruption": {
+          "points": 9,
+          "malignancies": [],
+          "mutations": []
+        },
+        "criticalInjuries": [],
+        "amputations": [],
         "talents": [],
         "traits": [],
         "conditions": [],
@@ -4627,7 +9898,63 @@ roll_table "Power Field Destruction" {
               "single": true,
               "burst": 2,
               "full": 0
+            },
+            "clip": {
+              "max": 30,
+              "value": 30
             }
+          }
+        ],
+        "armourItems": [],
+        "gear": [
+          {
+            "name": "Laspistol",
+            "equipped": true
+          },
+          {
+            "name": "Psy Focus - Aquila hand wrap",
+            "equipped": true
+          },
+          {
+            "name": "Marine Armor",
+            "equipped": true,
+            "weight": 15
+          },
+          {
+            "name": "Force Staff",
+            "equipped": true
+          },
+          {
+            "name": "Chameleoline Cloak",
+            "equipped": true
+          },
+          {
+            "name": "Micro-Bead",
+            "equipped": true
+          },
+          {
+            "name": "Stummer",
+            "equipped": true
+          },
+          {
+            "name": "Clip/Drop Harness",
+            "equipped": true
+          },
+          {
+            "name": "Grapnel & Line",
+            "equipped": true
+          },
+          {
+            "name": "Crystal Skull",
+            "equipped": true
+          },
+          {
+            "name": "Warp Chips",
+            "equipped": true
+          },
+          {
+            "name": "Smoke Grenades",
+            "equipped": true
           }
         ],
         "field": {
@@ -4635,17 +9962,15 @@ roll_table "Power Field Destruction" {
           "overloadMax": 0
         },
         "source": {
-          "adapter": "xlsx-campaign-v1",
+          "adapter": "xlsx-campaign-v3",
           "file": "Uriel.xlsx",
           "player": "Steve",
-          "importedAt": "2026-07-08T17:46:34.528Z",
+          "importedAt": "2026-07-12T00:27:00.623Z",
           "unmapped": [
             "armour is the STATS scalar applied to all locations",
-            "psychic powers (schema v2)",
-            "skills (schema v2)",
-            "weapon clip (schema v2)",
-            "weapon trainings (schema v2)",
-            "xp / aptitudes / gear / house content (schema v2)"
+            "armour worn as items (the STATS AP scalar is the flat armour block)",
+            "house content (Dramatic Moments, custom traits)",
+            "weapon trainings"
           ]
         }
       }
@@ -4779,20 +10104,80 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
   var DOCUMENTED_FUNCTIONS = DSL_DOCS.functions.map((f) => f.signature.split("(")[0]);
 
   // api/lib/character-schema.mjs
-  var CHARACTER_SCHEMA_VERSION = 1;
+  var CHARACTER_SCHEMA_VERSION = 3;
   var CHARACTERISTIC_KEYS = ["ws", "bs", "s", "t", "ag", "int", "per", "wp", "fel"];
   var UNNATURAL_KEYS = ["ws", "bs", "s", "t", "ag"];
   var ARMOUR_KEYS = ["head", "body", "leftArm", "rightArm", "leftLeg", "rightLeg"];
   var DAMAGE_TYPES = ["Impact", "Energy", "Explosive", "Rending"];
   var WEAPON_CLASSES = ["melee", "pistol", "basic", "heavy", "thrown"];
   var CRAFTSMANSHIP = ["Poor", "Common", "Good", "Best"];
+  var PSYKER_CLASSES = ["none", "bound", "unbound", "daemonic"];
+  var AMPUTATION_KEYS = ["leftArm", "rightArm", "leftHand", "rightHand", "leftLeg", "rightLeg", "leftFoot", "rightFoot", "leftEye", "rightEye"];
+  var SKILL_DEFS = {
+    "Acrobatics": { characteristic: "ag" },
+    "Athletics": { characteristic: "s" },
+    "Awareness": { characteristic: "per" },
+    "Charm": { characteristic: "fel" },
+    "Command": { characteristic: "fel" },
+    "Commerce": { characteristic: "int" },
+    "Common Lore": { characteristic: "int", specialist: true },
+    "Deceive": { characteristic: "fel" },
+    "Dodge": { characteristic: "ag" },
+    "Forbidden Lore": { characteristic: "int", specialist: true },
+    "Inquiry": { characteristic: "fel" },
+    "Interrogation": { characteristic: "wp" },
+    "Intimidate": { characteristic: "s" },
+    "Linguistics": { characteristic: "int", specialist: true },
+    "Logic": { characteristic: "int" },
+    "Medicae": { characteristic: "int" },
+    "Navigate": { characteristic: "int", specialist: true },
+    "Operate": { characteristic: "ag", specialist: true },
+    "Parry": { characteristic: "ws" },
+    "Psyniscience": { characteristic: "per" },
+    "Scholastic Lore": { characteristic: "int", specialist: true },
+    "Scrutiny": { characteristic: "per" },
+    "Security": { characteristic: "int" },
+    "Sleight of Hand": { characteristic: "ag" },
+    "Stealth": { characteristic: "ag" },
+    "Survival": { characteristic: "per" },
+    "Tech-Use": { characteristic: "int" },
+    "Trade": { characteristic: "int", specialist: true }
+  };
+  var canonicalSkillName = (name) => {
+    const k = normName(name).replace(/s$/, "");
+    for (const key of Object.keys(SKILL_DEFS)) if (normName(key).replace(/s$/, "") === k) return key;
+    return null;
+  };
+  var isModifier = (m) => m && typeof m === "object" && Number.isInteger(m.value) && (m.source === void 0 || typeof m.source === "string") && (m.note === void 0 || typeof m.note === "string");
+  var modifierTotal = (mods) => (mods ?? []).reduce((a, m) => a + (Number(m?.value) || 0), 0);
   var CHARACTER_FIELDS = [
     { path: "schemaVersion", type: "int", required: true, summary: `Document schema version (current: ${CHARACTER_SCHEMA_VERSION}). Migrations keep old documents loadable.` },
     { path: "kind", type: '"dh2.character"', required: true, summary: "Document discriminator." },
     { path: "name", type: "string", required: true, summary: "Character name." },
     { path: "system", type: "string", required: false, summary: 'Rule system id (default "dh2").' },
-    { path: "characteristics.<ws|bs|s|t|ag|int|per|wp|fel>", type: "int 0\u2013200", required: true, summary: "The nine DH2 characteristics (percentile values)." },
+    { path: "characteristics.<ws|bs|s|t|ag|int|per|wp|fel>", type: "{ base, advances, modifiers[] }", required: true, summary: "The nine DH2 characteristics. total = base + 5\xD7advances + \u03A3modifiers (derived \u2014 use characteristicTotal). v1 flat ints migrate automatically." },
+    { path: "characteristics.<k>.modifiers[]", type: "{ value, source?, note? }", required: false, summary: 'Manual modifiers BY SOURCE \u2014 e.g. { value: 5, source: "Custom Grip" }.' },
     { path: "unnatural.<ws|bs|s|t|ag>", type: "int \u2265 0", required: false, summary: "Unnatural Characteristic values (p.139): +X to the bonus, \u2308X/2\u2309 bonus DoS on successful tests." },
+    { path: "skills.<Name>", type: "{ advances 0\u20134, characteristic?, modifiers[], specialities? }", required: false, summary: `A DH2 skill (canonical names: ${Object.keys(SKILL_DEFS).join(", ")}). Target derived RAW: untrained = \xBD characteristic; advances 1\u20134 \u2192 +0/+10/+20/+30 (use skillTarget).` },
+    { path: "skills.<Name>.specialities.<X>", type: "{ advances 0\u20134, modifiers[] }", required: false, summary: "Specialist-skill entries \u2014 Scholastic Lore (Occult), Operate (Surface), \u2026 Only valid on specialist skills." },
+    { path: "skills.<Name>.modifiers[]", type: "{ value, source?, note? }", required: false, summary: 'Skill modifiers BY SOURCE \u2014 e.g. { value: 20, source: "Good Bionic Eyes" } on Tech-Use.' },
+    { path: "xp", type: "{ total, spent?, ledger[] }", required: false, summary: "Experience: earned total, spent (defaults to the ledger sum), and the per-purchase ledger." },
+    { path: "xp.ledger[]", type: "{ name, cost, source?, date? }", required: false, summary: 'One purchase \u2014 "Mighty Shot", 600, "Core RB".' },
+    { path: "aptitudes[]", type: "string | { name, source? }", required: false, summary: "Aptitudes with their origin (Homeworld / Background / Role / \u2026)." },
+    { path: "tarot", type: "{ card?, text?, effect? }", required: false, summary: "The Emperor's Tarot / divination drawn at creation (\u21C4 Foundry bio.divination)." },
+    { path: "weapons[].weight", type: "number \u2265 0 (kg)", required: false, summary: "Weapon weight \u2014 counts toward encumbrance while equipped." },
+    { path: "weapons[].equipped", type: "bool (default true)", required: false, summary: "On the character (counts weight; available in combat). false = stored." },
+    { path: "weapons[].clip", type: "{ max, value }", required: false, summary: "Magazine size and rounds remaining (consumed when ammo tracking lands)." },
+    { path: "armourItems[]", type: "{ name, ap, locations[], weight?, equipped?, maxAgility?, qualities? }", required: false, summary: 'Worn armour as items: AP + covered locations ("all" or head/body/\u2026). Equipped items derive per-location AP (highest wins \u2014 armour does not stack); the flat `armour` block is a manual override used when no item is equipped.' },
+    { path: "gear[]", type: "{ name, weight?, quantity?, equipped?, notes? }", required: false, summary: "Equipment. equipped=true (default) counts weight \xD7 quantity toward encumbrance; false = stored (quarters/ship)." },
+    { path: "fatigue", type: "{ current }", required: false, summary: "Fatigue levels. Threshold is DERIVED: TB + WB (p.233; fatigueThreshold())." },
+    { path: "psy", type: `{ rating, class: ${PSYKER_CLASSES.join("|")}, sustained }`, required: false, summary: "Psy rating (0 = not a psyker), psyker class, powers currently sustained." },
+    { path: "psychicPowers[]", type: "string | { name, discipline?, cost?, notes?, equipped? }", required: false, summary: "Known psychic powers. equipped=true (default) = in the active loadout / prepared; the power.* pipeline consumes these in Phase 6." },
+    { path: "insanity", type: "{ points 0\u2013100, disorders[] }", required: false, summary: "Insanity points and acquired Mental Disorders." },
+    { path: "corruption", type: "{ points 0\u2013100, malignancies[], mutations[] }", required: false, summary: "Corruption points, Malignancies, and Mutations." },
+    { path: "wounds.critical", type: "int \u2265 0", required: false, summary: "Critical damage taken beyond 0 wounds (the crit-table severity)." },
+    { path: "criticalInjuries[]", type: "string | { location?, effect, source? }", required: false, summary: "Lasting critical-injury effects (\u21C4 Foundry criticalInjury Items)." },
+    { path: "amputations[]", type: AMPUTATION_KEYS.join(" | "), required: false, summary: "Missing limbs/organs (DH2 core p.251)." },
     { path: "armour.<head|body|leftArm|rightArm|leftLeg|rightLeg>", type: "int \u2265 0", required: false, summary: "Armour points by hit location." },
     { path: "wounds", type: "{ max, current }", required: false, summary: "Wound track (carried, not yet consumed by the attack loop)." },
     { path: "fate", type: "{ max, current }", required: false, summary: "Fate points (carried, not yet consumed)." },
@@ -4819,18 +10204,47 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
       kind: "dh2.character",
       name,
       system: "dh2",
-      characteristics: Object.fromEntries(CHARACTERISTIC_KEYS.map((k) => [k, 30])),
+      characteristics: Object.fromEntries(CHARACTERISTIC_KEYS.map((k) => [k, { base: 30, advances: 0, modifiers: [] }])),
       unnatural: Object.fromEntries(UNNATURAL_KEYS.map((k) => [k, 0])),
       armour: Object.fromEntries(ARMOUR_KEYS.map((k) => [k, 0])),
-      wounds: { max: 10, current: 10 },
+      wounds: { max: 10, current: 10, critical: 0 },
       fate: { max: 2, current: 2 },
+      fatigue: { current: 0 },
+      skills: {},
+      xp: { total: 0, ledger: [] },
+      aptitudes: [],
+      tarot: {},
+      psy: { rating: 0, class: "none", sustained: 0 },
+      psychicPowers: [],
+      insanity: { points: 0, disorders: [] },
+      corruption: { points: 0, malignancies: [], mutations: [] },
+      criticalInjuries: [],
+      amputations: [],
       talents: [],
       traits: [],
       conditions: [],
       circumstances: [],
       weapons: [],
+      armourItems: [],
+      gear: [],
       field: { rating: 0, overloadMax: 0 }
     };
+  }
+  function armourByLocation(doc) {
+    const worn = (doc.armourItems ?? []).filter((a) => a.equipped !== false);
+    if (!worn.length) return { ...Object.fromEntries(ARMOUR_KEYS.map((k) => [k, 0])), ...doc.armour ?? {} };
+    const out = Object.fromEntries(ARMOUR_KEYS.map((k) => [k, 0]));
+    for (const a of worn) {
+      const locs = (a.locations ?? ["all"]).includes("all") ? ARMOUR_KEYS : a.locations;
+      for (const l of locs) if (l in out) out[l] = Math.max(out[l], a.ap ?? 0);
+    }
+    return out;
+  }
+  function characteristicTotal(doc, key) {
+    const c = doc.characteristics?.[key];
+    if (typeof c === "number") return c;
+    if (!c || typeof c !== "object") return 0;
+    return (c.base ?? 0) + 5 * (c.advances ?? 0) + modifierTotal(c.modifiers);
   }
   var isInt = (v) => Number.isInteger(v);
   var isNonNegInt = (v) => Number.isInteger(v) && v >= 0;
@@ -4845,14 +10259,187 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
     if (doc.kind !== "dh2.character") err("kind", 'Must be "dh2.character"');
     if (typeof doc.name !== "string" || !doc.name.trim()) err("name", "Required non-empty string");
     if (doc.system !== void 0 && typeof doc.system !== "string") err("system", "Must be a string");
+    const checkModifiers = (mods, path) => {
+      if (mods === void 0) return;
+      if (!Array.isArray(mods)) {
+        err(path, "Must be an array of { value, source?, note? }");
+        return;
+      }
+      mods.forEach((m, i) => {
+        if (!isModifier(m)) err(`${path}[${i}]`, "Must be { value: int, source?: string, note?: string }");
+      });
+    };
     if (!doc.characteristics || typeof doc.characteristics !== "object") err("characteristics", "Required object");
     else {
       for (const k of CHARACTERISTIC_KEYS) {
         const v = doc.characteristics[k];
-        if (v === void 0) err(`characteristics.${k}`, "Required");
-        else if (!isInt(v) || v < 0 || v > 200) err(`characteristics.${k}`, "Integer 0\u2013200 required");
+        if (v === void 0) {
+          err(`characteristics.${k}`, "Required");
+          continue;
+        }
+        if (isInt(v)) {
+          if (v < 0 || v > 200) err(`characteristics.${k}`, "Integer 0\u2013200 required");
+          continue;
+        }
+        if (!v || typeof v !== "object") {
+          err(`characteristics.${k}`, "{ base, advances, modifiers[] } (or a flat int) required");
+          continue;
+        }
+        if (!isInt(v.base) || v.base < 0 || v.base > 200) err(`characteristics.${k}.base`, "Integer 0\u2013200 required");
+        if (v.advances !== void 0 && (!isInt(v.advances) || v.advances < 0 || v.advances > 5)) err(`characteristics.${k}.advances`, "Integer 0\u20135 required");
+        checkModifiers(v.modifiers, `characteristics.${k}.modifiers`);
       }
       for (const k of Object.keys(doc.characteristics)) if (!CHARACTERISTIC_KEYS.includes(k)) warn(`characteristics.${k}`, "Unknown characteristic (ignored)");
+    }
+    if (doc.skills !== void 0) {
+      if (!doc.skills || typeof doc.skills !== "object" || Array.isArray(doc.skills)) err("skills", "Must be an object keyed by skill name");
+      else for (const [name, s] of Object.entries(doc.skills)) {
+        const canonical = canonicalSkillName(name);
+        if (!canonical) {
+          warn(`skills.${name}`, "Not a DH2 core skill name (kept, but skillTarget will not resolve it)");
+          continue;
+        }
+        if (!s || typeof s !== "object") {
+          err(`skills.${name}`, "Must be an object");
+          continue;
+        }
+        const specialist = !!SKILL_DEFS[canonical].specialist;
+        if (s.advances !== void 0 && (!isInt(s.advances) || s.advances < 0 || s.advances > 4)) err(`skills.${name}.advances`, "Integer 0\u20134 required");
+        if (s.characteristic !== void 0 && !CHARACTERISTIC_KEYS.includes(s.characteristic)) err(`skills.${name}.characteristic`, `One of: ${CHARACTERISTIC_KEYS.join(", ")}`);
+        checkModifiers(s.modifiers, `skills.${name}.modifiers`);
+        if (s.specialities !== void 0) {
+          if (!specialist) warn(`skills.${name}.specialities`, `${canonical} is not a specialist skill (entries ignored by skillTarget)`);
+          if (!s.specialities || typeof s.specialities !== "object") err(`skills.${name}.specialities`, "Must be an object keyed by speciality");
+          else for (const [spec, sv] of Object.entries(s.specialities)) {
+            if (!sv || typeof sv !== "object") {
+              err(`skills.${name}.specialities.${spec}`, "Must be an object");
+              continue;
+            }
+            if (sv.advances !== void 0 && (!isInt(sv.advances) || sv.advances < 0 || sv.advances > 4)) err(`skills.${name}.specialities.${spec}.advances`, "Integer 0\u20134 required");
+            checkModifiers(sv.modifiers, `skills.${name}.specialities.${spec}.modifiers`);
+          }
+        }
+        if (specialist && s.advances) warn(`skills.${name}.advances`, "Specialist skill \u2014 per-speciality advances are what skillTarget reads");
+      }
+    }
+    if (doc.xp !== void 0) {
+      if (!doc.xp || typeof doc.xp !== "object") err("xp", "Must be { total, spent?, ledger[] }");
+      else {
+        if (doc.xp.total !== void 0 && !isNonNegInt(doc.xp.total)) err("xp.total", "Non-negative integer required");
+        if (doc.xp.spent !== void 0 && !isNonNegInt(doc.xp.spent)) err("xp.spent", "Non-negative integer required");
+        if (doc.xp.ledger !== void 0) {
+          if (!Array.isArray(doc.xp.ledger)) err("xp.ledger", "Must be an array");
+          else doc.xp.ledger.forEach((e, i) => {
+            if (!e || typeof e !== "object" || typeof e.name !== "string" || !isNonNegInt(e.cost)) err(`xp.ledger[${i}]`, "{ name: string, cost: int \u2265 0, source?, date? } required");
+          });
+        }
+      }
+    }
+    if (doc.aptitudes !== void 0) {
+      if (!Array.isArray(doc.aptitudes)) err("aptitudes", "Must be an array");
+      else doc.aptitudes.forEach((a, i) => {
+        if (!isNamedEntry(a)) err(`aptitudes[${i}]`, "Must be a string or { name, source? }");
+      });
+    }
+    if (doc.tarot !== void 0) {
+      if (!doc.tarot || typeof doc.tarot !== "object") err("tarot", "Must be { card?, text?, effect? }");
+      else for (const p of ["card", "text", "effect"]) if (doc.tarot[p] !== void 0 && typeof doc.tarot[p] !== "string") err(`tarot.${p}`, "String required");
+    }
+    const isNonNegNum = (v) => typeof v === "number" && Number.isFinite(v) && v >= 0;
+    if (doc.armourItems !== void 0) {
+      if (!Array.isArray(doc.armourItems)) err("armourItems", "Must be an array");
+      else doc.armourItems.forEach((a, i) => {
+        const at = (p) => `armourItems[${i}].${p}`;
+        if (!a || typeof a !== "object") {
+          err(`armourItems[${i}]`, "Must be an object");
+          return;
+        }
+        if (typeof a.name !== "string" || !a.name.trim()) err(at("name"), "Required non-empty string");
+        if (!isNonNegInt(a.ap)) err(at("ap"), "Non-negative integer AP required");
+        if (a.locations !== void 0) {
+          if (!Array.isArray(a.locations)) err(at("locations"), 'Must be an array ("all" or location keys)');
+          else a.locations.forEach((l, li) => {
+            if (l !== "all" && !ARMOUR_KEYS.includes(l)) warn(at(`locations[${li}]`), `Unknown location "${l}" (ignored)`);
+          });
+        }
+        if (a.weight !== void 0 && !isNonNegNum(a.weight)) err(at("weight"), "Non-negative number (kg) required");
+        if (a.equipped !== void 0 && typeof a.equipped !== "boolean") err(at("equipped"), "Boolean required");
+        if (a.maxAgility !== void 0 && !isNonNegInt(a.maxAgility)) err(at("maxAgility"), "Non-negative integer required");
+      });
+    }
+    if (doc.gear !== void 0) {
+      if (!Array.isArray(doc.gear)) err("gear", "Must be an array");
+      else doc.gear.forEach((g, i) => {
+        const at = (p) => `gear[${i}].${p}`;
+        if (!g || typeof g !== "object") {
+          err(`gear[${i}]`, "Must be an object");
+          return;
+        }
+        if (typeof g.name !== "string" || !g.name.trim()) err(at("name"), "Required non-empty string");
+        if (g.weight !== void 0 && !isNonNegNum(g.weight)) err(at("weight"), "Non-negative number (kg) required");
+        if (g.quantity !== void 0 && (!isInt(g.quantity) || g.quantity < 1)) err(at("quantity"), "Integer \u2265 1 required");
+        if (g.equipped !== void 0 && typeof g.equipped !== "boolean") err(at("equipped"), "Boolean required");
+      });
+    }
+    if (doc.fatigue !== void 0) {
+      if (!doc.fatigue || typeof doc.fatigue !== "object") err("fatigue", "Must be { current }");
+      else if (doc.fatigue.current !== void 0 && !isNonNegInt(doc.fatigue.current)) err("fatigue.current", "Non-negative integer required");
+    }
+    if (doc.psy !== void 0) {
+      if (!doc.psy || typeof doc.psy !== "object") err("psy", "Must be { rating, class, sustained }");
+      else {
+        if (doc.psy.rating !== void 0 && !isNonNegInt(doc.psy.rating)) err("psy.rating", "Non-negative integer required");
+        if (doc.psy.class !== void 0 && !PSYKER_CLASSES.includes(doc.psy.class)) err("psy.class", `One of: ${PSYKER_CLASSES.join(", ")}`);
+        if (doc.psy.sustained !== void 0 && !isNonNegInt(doc.psy.sustained)) err("psy.sustained", "Non-negative integer required");
+      }
+    }
+    if (doc.psychicPowers !== void 0) {
+      if (!Array.isArray(doc.psychicPowers)) err("psychicPowers", "Must be an array");
+      else doc.psychicPowers.forEach((p, i) => {
+        if (!isNamedEntry(p)) {
+          err(`psychicPowers[${i}]`, "Must be a string or { name, \u2026 }");
+          return;
+        }
+        if (p && typeof p === "object") {
+          if (p.equipped !== void 0 && typeof p.equipped !== "boolean") err(`psychicPowers[${i}].equipped`, "Boolean required");
+          if (p.cost !== void 0 && !isNonNegInt(p.cost)) err(`psychicPowers[${i}].cost`, "Non-negative integer required");
+          for (const f of ["discipline", "notes"]) if (p[f] !== void 0 && typeof p[f] !== "string") err(`psychicPowers[${i}].${f}`, "String required");
+        }
+      });
+    }
+    for (const [block, lists] of [["insanity", ["disorders"]], ["corruption", ["malignancies", "mutations"]]]) {
+      const b = doc[block];
+      if (b === void 0) continue;
+      if (!b || typeof b !== "object") {
+        err(block, "Must be an object");
+        continue;
+      }
+      if (b.points !== void 0 && (!isInt(b.points) || b.points < 0 || b.points > 100)) err(`${block}.points`, "Integer 0\u2013100 required");
+      for (const ln of lists) {
+        if (b[ln] === void 0) continue;
+        if (!Array.isArray(b[ln])) {
+          err(`${block}.${ln}`, "Must be an array");
+          continue;
+        }
+        b[ln].forEach((e, i) => {
+          if (!isNamedEntry(e)) err(`${block}.${ln}[${i}]`, "Must be a string or { name, \u2026 }");
+        });
+      }
+    }
+    if (doc.wounds?.critical !== void 0 && !isNonNegInt(doc.wounds.critical)) err("wounds.critical", "Non-negative integer required");
+    if (doc.criticalInjuries !== void 0) {
+      if (!Array.isArray(doc.criticalInjuries)) err("criticalInjuries", "Must be an array");
+      else doc.criticalInjuries.forEach((c, i) => {
+        const ok = typeof c === "string" || c && typeof c === "object" && typeof c.effect === "string";
+        if (!ok) err(`criticalInjuries[${i}]`, "Must be a string or { location?, effect, source? }");
+        else if (c && typeof c === "object" && c.location !== void 0 && !ARMOUR_KEYS.includes(c.location)) warn(`criticalInjuries[${i}].location`, `Unknown location "${c.location}"`);
+      });
+    }
+    if (doc.amputations !== void 0) {
+      if (!Array.isArray(doc.amputations)) err("amputations", "Must be an array");
+      else doc.amputations.forEach((a, i) => {
+        if (!AMPUTATION_KEYS.includes(a)) warn(`amputations[${i}]`, `Unknown part "${a}" (known: ${AMPUTATION_KEYS.join(", ")})`);
+      });
     }
     if (doc.unnatural !== void 0) {
       if (typeof doc.unnatural !== "object") err("unnatural", "Must be an object");
@@ -4910,6 +10497,12 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
         }
         if (w.rof !== void 0 && (typeof w.rof !== "object" || w.rof === null)) err(at("rof"), "Must be { single, burst, full }");
         if (w.sbMultiplier !== void 0 && (!isInt(w.sbMultiplier) || w.sbMultiplier < 0 || w.sbMultiplier > 2)) err(at("sbMultiplier"), "Integer 0\u20132 required");
+        if (w.weight !== void 0 && !(typeof w.weight === "number" && Number.isFinite(w.weight) && w.weight >= 0)) err(at("weight"), "Non-negative number (kg) required");
+        if (w.equipped !== void 0 && typeof w.equipped !== "boolean") err(at("equipped"), "Boolean required");
+        if (w.clip !== void 0) {
+          if (!w.clip || typeof w.clip !== "object") err(at("clip"), "Must be { max, value }");
+          else for (const p of ["max", "value"]) if (w.clip[p] !== void 0 && !isNonNegInt(w.clip[p])) err(at(`clip.${p}`), "Non-negative integer required");
+        }
       });
     }
     if (doc.field !== void 0) {
@@ -4925,8 +10518,31 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
       case 0:
         d2.schemaVersion = 1;
         d2.kind = d2.kind ?? "dh2.character";
-      // fallthrough for future versions:
-      case 1:
+      // fallthrough:
+      case 1: {
+        if (d2.characteristics && typeof d2.characteristics === "object") {
+          d2.characteristics = Object.fromEntries(Object.entries(d2.characteristics).map(([k, v]) => [k, isFinite(v) && typeof v === "number" ? { base: v, advances: 0, modifiers: [] } : v]));
+        }
+        d2.skills ?? (d2.skills = {});
+        d2.xp ?? (d2.xp = { total: 0, ledger: [] });
+        d2.aptitudes ?? (d2.aptitudes = []);
+        d2.tarot ?? (d2.tarot = {});
+        d2.schemaVersion = 2;
+      }
+      case 2:
+        d2.armourItems ?? (d2.armourItems = []);
+        d2.gear ?? (d2.gear = []);
+        d2.fatigue ?? (d2.fatigue = { current: 0 });
+        d2.psy ?? (d2.psy = { rating: 0, class: "none", sustained: 0 });
+        d2.psychicPowers ?? (d2.psychicPowers = []);
+        d2.insanity ?? (d2.insanity = { points: 0, disorders: [] });
+        d2.corruption ?? (d2.corruption = { points: 0, malignancies: [], mutations: [] });
+        d2.criticalInjuries ?? (d2.criticalInjuries = []);
+        d2.amputations ?? (d2.amputations = []);
+        if (d2.wounds && typeof d2.wounds === "object") d2.wounds = { critical: 0, ...d2.wounds };
+        d2.schemaVersion = 3;
+      // fallthrough:
+      case 3:
         break;
       default:
         break;
@@ -4934,11 +10550,11 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
     return d2;
   }
   function characterToCombatant(doc, { weaponIndex = 0, location = "body" } = {}) {
-    const c = doc.characteristics ?? {};
     const w = (doc.weapons ?? [])[weaponIndex];
+    const ct = (k) => characteristicTotal(doc, k);
     return {
       name: doc.name,
-      characteristics: { ws: c.ws ?? 0, bs: c.bs ?? 0, s: c.s ?? 0, t: c.t ?? 0, ag: c.ag ?? 0, wp: c.wp ?? 0 },
+      characteristics: { ws: ct("ws"), bs: ct("bs"), s: ct("s"), t: ct("t"), ag: ct("ag"), wp: ct("wp") },
       unnatural: { ...doc.unnatural ?? {} },
       weapon: w ? {
         name: w.name,
@@ -4947,7 +10563,7 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
         damage: w.damage,
         pen: w.pen ?? 0,
         damageType: w.damageType ?? "Impact",
-        rof: { single: true, burst: Number(w.rof?.burst) || 0, full: Number(w.rof?.full) || 0 },
+        rof: { single: w.rof?.single !== false, burst: Number(w.rof?.burst) || 0, full: Number(w.rof?.full) || 0 },
         qualities: canonList(w.qualities),
         craftsmanship: w.craftsmanship ?? "Common",
         sbMultiplier: w.sbMultiplier ?? (w.class === "melee" || w.class === "thrown" ? 1 : 0)
@@ -4956,9 +10572,11 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
       traits: canonList(doc.traits),
       conditions: doc.conditions ?? [],
       circumstances: doc.circumstances ?? [],
+      // psyker (Force weapons read this; the power.* pipeline will too)
+      psyRating: doc.psy?.rating ?? 0,
       // defender-side extras (harmless on the attacker side):
-      armour: (doc.armour ?? {})[location] ?? 0,
-      toughnessBonus: Math.floor((c.t ?? 0) / 10),
+      armour: armourByLocation(doc)[location] ?? 0,
+      toughnessBonus: Math.floor(ct("t") / 10),
       unnaturalToughness: doc.unnatural?.t ?? 0,
       field: doc.field ?? { rating: 0, overloadMax: 0 }
     };

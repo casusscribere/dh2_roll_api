@@ -2422,10 +2422,10 @@ var defaultRegistry = buildDefaultRegistry();
 
 // api/lib/engine.mjs
 function rollTest({ target = 0, modifiers = {}, label = "test", unnatural = 0 }, rng = Math.random, forcedRoll = null) {
-  let modifierTotal = Object.values(modifiers).reduce((a, b) => a + (Number(b) || 0), 0);
-  if (modifierTotal > 60) modifierTotal = 60;
-  if (modifierTotal < -60) modifierTotal = -60;
-  const modifiedTarget = Number(target) + modifierTotal;
+  let modifierTotal2 = Object.values(modifiers).reduce((a, b) => a + (Number(b) || 0), 0);
+  if (modifierTotal2 > 60) modifierTotal2 = 60;
+  if (modifierTotal2 < -60) modifierTotal2 = -60;
+  const modifiedTarget = Number(target) + modifierTotal2;
   const roll = forcedRoll ?? d(100, rng, label);
   const success = roll === 1 || roll <= modifiedTarget && roll !== 100;
   const unnaturalValue = Number(unnatural) || 0;
@@ -2434,7 +2434,7 @@ function rollTest({ target = 0, modifiers = {}, label = "test", unnatural = 0 },
     roll,
     target: Number(target),
     modifiers,
-    modifierTotal,
+    modifierTotal: modifierTotal2,
     modifiedTarget,
     success,
     dos: success ? 1 + getDegree(modifiedTarget, roll) + bonusDos : 0,
@@ -2653,10 +2653,12 @@ function runToHit(input, rng, registry) {
     ctx.effects.push({ name: "Spray", effect: "no attack roll \u2014 everyone in the 30\xB0 cone is struck unless they pass a Challenging (+0) Agility test; always hits the Body; cannot make Called Shots" });
   }
   runCheckpoint(registry, CHECKPOINTS.POST_ROLL, ctx);
+  const ammoUsed = isMelee ? 0 : (actionInfo.rate === "semi" ? weapon.rof?.burst || 1 : actionInfo.rate === "full" ? weapon.rof?.full || 1 : 1) * (hasQuality(input.configs ?? input.firingModes, "Maximal") ? 3 : 1);
   const base = {
     weapon: weapon.name ?? "Unnamed weapon",
     action,
     rangeBand,
+    ammoUsed,
     test: { ...test, success: ctx.success },
     effects: ctx.effects,
     log: ctx.log,
@@ -3233,20 +3235,80 @@ var DOCUMENTED_FACTS = DSL_DOCS.facts.map((f) => f.name);
 var DOCUMENTED_FUNCTIONS = DSL_DOCS.functions.map((f) => f.signature.split("(")[0]);
 
 // api/lib/character-schema.mjs
-var CHARACTER_SCHEMA_VERSION = 1;
+var CHARACTER_SCHEMA_VERSION = 3;
 var CHARACTERISTIC_KEYS = ["ws", "bs", "s", "t", "ag", "int", "per", "wp", "fel"];
 var UNNATURAL_KEYS = ["ws", "bs", "s", "t", "ag"];
 var ARMOUR_KEYS = ["head", "body", "leftArm", "rightArm", "leftLeg", "rightLeg"];
 var DAMAGE_TYPES = ["Impact", "Energy", "Explosive", "Rending"];
 var WEAPON_CLASSES = ["melee", "pistol", "basic", "heavy", "thrown"];
 var CRAFTSMANSHIP = ["Poor", "Common", "Good", "Best"];
+var PSYKER_CLASSES = ["none", "bound", "unbound", "daemonic"];
+var AMPUTATION_KEYS = ["leftArm", "rightArm", "leftHand", "rightHand", "leftLeg", "rightLeg", "leftFoot", "rightFoot", "leftEye", "rightEye"];
+var SKILL_DEFS = {
+  "Acrobatics": { characteristic: "ag" },
+  "Athletics": { characteristic: "s" },
+  "Awareness": { characteristic: "per" },
+  "Charm": { characteristic: "fel" },
+  "Command": { characteristic: "fel" },
+  "Commerce": { characteristic: "int" },
+  "Common Lore": { characteristic: "int", specialist: true },
+  "Deceive": { characteristic: "fel" },
+  "Dodge": { characteristic: "ag" },
+  "Forbidden Lore": { characteristic: "int", specialist: true },
+  "Inquiry": { characteristic: "fel" },
+  "Interrogation": { characteristic: "wp" },
+  "Intimidate": { characteristic: "s" },
+  "Linguistics": { characteristic: "int", specialist: true },
+  "Logic": { characteristic: "int" },
+  "Medicae": { characteristic: "int" },
+  "Navigate": { characteristic: "int", specialist: true },
+  "Operate": { characteristic: "ag", specialist: true },
+  "Parry": { characteristic: "ws" },
+  "Psyniscience": { characteristic: "per" },
+  "Scholastic Lore": { characteristic: "int", specialist: true },
+  "Scrutiny": { characteristic: "per" },
+  "Security": { characteristic: "int" },
+  "Sleight of Hand": { characteristic: "ag" },
+  "Stealth": { characteristic: "ag" },
+  "Survival": { characteristic: "per" },
+  "Tech-Use": { characteristic: "int" },
+  "Trade": { characteristic: "int", specialist: true }
+};
+var canonicalSkillName = (name) => {
+  const k = normName(name).replace(/s$/, "");
+  for (const key of Object.keys(SKILL_DEFS)) if (normName(key).replace(/s$/, "") === k) return key;
+  return null;
+};
+var isModifier = (m) => m && typeof m === "object" && Number.isInteger(m.value) && (m.source === void 0 || typeof m.source === "string") && (m.note === void 0 || typeof m.note === "string");
+var modifierTotal = (mods) => (mods ?? []).reduce((a, m) => a + (Number(m?.value) || 0), 0);
 var CHARACTER_FIELDS = [
   { path: "schemaVersion", type: "int", required: true, summary: `Document schema version (current: ${CHARACTER_SCHEMA_VERSION}). Migrations keep old documents loadable.` },
   { path: "kind", type: '"dh2.character"', required: true, summary: "Document discriminator." },
   { path: "name", type: "string", required: true, summary: "Character name." },
   { path: "system", type: "string", required: false, summary: 'Rule system id (default "dh2").' },
-  { path: "characteristics.<ws|bs|s|t|ag|int|per|wp|fel>", type: "int 0\u2013200", required: true, summary: "The nine DH2 characteristics (percentile values)." },
+  { path: "characteristics.<ws|bs|s|t|ag|int|per|wp|fel>", type: "{ base, advances, modifiers[] }", required: true, summary: "The nine DH2 characteristics. total = base + 5\xD7advances + \u03A3modifiers (derived \u2014 use characteristicTotal). v1 flat ints migrate automatically." },
+  { path: "characteristics.<k>.modifiers[]", type: "{ value, source?, note? }", required: false, summary: 'Manual modifiers BY SOURCE \u2014 e.g. { value: 5, source: "Custom Grip" }.' },
   { path: "unnatural.<ws|bs|s|t|ag>", type: "int \u2265 0", required: false, summary: "Unnatural Characteristic values (p.139): +X to the bonus, \u2308X/2\u2309 bonus DoS on successful tests." },
+  { path: "skills.<Name>", type: "{ advances 0\u20134, characteristic?, modifiers[], specialities? }", required: false, summary: `A DH2 skill (canonical names: ${Object.keys(SKILL_DEFS).join(", ")}). Target derived RAW: untrained = \xBD characteristic; advances 1\u20134 \u2192 +0/+10/+20/+30 (use skillTarget).` },
+  { path: "skills.<Name>.specialities.<X>", type: "{ advances 0\u20134, modifiers[] }", required: false, summary: "Specialist-skill entries \u2014 Scholastic Lore (Occult), Operate (Surface), \u2026 Only valid on specialist skills." },
+  { path: "skills.<Name>.modifiers[]", type: "{ value, source?, note? }", required: false, summary: 'Skill modifiers BY SOURCE \u2014 e.g. { value: 20, source: "Good Bionic Eyes" } on Tech-Use.' },
+  { path: "xp", type: "{ total, spent?, ledger[] }", required: false, summary: "Experience: earned total, spent (defaults to the ledger sum), and the per-purchase ledger." },
+  { path: "xp.ledger[]", type: "{ name, cost, source?, date? }", required: false, summary: 'One purchase \u2014 "Mighty Shot", 600, "Core RB".' },
+  { path: "aptitudes[]", type: "string | { name, source? }", required: false, summary: "Aptitudes with their origin (Homeworld / Background / Role / \u2026)." },
+  { path: "tarot", type: "{ card?, text?, effect? }", required: false, summary: "The Emperor's Tarot / divination drawn at creation (\u21C4 Foundry bio.divination)." },
+  { path: "weapons[].weight", type: "number \u2265 0 (kg)", required: false, summary: "Weapon weight \u2014 counts toward encumbrance while equipped." },
+  { path: "weapons[].equipped", type: "bool (default true)", required: false, summary: "On the character (counts weight; available in combat). false = stored." },
+  { path: "weapons[].clip", type: "{ max, value }", required: false, summary: "Magazine size and rounds remaining (consumed when ammo tracking lands)." },
+  { path: "armourItems[]", type: "{ name, ap, locations[], weight?, equipped?, maxAgility?, qualities? }", required: false, summary: 'Worn armour as items: AP + covered locations ("all" or head/body/\u2026). Equipped items derive per-location AP (highest wins \u2014 armour does not stack); the flat `armour` block is a manual override used when no item is equipped.' },
+  { path: "gear[]", type: "{ name, weight?, quantity?, equipped?, notes? }", required: false, summary: "Equipment. equipped=true (default) counts weight \xD7 quantity toward encumbrance; false = stored (quarters/ship)." },
+  { path: "fatigue", type: "{ current }", required: false, summary: "Fatigue levels. Threshold is DERIVED: TB + WB (p.233; fatigueThreshold())." },
+  { path: "psy", type: `{ rating, class: ${PSYKER_CLASSES.join("|")}, sustained }`, required: false, summary: "Psy rating (0 = not a psyker), psyker class, powers currently sustained." },
+  { path: "psychicPowers[]", type: "string | { name, discipline?, cost?, notes?, equipped? }", required: false, summary: "Known psychic powers. equipped=true (default) = in the active loadout / prepared; the power.* pipeline consumes these in Phase 6." },
+  { path: "insanity", type: "{ points 0\u2013100, disorders[] }", required: false, summary: "Insanity points and acquired Mental Disorders." },
+  { path: "corruption", type: "{ points 0\u2013100, malignancies[], mutations[] }", required: false, summary: "Corruption points, Malignancies, and Mutations." },
+  { path: "wounds.critical", type: "int \u2265 0", required: false, summary: "Critical damage taken beyond 0 wounds (the crit-table severity)." },
+  { path: "criticalInjuries[]", type: "string | { location?, effect, source? }", required: false, summary: "Lasting critical-injury effects (\u21C4 Foundry criticalInjury Items)." },
+  { path: "amputations[]", type: AMPUTATION_KEYS.join(" | "), required: false, summary: "Missing limbs/organs (DH2 core p.251)." },
   { path: "armour.<head|body|leftArm|rightArm|leftLeg|rightLeg>", type: "int \u2265 0", required: false, summary: "Armour points by hit location." },
   { path: "wounds", type: "{ max, current }", required: false, summary: "Wound track (carried, not yet consumed by the attack loop)." },
   { path: "fate", type: "{ max, current }", required: false, summary: "Fate points (carried, not yet consumed)." },
@@ -3267,6 +3329,22 @@ var CHARACTER_FIELDS = [
   { path: "field", type: "{ rating, overloadMax }", required: false, summary: "Force field (absorbs on roll \u2264 rating; overloads on roll \u2264 overloadMax)." },
   { path: "source", type: "{ adapter, ... }", required: false, summary: "Import provenance (adapter name, source identifiers, timestamp)." }
 ];
+function armourByLocation(doc) {
+  const worn = (doc.armourItems ?? []).filter((a) => a.equipped !== false);
+  if (!worn.length) return { ...Object.fromEntries(ARMOUR_KEYS.map((k) => [k, 0])), ...doc.armour ?? {} };
+  const out = Object.fromEntries(ARMOUR_KEYS.map((k) => [k, 0]));
+  for (const a of worn) {
+    const locs = (a.locations ?? ["all"]).includes("all") ? ARMOUR_KEYS : a.locations;
+    for (const l of locs) if (l in out) out[l] = Math.max(out[l], a.ap ?? 0);
+  }
+  return out;
+}
+function characteristicTotal(doc, key) {
+  const c = doc.characteristics?.[key];
+  if (typeof c === "number") return c;
+  if (!c || typeof c !== "object") return 0;
+  return (c.base ?? 0) + 5 * (c.advances ?? 0) + modifierTotal(c.modifiers);
+}
 var isInt = (v) => Number.isInteger(v);
 var isNonNegInt = (v) => Number.isInteger(v) && v >= 0;
 var isNamedEntry = (v) => typeof v === "string" || v && typeof v === "object" && typeof v.name === "string";
@@ -3280,14 +3358,187 @@ function validateCharacter(doc) {
   if (doc.kind !== "dh2.character") err("kind", 'Must be "dh2.character"');
   if (typeof doc.name !== "string" || !doc.name.trim()) err("name", "Required non-empty string");
   if (doc.system !== void 0 && typeof doc.system !== "string") err("system", "Must be a string");
+  const checkModifiers = (mods, path) => {
+    if (mods === void 0) return;
+    if (!Array.isArray(mods)) {
+      err(path, "Must be an array of { value, source?, note? }");
+      return;
+    }
+    mods.forEach((m, i) => {
+      if (!isModifier(m)) err(`${path}[${i}]`, "Must be { value: int, source?: string, note?: string }");
+    });
+  };
   if (!doc.characteristics || typeof doc.characteristics !== "object") err("characteristics", "Required object");
   else {
     for (const k of CHARACTERISTIC_KEYS) {
       const v = doc.characteristics[k];
-      if (v === void 0) err(`characteristics.${k}`, "Required");
-      else if (!isInt(v) || v < 0 || v > 200) err(`characteristics.${k}`, "Integer 0\u2013200 required");
+      if (v === void 0) {
+        err(`characteristics.${k}`, "Required");
+        continue;
+      }
+      if (isInt(v)) {
+        if (v < 0 || v > 200) err(`characteristics.${k}`, "Integer 0\u2013200 required");
+        continue;
+      }
+      if (!v || typeof v !== "object") {
+        err(`characteristics.${k}`, "{ base, advances, modifiers[] } (or a flat int) required");
+        continue;
+      }
+      if (!isInt(v.base) || v.base < 0 || v.base > 200) err(`characteristics.${k}.base`, "Integer 0\u2013200 required");
+      if (v.advances !== void 0 && (!isInt(v.advances) || v.advances < 0 || v.advances > 5)) err(`characteristics.${k}.advances`, "Integer 0\u20135 required");
+      checkModifiers(v.modifiers, `characteristics.${k}.modifiers`);
     }
     for (const k of Object.keys(doc.characteristics)) if (!CHARACTERISTIC_KEYS.includes(k)) warn(`characteristics.${k}`, "Unknown characteristic (ignored)");
+  }
+  if (doc.skills !== void 0) {
+    if (!doc.skills || typeof doc.skills !== "object" || Array.isArray(doc.skills)) err("skills", "Must be an object keyed by skill name");
+    else for (const [name, s] of Object.entries(doc.skills)) {
+      const canonical = canonicalSkillName(name);
+      if (!canonical) {
+        warn(`skills.${name}`, "Not a DH2 core skill name (kept, but skillTarget will not resolve it)");
+        continue;
+      }
+      if (!s || typeof s !== "object") {
+        err(`skills.${name}`, "Must be an object");
+        continue;
+      }
+      const specialist = !!SKILL_DEFS[canonical].specialist;
+      if (s.advances !== void 0 && (!isInt(s.advances) || s.advances < 0 || s.advances > 4)) err(`skills.${name}.advances`, "Integer 0\u20134 required");
+      if (s.characteristic !== void 0 && !CHARACTERISTIC_KEYS.includes(s.characteristic)) err(`skills.${name}.characteristic`, `One of: ${CHARACTERISTIC_KEYS.join(", ")}`);
+      checkModifiers(s.modifiers, `skills.${name}.modifiers`);
+      if (s.specialities !== void 0) {
+        if (!specialist) warn(`skills.${name}.specialities`, `${canonical} is not a specialist skill (entries ignored by skillTarget)`);
+        if (!s.specialities || typeof s.specialities !== "object") err(`skills.${name}.specialities`, "Must be an object keyed by speciality");
+        else for (const [spec, sv] of Object.entries(s.specialities)) {
+          if (!sv || typeof sv !== "object") {
+            err(`skills.${name}.specialities.${spec}`, "Must be an object");
+            continue;
+          }
+          if (sv.advances !== void 0 && (!isInt(sv.advances) || sv.advances < 0 || sv.advances > 4)) err(`skills.${name}.specialities.${spec}.advances`, "Integer 0\u20134 required");
+          checkModifiers(sv.modifiers, `skills.${name}.specialities.${spec}.modifiers`);
+        }
+      }
+      if (specialist && s.advances) warn(`skills.${name}.advances`, "Specialist skill \u2014 per-speciality advances are what skillTarget reads");
+    }
+  }
+  if (doc.xp !== void 0) {
+    if (!doc.xp || typeof doc.xp !== "object") err("xp", "Must be { total, spent?, ledger[] }");
+    else {
+      if (doc.xp.total !== void 0 && !isNonNegInt(doc.xp.total)) err("xp.total", "Non-negative integer required");
+      if (doc.xp.spent !== void 0 && !isNonNegInt(doc.xp.spent)) err("xp.spent", "Non-negative integer required");
+      if (doc.xp.ledger !== void 0) {
+        if (!Array.isArray(doc.xp.ledger)) err("xp.ledger", "Must be an array");
+        else doc.xp.ledger.forEach((e, i) => {
+          if (!e || typeof e !== "object" || typeof e.name !== "string" || !isNonNegInt(e.cost)) err(`xp.ledger[${i}]`, "{ name: string, cost: int \u2265 0, source?, date? } required");
+        });
+      }
+    }
+  }
+  if (doc.aptitudes !== void 0) {
+    if (!Array.isArray(doc.aptitudes)) err("aptitudes", "Must be an array");
+    else doc.aptitudes.forEach((a, i) => {
+      if (!isNamedEntry(a)) err(`aptitudes[${i}]`, "Must be a string or { name, source? }");
+    });
+  }
+  if (doc.tarot !== void 0) {
+    if (!doc.tarot || typeof doc.tarot !== "object") err("tarot", "Must be { card?, text?, effect? }");
+    else for (const p of ["card", "text", "effect"]) if (doc.tarot[p] !== void 0 && typeof doc.tarot[p] !== "string") err(`tarot.${p}`, "String required");
+  }
+  const isNonNegNum = (v) => typeof v === "number" && Number.isFinite(v) && v >= 0;
+  if (doc.armourItems !== void 0) {
+    if (!Array.isArray(doc.armourItems)) err("armourItems", "Must be an array");
+    else doc.armourItems.forEach((a, i) => {
+      const at = (p) => `armourItems[${i}].${p}`;
+      if (!a || typeof a !== "object") {
+        err(`armourItems[${i}]`, "Must be an object");
+        return;
+      }
+      if (typeof a.name !== "string" || !a.name.trim()) err(at("name"), "Required non-empty string");
+      if (!isNonNegInt(a.ap)) err(at("ap"), "Non-negative integer AP required");
+      if (a.locations !== void 0) {
+        if (!Array.isArray(a.locations)) err(at("locations"), 'Must be an array ("all" or location keys)');
+        else a.locations.forEach((l, li) => {
+          if (l !== "all" && !ARMOUR_KEYS.includes(l)) warn(at(`locations[${li}]`), `Unknown location "${l}" (ignored)`);
+        });
+      }
+      if (a.weight !== void 0 && !isNonNegNum(a.weight)) err(at("weight"), "Non-negative number (kg) required");
+      if (a.equipped !== void 0 && typeof a.equipped !== "boolean") err(at("equipped"), "Boolean required");
+      if (a.maxAgility !== void 0 && !isNonNegInt(a.maxAgility)) err(at("maxAgility"), "Non-negative integer required");
+    });
+  }
+  if (doc.gear !== void 0) {
+    if (!Array.isArray(doc.gear)) err("gear", "Must be an array");
+    else doc.gear.forEach((g, i) => {
+      const at = (p) => `gear[${i}].${p}`;
+      if (!g || typeof g !== "object") {
+        err(`gear[${i}]`, "Must be an object");
+        return;
+      }
+      if (typeof g.name !== "string" || !g.name.trim()) err(at("name"), "Required non-empty string");
+      if (g.weight !== void 0 && !isNonNegNum(g.weight)) err(at("weight"), "Non-negative number (kg) required");
+      if (g.quantity !== void 0 && (!isInt(g.quantity) || g.quantity < 1)) err(at("quantity"), "Integer \u2265 1 required");
+      if (g.equipped !== void 0 && typeof g.equipped !== "boolean") err(at("equipped"), "Boolean required");
+    });
+  }
+  if (doc.fatigue !== void 0) {
+    if (!doc.fatigue || typeof doc.fatigue !== "object") err("fatigue", "Must be { current }");
+    else if (doc.fatigue.current !== void 0 && !isNonNegInt(doc.fatigue.current)) err("fatigue.current", "Non-negative integer required");
+  }
+  if (doc.psy !== void 0) {
+    if (!doc.psy || typeof doc.psy !== "object") err("psy", "Must be { rating, class, sustained }");
+    else {
+      if (doc.psy.rating !== void 0 && !isNonNegInt(doc.psy.rating)) err("psy.rating", "Non-negative integer required");
+      if (doc.psy.class !== void 0 && !PSYKER_CLASSES.includes(doc.psy.class)) err("psy.class", `One of: ${PSYKER_CLASSES.join(", ")}`);
+      if (doc.psy.sustained !== void 0 && !isNonNegInt(doc.psy.sustained)) err("psy.sustained", "Non-negative integer required");
+    }
+  }
+  if (doc.psychicPowers !== void 0) {
+    if (!Array.isArray(doc.psychicPowers)) err("psychicPowers", "Must be an array");
+    else doc.psychicPowers.forEach((p, i) => {
+      if (!isNamedEntry(p)) {
+        err(`psychicPowers[${i}]`, "Must be a string or { name, \u2026 }");
+        return;
+      }
+      if (p && typeof p === "object") {
+        if (p.equipped !== void 0 && typeof p.equipped !== "boolean") err(`psychicPowers[${i}].equipped`, "Boolean required");
+        if (p.cost !== void 0 && !isNonNegInt(p.cost)) err(`psychicPowers[${i}].cost`, "Non-negative integer required");
+        for (const f of ["discipline", "notes"]) if (p[f] !== void 0 && typeof p[f] !== "string") err(`psychicPowers[${i}].${f}`, "String required");
+      }
+    });
+  }
+  for (const [block, lists] of [["insanity", ["disorders"]], ["corruption", ["malignancies", "mutations"]]]) {
+    const b = doc[block];
+    if (b === void 0) continue;
+    if (!b || typeof b !== "object") {
+      err(block, "Must be an object");
+      continue;
+    }
+    if (b.points !== void 0 && (!isInt(b.points) || b.points < 0 || b.points > 100)) err(`${block}.points`, "Integer 0\u2013100 required");
+    for (const ln of lists) {
+      if (b[ln] === void 0) continue;
+      if (!Array.isArray(b[ln])) {
+        err(`${block}.${ln}`, "Must be an array");
+        continue;
+      }
+      b[ln].forEach((e, i) => {
+        if (!isNamedEntry(e)) err(`${block}.${ln}[${i}]`, "Must be a string or { name, \u2026 }");
+      });
+    }
+  }
+  if (doc.wounds?.critical !== void 0 && !isNonNegInt(doc.wounds.critical)) err("wounds.critical", "Non-negative integer required");
+  if (doc.criticalInjuries !== void 0) {
+    if (!Array.isArray(doc.criticalInjuries)) err("criticalInjuries", "Must be an array");
+    else doc.criticalInjuries.forEach((c, i) => {
+      const ok = typeof c === "string" || c && typeof c === "object" && typeof c.effect === "string";
+      if (!ok) err(`criticalInjuries[${i}]`, "Must be a string or { location?, effect, source? }");
+      else if (c && typeof c === "object" && c.location !== void 0 && !ARMOUR_KEYS.includes(c.location)) warn(`criticalInjuries[${i}].location`, `Unknown location "${c.location}"`);
+    });
+  }
+  if (doc.amputations !== void 0) {
+    if (!Array.isArray(doc.amputations)) err("amputations", "Must be an array");
+    else doc.amputations.forEach((a, i) => {
+      if (!AMPUTATION_KEYS.includes(a)) warn(`amputations[${i}]`, `Unknown part "${a}" (known: ${AMPUTATION_KEYS.join(", ")})`);
+    });
   }
   if (doc.unnatural !== void 0) {
     if (typeof doc.unnatural !== "object") err("unnatural", "Must be an object");
@@ -3345,6 +3596,12 @@ function validateCharacter(doc) {
       }
       if (w.rof !== void 0 && (typeof w.rof !== "object" || w.rof === null)) err(at("rof"), "Must be { single, burst, full }");
       if (w.sbMultiplier !== void 0 && (!isInt(w.sbMultiplier) || w.sbMultiplier < 0 || w.sbMultiplier > 2)) err(at("sbMultiplier"), "Integer 0\u20132 required");
+      if (w.weight !== void 0 && !(typeof w.weight === "number" && Number.isFinite(w.weight) && w.weight >= 0)) err(at("weight"), "Non-negative number (kg) required");
+      if (w.equipped !== void 0 && typeof w.equipped !== "boolean") err(at("equipped"), "Boolean required");
+      if (w.clip !== void 0) {
+        if (!w.clip || typeof w.clip !== "object") err(at("clip"), "Must be { max, value }");
+        else for (const p of ["max", "value"]) if (w.clip[p] !== void 0 && !isNonNegInt(w.clip[p])) err(at(`clip.${p}`), "Non-negative integer required");
+      }
     });
   }
   if (doc.field !== void 0) {
@@ -3360,8 +3617,31 @@ function migrateCharacter(doc) {
     case 0:
       d2.schemaVersion = 1;
       d2.kind = d2.kind ?? "dh2.character";
-    // fallthrough for future versions:
-    case 1:
+    // fallthrough:
+    case 1: {
+      if (d2.characteristics && typeof d2.characteristics === "object") {
+        d2.characteristics = Object.fromEntries(Object.entries(d2.characteristics).map(([k, v]) => [k, isFinite(v) && typeof v === "number" ? { base: v, advances: 0, modifiers: [] } : v]));
+      }
+      d2.skills ?? (d2.skills = {});
+      d2.xp ?? (d2.xp = { total: 0, ledger: [] });
+      d2.aptitudes ?? (d2.aptitudes = []);
+      d2.tarot ?? (d2.tarot = {});
+      d2.schemaVersion = 2;
+    }
+    case 2:
+      d2.armourItems ?? (d2.armourItems = []);
+      d2.gear ?? (d2.gear = []);
+      d2.fatigue ?? (d2.fatigue = { current: 0 });
+      d2.psy ?? (d2.psy = { rating: 0, class: "none", sustained: 0 });
+      d2.psychicPowers ?? (d2.psychicPowers = []);
+      d2.insanity ?? (d2.insanity = { points: 0, disorders: [] });
+      d2.corruption ?? (d2.corruption = { points: 0, malignancies: [], mutations: [] });
+      d2.criticalInjuries ?? (d2.criticalInjuries = []);
+      d2.amputations ?? (d2.amputations = []);
+      if (d2.wounds && typeof d2.wounds === "object") d2.wounds = { critical: 0, ...d2.wounds };
+      d2.schemaVersion = 3;
+    // fallthrough:
+    case 3:
       break;
     default:
       break;
@@ -3369,11 +3649,11 @@ function migrateCharacter(doc) {
   return d2;
 }
 function characterToCombatant(doc, { weaponIndex = 0, location = "body" } = {}) {
-  const c = doc.characteristics ?? {};
   const w = (doc.weapons ?? [])[weaponIndex];
+  const ct = (k) => characteristicTotal(doc, k);
   return {
     name: doc.name,
-    characteristics: { ws: c.ws ?? 0, bs: c.bs ?? 0, s: c.s ?? 0, t: c.t ?? 0, ag: c.ag ?? 0, wp: c.wp ?? 0 },
+    characteristics: { ws: ct("ws"), bs: ct("bs"), s: ct("s"), t: ct("t"), ag: ct("ag"), wp: ct("wp") },
     unnatural: { ...doc.unnatural ?? {} },
     weapon: w ? {
       name: w.name,
@@ -3382,7 +3662,7 @@ function characterToCombatant(doc, { weaponIndex = 0, location = "body" } = {}) 
       damage: w.damage,
       pen: w.pen ?? 0,
       damageType: w.damageType ?? "Impact",
-      rof: { single: true, burst: Number(w.rof?.burst) || 0, full: Number(w.rof?.full) || 0 },
+      rof: { single: w.rof?.single !== false, burst: Number(w.rof?.burst) || 0, full: Number(w.rof?.full) || 0 },
       qualities: canonList(w.qualities),
       craftsmanship: w.craftsmanship ?? "Common",
       sbMultiplier: w.sbMultiplier ?? (w.class === "melee" || w.class === "thrown" ? 1 : 0)
@@ -3391,9 +3671,11 @@ function characterToCombatant(doc, { weaponIndex = 0, location = "body" } = {}) 
     traits: canonList(doc.traits),
     conditions: doc.conditions ?? [],
     circumstances: doc.circumstances ?? [],
+    // psyker (Force weapons read this; the power.* pipeline will too)
+    psyRating: doc.psy?.rating ?? 0,
     // defender-side extras (harmless on the attacker side):
-    armour: (doc.armour ?? {})[location] ?? 0,
-    toughnessBonus: Math.floor((c.t ?? 0) / 10),
+    armour: armourByLocation(doc)[location] ?? 0,
+    toughnessBonus: Math.floor(ct("t") / 10),
     unnaturalToughness: doc.unnatural?.t ?? 0,
     field: doc.field ?? { rating: 0, overloadMax: 0 }
   };

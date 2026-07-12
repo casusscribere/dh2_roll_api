@@ -128,21 +128,195 @@ function select(entry) {
   renderRoster(); renderSheet();
 }
 
-const bonus = (doc, k) => Math.floor((doc.characteristics?.[k] ?? 0) / 10) + (doc.unnatural?.[k] ?? 0);
+// --- schema v2 derivation (mirrors character-schema.mjs helpers) ---------------
+const modSum = (mods) => (mods ?? []).reduce((a, m) => a + (Number(m?.value) || 0), 0);
+const modTitle = (mods) => (mods ?? []).map((m) => `${m.value >= 0 ? '+' : ''}${m.value}${m.source ? ` (${m.source})` : ''}`).join(', ');
+function charParts(doc, k) {
+  const c = doc.characteristics?.[k];
+  if (typeof c === 'number') return { base: c, advances: 0, mods: [], total: c };   // v1 flat
+  if (!c || typeof c !== 'object') return { base: 0, advances: 0, mods: [], total: 0 };
+  const mods = c.modifiers ?? [];
+  return { base: c.base ?? 0, advances: c.advances ?? 0, mods, total: (c.base ?? 0) + 5 * (c.advances ?? 0) + modSum(mods) };
+}
+const charTotal = (doc, k) => charParts(doc, k).total;
+const bonus = (doc, k) => Math.floor(charTotal(doc, k) / 10) + (doc.unnatural?.[k] ?? 0);
+// RAW skill target: untrained = ½ characteristic; advances 1–4 → +0/+10/+20/+30
+function skillRow(doc, charKey, advances, mods) {
+  const cv = charTotal(doc, charKey);
+  const base = advances > 0 ? cv + (advances - 1) * 10 : Math.floor(cv / 2);
+  return { target: base + modSum(mods), trained: advances > 0 };
+}
 
 // --- panels (each mirrors a Foundry acolyte-sheet panel) -----------------------
 function characteristicsPanel(doc) {
-  let h = '<div class="dhpanel"><h3>Characteristics</h3><div class="chartable">';
-  h += '<div class="h"></div><div class="h">Current</div><div class="h">Unnatural</div><div class="h">Bonus</div>';
+  let h = '<div class="dhpanel" style="grid-column:1/-1"><h3>Characteristics</h3><div class="chartable" style="grid-template-columns:auto repeat(6, 1fr)">';
+  h += '<div class="h"></div><div class="h">Base</div><div class="h">Advances</div><div class="h">Modifiers</div><div class="h">Current</div><div class="h">Unnatural</div><div class="h">Bonus</div>';
   for (const [k, label] of Object.entries(CHAR_LABELS)) {
+    const p = charParts(doc, k);
     const un = doc.unnatural?.[k] ?? 0;
+    const modCell = p.mods.length
+      ? `<span title="${esc(modTitle(p.mods))}" style="cursor:help">${modSum(p.mods) >= 0 ? '+' : ''}${modSum(p.mods)} <span class="dim">(${p.mods.length})</span></span>` : '—';
     h += `<div class="k" title="${esc(label)}">${k.toUpperCase()}</div>` +
-      `<div class="hl">${doc.characteristics?.[k] ?? 0}</div>` +
+      `<div>${p.base}</div>` +
+      `<div>${p.advances ? `+${p.advances * 5} <span class="dim">(${p.advances})</span>` : '—'}</div>` +
+      `<div>${modCell}</div>` +
+      `<div class="hl">${p.total}</div>` +
       `<div class="${un ? 'un' : ''}">${un || '—'}</div>` +
       `<div class="hl">${bonus(doc, k)}</div>`;
   }
-  h += '</div><div class="v2note" style="margin-top:.4rem">Initial / Advances / Modifier columns arrive with schema v2 (v1 carries totals).</div></div>';
+  h += '</div><div class="v2note" style="margin-top:.4rem">Current = Base + 5 × Advances + Σ modifiers-by-source (hover a Modifiers cell for the sources).</div></div>';
   return h;
+}
+
+function skillsPanel(doc) {
+  const skills = doc.skills ?? {};
+  const names = Object.keys(skills);
+  let h = `<div class="dhpanel" style="grid-column:1/-1"><h3>Skills (${names.length})</h3>`;
+  if (!names.length) return h + '<div class="v2note">none recorded</div></div>';
+  h += '<div class="chartable" style="grid-template-columns:2fr auto auto auto 1fr">';
+  h += '<div class="h">Skill</div><div class="h">Char</div><div class="h">Adv</div><div class="h">Target</div><div class="h">Modifiers</div>';
+  const modCell = (mods) => (mods ?? []).length
+    ? `<span title="${esc(modTitle(mods))}" style="cursor:help">${modSum(mods) >= 0 ? '+' : ''}${modSum(mods)} <span class="dim">(${mods.length})</span></span>` : '—';
+  const row = (name, charKey, advances, mods, indent = false) => {
+    const r = skillRow(doc, charKey, advances, mods);
+    h += `<div class="${indent ? '' : 'k'}" style="${indent ? 'padding-left:1.4rem' : ''}">${esc(name)}</div>` +
+      `<div>${charKey.toUpperCase()}</div>` +
+      `<div>${advances || '—'}</div>` +
+      `<div class="hl" title="${r.trained ? 'trained' : 'untrained — ½ characteristic (RAW; the campaign sheets house-rule −20)'}">${r.target}${r.trained ? '' : '*'}</div>` +
+      `<div>${modCell(mods)}</div>`;
+  };
+  for (const name of names.sort()) {
+    const s = skills[name];
+    const charKey = s.characteristic ?? guessChar(name);
+    if (s.specialities && Object.keys(s.specialities).length) {
+      h += `<div class="k" style="grid-column:1/-1">${esc(name)} <span class="dim">(specialist)</span></div>`;
+      for (const [spec, sv] of Object.entries(s.specialities)) {
+        row(spec, charKey, sv.advances ?? 0, [...(s.modifiers ?? []), ...(sv.modifiers ?? [])], true);
+      }
+    } else {
+      row(name, charKey, s.advances ?? 0, s.modifiers ?? []);
+    }
+  }
+  h += '</div><div class="v2note" style="margin-top:.4rem">* untrained (½ characteristic, RAW). Hover a Modifiers cell for the per-source breakdown.</div></div>';
+  return h;
+}
+// default governing characteristic per DH2 core skill (mirror of SKILL_DEFS)
+const SKILL_CHARS = { acrobatics:'ag', athletics:'s', awareness:'per', charm:'fel', command:'fel', commerce:'int', commonlore:'int', deceive:'fel', dodge:'ag', forbiddenlore:'int', inquiry:'fel', interrogation:'wp', intimidate:'s', linguistics:'int', logic:'int', medicae:'int', navigate:'int', operate:'ag', parry:'ws', psyniscience:'per', scholasticlore:'int', scrutiny:'per', security:'int', sleightofhand:'ag', stealth:'ag', survival:'per', techuse:'int', trade:'int' };
+const guessChar = (name) => SKILL_CHARS[String(name).toLowerCase().replace(/[\s_-]+/g, '').replace(/s$/, '')] ?? 'int';
+
+function xpPanel(doc) {
+  const xp = doc.xp ?? {};
+  const spent = xp.spent ?? (xp.ledger ?? []).reduce((a, e) => a + (e.cost || 0), 0);
+  let h = `<div class="dhpanel"><h3>Experience</h3>` +
+    `<div>Total <span class="hl">${xp.total ?? 0}</span> · Spent <span class="hl">${spent}</span> · Remaining <span class="hl">${(xp.total ?? 0) - spent}</span></div>`;
+  if ((xp.ledger ?? []).length) {
+    h += `<details style="margin-top:.4rem"><summary class="toggle">Spending ledger (${xp.ledger.length})</summary><div class="chartable" style="grid-template-columns:2fr auto 1fr;margin-top:.4rem">` +
+      '<div class="h">Purchase</div><div class="h">Cost</div><div class="h">Source</div>' +
+      xp.ledger.map((e) => `<div>${esc(e.name)}</div><div class="hl">${e.cost}</div><div class="dim">${esc(e.source ?? '')}</div>`).join('') +
+      '</div></details>';
+  } else h += '<div class="v2note" style="margin-top:.3rem">no ledger recorded</div>';
+  return h + '</div>';
+}
+function aptitudesPanel(doc) {
+  const a = doc.aptitudes ?? [];
+  return `<div class="dhpanel"><h3>Aptitudes (${a.length})</h3>` +
+    (a.length ? `<div class="chiplist">${a.map((x) => {
+      const name = nameOf(x), src = (x && typeof x === 'object') ? x.source : null;
+      return `<span class="chip" ${src ? `title="from ${esc(src)}" style="cursor:help"` : ''}>${esc(name)}${src ? ` <span class="dim">· ${esc(src)}</span>` : ''}</span>`;
+    }).join('')}</div>` : '<div class="v2note">none recorded</div>') + '</div>';
+}
+// --- v3: equipment, encumbrance, psy, condition-state panels --------------------
+const CARRY_TABLE = [
+  [0.9,2.25,4.5],[2.25,4.5,9],[4.5,9,18],[9,18,36],[18,36,72],[27,54,108],[36,72,144],[45,90,180],
+  [56,112,224],[67,134,268],[78,156,312],[90,180,360],[112,224,448],[225,450,900],[337,674,1348],
+  [450,900,1800],[675,1350,2700],[900,1800,3600],[1350,2700,5400],[1800,3600,7200],[2250,4500,9000]];
+function encumbrance(doc) {
+  const eq = (x) => x?.equipped !== false, wt = (x) => Number(x?.weight) || 0;
+  let carried = 0;
+  for (const w of doc.weapons ?? []) if (eq(w)) carried += wt(w);
+  for (const a of doc.armourItems ?? []) if (eq(a)) carried += wt(a);
+  for (const g of doc.gear ?? []) if (eq(g)) carried += wt(g) * (g.quantity ?? 1);
+  const sum = Math.max(0, Math.min(20, bonus(doc, 's') + bonus(doc, 't')));
+  const [carry, lift, push] = CARRY_TABLE[sum];
+  return { carried: Math.round(carried * 100) / 100, sum, carry, lift, push, over: carried > carry };
+}
+function encumbrancePanel(doc) {
+  const e = encumbrance(doc);
+  const pct = Math.min(100, Math.round(100 * e.carried / e.carry));
+  return `<div class="dhpanel"><h3>Encumbrance</h3>` +
+    `<div>Carried <span class="${e.over ? 'bad' : 'hl'}">${e.carried} kg</span> of <span class="hl">${e.carry} kg</span> <span class="dim">(SB+TB ${e.sum}, Table 7-26 p.248)</span></div>` +
+    `<div style="border:1px solid var(--border);border-radius:3px;height:.6rem;margin:.4rem 0;background:#0e0c09"><div style="width:${pct}%;height:100%;background:${e.over ? '#a33' : 'var(--gold)'};border-radius:2px"></div></div>` +
+    `<div class="dim">Lift ${e.lift} kg · Push ${e.push} kg${e.over ? ' · <span class="bad">ENCUMBERED — fatigue + movement penalties</span>' : ''}</div>` +
+    `<div class="v2note" style="margin-top:.3rem">Only EQUIPPED items count — toggle equipment in the document's gear/weapons/armourItems.</div></div>`;
+}
+function inventoryPanel(doc) {
+  const badge = (x) => x.equipped !== false ? '<span class="badge" style="color:var(--gold)">equipped</span>' : '<span class="badge">stored</span>';
+  let h = `<div class="dhpanel" style="grid-column:1/-1"><h3>Inventory</h3>`;
+  const section = (title, rows) => {
+    if (!rows.length) return;
+    h += `<div class="k" style="margin:.4rem 0 .2rem">${title}</div><div class="chartable" style="grid-template-columns:2fr auto auto auto">` +
+      '<div class="h">Item</div><div class="h">Qty</div><div class="h">Weight</div><div class="h">State</div>' +
+      rows.join('') + '</div>';
+  };
+  section('Weapons', (doc.weapons ?? []).map((w) =>
+    `<div>${esc(w.name)}</div><div>—</div><div>${w.weight != null ? w.weight + ' kg' : '—'}</div><div>${badge(w)}</div>`));
+  section('Armour', (doc.armourItems ?? []).map((a) =>
+    `<div>${esc(a.name)} <span class="dim">(AP ${a.ap}, ${(a.locations ?? ['all']).join('/')})</span></div><div>—</div><div>${a.weight != null ? a.weight + ' kg' : '—'}</div><div>${badge(a)}</div>`));
+  section('Gear', (doc.gear ?? []).map((g) =>
+    `<div>${esc(g.name)}</div><div>${g.quantity ?? 1}</div><div>${g.weight != null ? (Math.round(g.weight * (g.quantity ?? 1) * 100) / 100) + ' kg' : '—'}</div><div>${badge(g)}</div>`));
+  if (!(doc.weapons ?? []).length && !(doc.armourItems ?? []).length && !(doc.gear ?? []).length) h += '<div class="v2note">no inventory recorded</div>';
+  return h + '</div>';
+}
+function statePanel(doc) {
+  const ft = bonus(doc, 't') + bonus(doc, 'wp');
+  const agb = bonus(doc, 'ag');
+  const fat = doc.fatigue?.current ?? 0;
+  return `<div class="dhpanel"><h3>Fatigue & Movement</h3>` +
+    `<div>Fatigue <span class="${fat > ft ? 'bad' : 'hl'}">${fat}</span> / threshold <span class="hl">${ft}</span> <span class="dim">(TB+WB, p.233${fat > ft ? ' — UNCONSCIOUS' : ''})</span></div>` +
+    `<div style="margin-top:.3rem">Move <span class="hl">${agb}</span> / <span class="hl">${agb * 2}</span> / <span class="hl">${agb * 3}</span> / <span class="hl">${agb * 6}</span> m <span class="dim">(half/full/charge/run, p.245)</span></div></div>`;
+}
+function mindPanel(doc) {
+  const ins = doc.insanity ?? {}, cor = doc.corruption ?? {};
+  const list = (arr) => (arr ?? []).length ? (arr).map((x) => `<span class="chip">${esc(nameOf(x))}</span>`).join(' ') : '<span class="dim">none</span>';
+  return `<div class="dhpanel"><h3>Insanity & Corruption</h3>` +
+    `<div>Insanity <span class="hl">${ins.points ?? 0}</span>/100 — disorders: ${list(ins.disorders)}</div>` +
+    `<div style="margin-top:.3rem">Corruption <span class="hl">${cor.points ?? 0}</span>/100 — malignancies: ${list(cor.malignancies)}</div>` +
+    `<div style="margin-top:.3rem">Mutations: ${list(cor.mutations)}</div></div>`;
+}
+function injuriesPanel(doc) {
+  const crit = doc.wounds?.critical ?? 0;
+  const inj = doc.criticalInjuries ?? [], amp = doc.amputations ?? [];
+  return `<div class="dhpanel"><h3>Critical Wounds & Injuries</h3>` +
+    `<div>Critical damage <span class="${crit ? 'bad' : 'hl'}">${crit}</span></div>` +
+    `<div style="margin-top:.3rem">Injuries: ${inj.length ? inj.map((c) => `<span class="chip" ${typeof c === 'object' && c.source ? `title="${esc(c.source)}"` : ''}>${esc(typeof c === 'object' ? `${c.location ? c.location + ': ' : ''}${c.effect}` : c)}</span>`).join(' ') : '<span class="dim">none</span>'}</div>` +
+    `<div style="margin-top:.3rem">Missing limbs: ${amp.length ? amp.map((a) => `<span class="chip bad">${esc(a)}</span>`).join(' ') : '<span class="dim">none</span>'}</div></div>`;
+}
+function psyPanel(doc) {
+  const p = doc.psy ?? {};
+  const powers = doc.psychicPowers ?? [];
+  let h = `<div class="dhpanel" style="grid-column:1/-1"><h3>Psychic</h3>`;
+  if (!(p.rating ?? 0)) return h + '<div class="v2note">not a psyker (psy.rating 0)</div></div>';
+  h += `<div>Psy Rating <span class="hl">${p.rating}</span> · class <span class="hl">${esc(p.class ?? 'bound')}</span> · sustaining <span class="hl">${p.sustained ?? 0}</span></div>`;
+  if (!powers.length) return h + '<div class="v2note" style="margin-top:.4rem">no powers recorded</div></div>';
+  // equipped = in the active loadout; unequipped powers are known but shelved
+  h += `<div class="chartable" style="grid-template-columns:2fr 1fr 2fr auto;margin-top:.4rem">` +
+    '<div class="h">Power</div><div class="h">Discipline</div><div class="h">Notes</div><div class="h">Loadout</div>' +
+    powers.map((x) => {
+      const o = (x && typeof x === 'object') ? x : { name: x };
+      return `<div class="k">${esc(o.name)}</div><div>${esc(o.discipline ?? '—')}</div><div class="dim">${esc(o.notes ?? '')}</div>` +
+        `<div>${o.equipped === false ? '<span class="badge">shelved</span>' : '<span class="badge" style="color:var(--gold)">equipped</span>'}</div>`;
+    }).join('') + '</div>';
+  return h + '</div>';
+}
+
+function tarotPanel(doc) {
+  const t = doc.tarot ?? {};
+  const drawn = t.card || t.text || t.effect;
+  return `<div class="dhpanel"><h3>Emperor's Tarot</h3>` +
+    (drawn ? `${t.card ? `<div class="hl">${esc(t.card)}</div>` : ''}` +
+             `${t.text ? `<div class="dim" style="font-style:italic">"${esc(t.text)}"</div>` : ''}` +
+             `${t.effect ? `<div style="margin-top:.3rem">${esc(t.effect)}</div>` : ''}`
+           : '<div class="v2note">not drawn — edit the document\'s <code>tarot</code> block (⇄ Foundry bio.divination)</div>') + '</div>';
 }
 function armourPanel(doc) {
   let h = '<div class="dhpanel"><h3>Armour</h3><div class="loctable">';
@@ -180,6 +354,7 @@ function weaponsPanel(doc) {
       `<span class="badge">${esc(w.class ?? 'basic')}</span>` +
       (w.craftsmanship && w.craftsmanship !== 'Common' ? `<span class="badge">${esc(w.craftsmanship)}</span>` : '') +
       `<div class="wline">Damage <span class="hl">${esc(w.damage)}</span> ${esc(w.damageType ?? '')} · Pen <span class="hl">${w.pen ?? 0}</span> · RoF <span class="hl">${rof}</span>` +
+      (w.clip ? ` · Clip <span class="hl">${w.clip.value ?? w.clip.max}/${w.clip.max}</span>` : '') +
       (w.sbMultiplier ? ` · SB×${w.sbMultiplier}` : '') + `</div>` +
       ((w.qualities ?? []).length ? `<div class="wline chiplist" style="margin-top:.3rem">${w.qualities.map((q) => `<span class="chip">${esc(nameOf(q))}</span>`).join('')}</div>` : '');
     h += '</div>';
@@ -203,12 +378,12 @@ function bioPanel(entry) {
 }
 
 const TABS = {
-  main:    (e) => characteristicsPanel(e.doc) + armourPanel(e.doc) + fieldPanel(e.doc) + talentsPanel(e.doc) + traitsPanel(e.doc),
-  combat:  (e) => weaponsPanel(e.doc) + armourPanel(e.doc) + fieldPanel(e.doc),
-  gear:    (e) => v2Panel('Gear & Cybernetics', ['gear', 'clip'], e.doc),
-  advances: (e) => v2Panel('Experience, Aptitudes & Skills', ['xp', 'aptitude', 'skills'], e.doc),
-  psychic: (e) => v2Panel('Psychic Powers', ['psy'], e.doc),
-  bio:     (e) => bioPanel(e),
+  main:    (e) => characteristicsPanel(e.doc) + skillsPanel(e.doc) + statePanel(e.doc) + mindPanel(e.doc) + injuriesPanel(e.doc) + armourPanel(e.doc) + fieldPanel(e.doc) + talentsPanel(e.doc) + traitsPanel(e.doc),
+  combat:  (e) => weaponsPanel(e.doc) + injuriesPanel(e.doc) + armourPanel(e.doc) + fieldPanel(e.doc),
+  gear:    (e) => encumbrancePanel(e.doc) + inventoryPanel(e.doc),
+  advances: (e) => xpPanel(e.doc) + aptitudesPanel(e.doc) + talentsPanel(e.doc),
+  psychic: (e) => psyPanel(e.doc),
+  bio:     (e) => tarotPanel(e.doc) + bioPanel(e),
 };
 
 function renderSheet() {
@@ -221,7 +396,9 @@ function renderSheet() {
     `<div class="pooltiles">` +
     `<div class="pool"><div class="pv">${w.current ?? '—'}/${w.max ?? '—'}</div><div class="pl">Wounds</div></div>` +
     `<div class="pool"><div class="pv">${f.current ?? '—'}/${f.max ?? '—'}</div><div class="pl">Fate</div></div>` +
-    `<div class="pool"><div class="pv">${bonus(doc, 'ag')}</div><div class="pl">Ag Bonus</div></div>` +
+    `<div class="pool"><div class="pv">${doc.fatigue?.current ?? 0}/${bonus(doc, 't') + bonus(doc, 'wp')}</div><div class="pl">Fatigue</div></div>` +
+    `<div class="pool"><div class="pv">${encumbrance(doc).carried}/${encumbrance(doc).carry}</div><div class="pl">Carry kg</div></div>` +
+    `<div class="pool"><div class="pv">${(doc.xp?.total ?? 0) - (doc.xp?.spent ?? (doc.xp?.ledger ?? []).reduce((a, e) => a + (e.cost || 0), 0))}</div><div class="pl">XP Left</div></div>` +
     (CURRENT.id ? `<button class="minibtn" style="align-self:center" onclick="location.href='roll.html?preset=${encodeURIComponent(CURRENT.id)}'">→ load on Roll page</button>` : '') +
     `</div></div>`;
   h += `<div class="tabbar">` + Object.keys(TABS).map((t) =>

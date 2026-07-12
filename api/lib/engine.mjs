@@ -308,8 +308,16 @@ function runToHit(input, rng, registry) {
     }
     runCheckpoint(registry, CHECKPOINTS.POST_ROLL, ctx);   // jam / overheat / all-out
 
+    // Ammo expended (p.144): the RoF number IS the shots fired per mode —
+    // 1 single / burst on semi / full on full-auto, regardless of hits or
+    // misses (a jam still wastes the trigger pull). Maximal ×3 (p.146).
+    const ammoUsed = isMelee ? 0
+        : (actionInfo.rate === 'semi' ? (weapon.rof?.burst || 1)
+            : actionInfo.rate === 'full' ? (weapon.rof?.full || 1) : 1)
+        * (hasQuality(input.configs ?? input.firingModes, 'Maximal') ? 3 : 1);
+
     const base = {
-        weapon: weapon.name ?? 'Unnamed weapon', action, rangeBand,
+        weapon: weapon.name ?? 'Unnamed weapon', action, rangeBand, ammoUsed,
         test: { ...test, success: ctx.success }, effects: ctx.effects, log: ctx.log,
         preventsParry: !!ctx.preventParry,   // Flexible: the defender cannot Parry this attack
     };

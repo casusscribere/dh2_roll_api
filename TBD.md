@@ -41,8 +41,13 @@ Detailed design sketches for the engine gaps live in
 ## 2. Deferred engine/model gaps
 (sketches in POTENTIAL_FEATURES.md unless noted)
 
-- [ ] **Ammo tracking** — clips/reloads/`consume_ammo`; unblocks Maximal's ×3
-      ammo (currently a note) and real Recharge economies.
+- [~] **Ammo tracking** — PARTIALLY SHIPPED (2026-07-08): the engine reports
+      `ammoUsed` per attack (p.144 mode costs, Maximal ×3 enforced), weapons
+      carry `clip { max, value }`, and the Roll page ticks the clip down with
+      insufficient/empty warnings + reload. Still open: engine-side clip
+      STATE (the engine doesn't refuse to fire an empty clip — UI-advisory
+      only), a `consume_ammo <expr>` DSL action for qualities with custom
+      costs, and the Recharge/Overheats cooldown economy.
 - [ ] **Range in metres** — numeric range + derived band; unblocks Maximal's
       +10 m and scatter↔band interaction.
 - [ ] **Blast on-hit AoE** — secondary targets in the X-metre radius; makes
@@ -101,6 +106,34 @@ Detailed design sketches for the engine gaps live in
       D10 resolved as proposed (explicit re-run only). **D9 still open**: the
       roster is currently bundled by `build:static` — decide before the next
       Pages publish whether PC data should ship (exclude flag is trivial).
-- [ ] **§6b Delta 2 — apply-coverage upgrade** (needs schema v2): skills →
-      d100 box, psy rating, clip/range/mods, multi-weapon picker, re-import on
-      v2 to recover the fields v1 drops.
+- [x] **Schema v2** — SHIPPED (2026-07-08): characteristics as
+      { base, advances, modifiers[] } (totals derived), skills incl.
+      specialist categories with per-speciality advances, modifiers-by-source
+      on characteristics AND skills, XP total/spent/ledger, aptitudes
+      (+origin), Emperor's Tarot (⇄ Foundry bio.divination); v1→v2 migration;
+      importer fills everything from the workbooks (incl. side-table lores,
+      Upgrades→advances, Misc→sourced modifier, XP-spending tab); Characters
+      page renders the full Foundry column set. Roster regenerated as v2.
+- [x] **Schema v3** — SHIPPED (2026-07-08): equipment with the equip toggle
+      (weapons weight/equipped/clip, armourItems deriving per-location AP,
+      gear × quantity incl. Stored Inventory as unequipped), RAW-derived
+      encumbrance (Table 7-26 p.248) / fatigue threshold (p.233) / movement
+      (p.245), psy (→ combatant psyRating), psychicPowers, insanity/
+      corruption (+disorders/malignancies/mutations lists), wounds.critical,
+      criticalInjuries, amputations. Characters page: Gear + Psychic tabs
+      real, state panels on Main. Roster regenerated (psy ratings, gear,
+      insanity/corruption imported).
+- [ ] **§6b Delta 2 remainder** — Roll-page skill application (d100 box skill
+      picker fed by skillTarget), psy rating auto-fill from the preset (the
+      combatant now carries it — wire the input), weapon range/mods fields +
+      multi-weapon picker on apply.
+- [ ] **v3 content the sheets hold but the importer skips**: armour worn as
+      items (only the STATS AP scalar is carried), weapon weights (ARMAMENTS
+      blocks lack a weight column — gear rows carry them instead).
+      SHIPPED since first noted: PSY POWERS block → psychicPowers[] (with
+      discipline + equipped loadout flag), weapon clips → clip{max,value},
+      disorder/malignancy/mutation names from their sections.
+- [ ] **Foundry importer v2** — map the new blocks onto the Actor: skills →
+      system.skills (specialities map), xp → system.experience, aptitudes →
+      aptitude Items, tarot → bio.divination, modifiers-by-source → item-tied
+      bonuses / ActiveEffects.

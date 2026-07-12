@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CHARACTER_ROSTER } from '../data/characters/roster.mjs';
-import { validateCharacter, migrateCharacter } from '../lib/character-schema.mjs';
+import { validateCharacter, migrateCharacter, characteristicTotal, skillTarget } from '../lib/character-schema.mjs';
 import { characterToCombatant } from '../lib/character-schema.mjs';
 import { dispatch } from '../lib/api-router.mjs';
 
@@ -16,8 +16,9 @@ test('every roster document validates against the character schema', () => {
         assert.ok(id && name && player, `entry metadata complete for ${name}`);
         const r = validateCharacter(migrateCharacter(doc));
         assert.ok(r.ok, `${name}: ${JSON.stringify(r.errors)}`);
-        assert.equal(doc.source.adapter, 'xlsx-campaign-v1');
-        assert.ok(Array.isArray(doc.source.unmapped) && doc.source.unmapped.length, `${name}: lossiness must be recorded`);
+        assert.equal(doc.schemaVersion, 3);
+        assert.equal(doc.source.adapter, 'xlsx-campaign-v3');
+        assert.ok(Array.isArray(doc.source.unmapped) && doc.source.unmapped.length, `${name}: residual gaps must be recorded`);
     }
 });
 
@@ -31,14 +32,32 @@ test('roster documents convert to combatants (engine-consumable)', () => {
 test('spot-check known sheet values survive the import', () => {
     const aug = CHARACTER_ROSTER.find((c) => c.id.includes('augustine'))?.doc;
     assert.ok(aug, 'Augustine present');
-    assert.equal(aug.characteristics.bs, 68);
-    assert.equal(aug.characteristics.s, 34);          // NOT Athletics' 44 (skills-table trap)
+    assert.equal(characteristicTotal(aug, 'bs'), 68);
+    assert.equal(aug.characteristics.bs.advances, 5);        // Upgrades column
+    assert.equal(characteristicTotal(aug, 's'), 34);         // NOT Athletics' 44 (skills-table trap)
     assert.equal(aug.fate.max, 4);
     assert.ok(aug.weapons.some((w) => w.name === 'Shuriken Catapult' && w.rof.burst === 3 && w.rof.full === 10));
     const ogg = CHARACTER_ROSTER.find((c) => c.id === 'ogg')?.doc;
     assert.ok(ogg, 'Ogg present');
-    assert.deepEqual(ogg.unnatural, { s: 2, t: 2 });  // Ogryn
-    assert.equal(ogg.characteristics.s, 50);
+    assert.deepEqual(ogg.unnatural, { s: 2, t: 2 });         // Ogryn
+    assert.equal(characteristicTotal(ogg, 's'), 50);
+});
+
+test('v2 blocks import from the sheets: skills, specialities, aptitudes, xp ledger', () => {
+    const aug = CHARACTER_ROSTER.find((c) => c.id.includes('augustine'))?.doc;
+    // skills — Dodge advances 4, target 82 per the sheet (Ag 52 + 30)
+    assert.equal(aug.skills['Dodge'].advances, 4);
+    assert.equal(skillTarget(aug, 'Dodge').target, 82);
+    // specialist categories, incl. the side-table lores and "Trade: Linguist"
+    assert.equal(skillTarget(aug, 'Forbidden Lore', 'Archaeotech').target, 70);
+    assert.ok(Object.keys(aug.skills['Forbidden Lore'].specialities).length >= 8, 'side-table lores merged');
+    assert.equal(skillTarget(aug, 'Trade', 'Linguist').target, 80);
+    // aptitudes with origin
+    assert.ok(aug.aptitudes.some((a) => a.name === 'Knowledge' && a.source === 'Homeworld'));
+    // xp: totals + ledger with epoch source
+    assert.equal(aug.xp.total, 37000);
+    assert.equal(aug.xp.spent, 35950);
+    assert.ok(aug.xp.ledger.some((e) => e.name === 'Mighty Shot' && e.cost === 600));
 });
 
 test('GET /api/characters serves the roster grouped-ready', () => {
