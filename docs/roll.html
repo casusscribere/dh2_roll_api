@@ -26,7 +26,9 @@
   <!-- ===================== d100 TEST ===================== -->
   <fieldset>
     <legend>d100 Test</legend>
-    <div class="row3">
+    <div class="row4">
+      <div><label title="Populated when a character is applied to the ATTACKER — RAW targets via skillTarget (untrained = ½ characteristic)">Skill (from attacker)</label>
+        <select id="t-skill"><option value="">— manual target —</option></select></div>
       <div><label>Target (characteristic / skill)</label><input type="number" id="t-target" value="35"></div>
       <div><label>Difficulty</label>
         <select id="t-difficulty">
@@ -77,6 +79,8 @@
         <div><label>Preset <span class="dim">— campaign roster (imported from the character spreadsheets)</span></label>
           <select id="char-preset"><option value="">— none (use a file) —</option></select></div>
         <div><label>Character JSON file</label><input type="file" id="char-file" accept=".json,application/json"></div>
+        <div><label title="Multi-weapon documents: pick which of the character's weapons to load">Weapon</label>
+          <select id="char-weapon"><option value="0">— first weapon —</option></select></div>
       </div>
       <div class="row">
         <div><label>&nbsp;</label>
@@ -102,11 +106,11 @@
           <div><label>S</label><input type="number" id="a-s" value="35"></div>
           <div><label>T</label><input type="number" id="a-t" value="30"></div>
         </div>
-        <div class="row4" title="Unnatural Characteristic (X) per DH2 p.139: WS/BS add ⌈X/2⌉ DoS to the hit; S adds X to the melee Strength Bonus. 0 = none.">
+        <div class="row4" title="Unnatural Characteristic (X) per DH2 p.139: WS/BS add ⌈X/2⌉ DoS to the hit; S adds X to the melee Strength Bonus. Psy Rating feeds Force weapons (p.145). 0 = none.">
           <div><label>Unnat. WS</label><input type="number" id="a-un-ws" value="0" min="0"></div>
           <div><label>Unnat. BS</label><input type="number" id="a-un-bs" value="0" min="0"></div>
           <div><label>Unnat. S</label><input type="number" id="a-un-s" value="0" min="0"></div>
-          <div></div>
+          <div><label>Psy Rating</label><input type="number" id="a-psy" value="0" min="0"></div>
         </div>
         <label style="margin-top:.6rem">Active rules <span class="dim">— toggle on/off; set a value where it applies. Talents &amp; Traits default ON.</span></label>
         <div id="a-rules" class="rulepanel"><span class="dim">loading…</span></div>
@@ -522,34 +526,77 @@ async function loadPresets() {
   if (!sel) return;
   try {
     const d = await fetch('/api/characters').then((r) => r.json());
-    const byPlayer = {};
     for (const c of (d.characters ?? [])) {
       PRESET_DOCS[c.id] = c.doc;
-      (byPlayer[c.player] ??= []).push(c);
-    }
-    for (const [player, list] of Object.entries(byPlayer)) {
-      const og = document.createElement('optgroup');
-      og.label = player;
-      for (const c of list) og.appendChild(new Option(c.name, c.id));
-      sel.appendChild(og);
+      sel.add(new Option(c.name, c.id));
     }
   } catch { /* offline/static without roster — dropdown stays empty */ }
   sel.onchange = () => {
     if (sel.value) {
       $('char-file').value = '';
       const doc = PRESET_DOCS[sel.value];
+      populateWeaponPicker(doc);
       const un = doc?.source?.unmapped ?? [];
-      charStatus(`Preset <span class="gold">${esc(doc?.name ?? sel.value)}</span> ready — click →Attacker or →Defender.` +
-        (un.length ? `\n<span class="dim">not carried by schema v1: ${esc(un.join('; '))}</span>` : ''));
+      charStatus(`Preset <span class="gold">${esc(doc?.name ?? sel.value)}</span> ready — pick a weapon, then →Attacker or →Defender.` +
+        (un.length ? `\n<span class="dim">not carried: ${esc(un.join('; '))}</span>` : ''));
     }
   };
-  $('char-file').addEventListener('change', () => { sel.value = ''; });
+  $('char-file').addEventListener('change', async () => {
+    sel.value = '';
+    const f = $('char-file').files[0];
+    if (!f) return;
+    try { populateWeaponPicker(JSON.parse(await f.text())); } catch { /* apply will report */ }
+  });
   // deep link from the Characters page: roll.html?preset=<id> pre-selects it
   const want = new URLSearchParams(location.search).get('preset');
   if (want && PRESET_DOCS[want]) {
     sel.value = want;
     sel.onchange();
     sel.closest('details')?.setAttribute('open', '');   // reveal the import panel
+  }
+}
+
+// --- multi-weapon picker (Delta 2): pick which of the document's weapons loads
+function populateWeaponPicker(doc) {
+  const sel = $('char-weapon');
+  if (!sel) return;
+  sel.innerHTML = '';
+  const ws = doc?.weapons ?? [];
+  if (!ws.length) { sel.add(new Option('— no weapons —', '0')); return; }
+  ws.forEach((w, i) => sel.add(new Option(`${w.name} (${w.damage}${w.clip?.max ? `, clip ${w.clip.max}` : ''})`, String(i))));
+}
+
+// --- d100 skill picker (Delta 2): the attacker's skills with RAW targets ------
+// Mirrors skillTarget (character-schema.mjs): untrained = ½ characteristic;
+// advances 1–4 → +0/+10/+20/+30; skill + speciality modifiers-by-source added.
+const SKILL_CHARS_RP = { acrobatics:'ag', athletics:'s', awareness:'per', charm:'fel', command:'fel', commerce:'int', commonlore:'int', deceive:'fel', dodge:'ag', forbiddenlore:'int', inquiry:'fel', interrogation:'wp', intimidate:'s', linguistics:'int', logic:'int', medicae:'int', navigate:'int', operate:'ag', parry:'ws', psyniscience:'per', scholasticlore:'int', scrutiny:'per', security:'int', sleightofhand:'ag', stealth:'ag', survival:'per', techuse:'int', trade:'int' };
+const guessCharRP = (name) => SKILL_CHARS_RP[String(name).toLowerCase().replace(/[\s_-]+/g, '').replace(/s$/, '')] ?? 'int';
+const charTotalDoc = (doc, k) => {
+  const c = doc.characteristics?.[k];
+  if (typeof c === 'number') return c;
+  if (!c || typeof c !== 'object') return 0;
+  return (c.base ?? 0) + 5 * (c.advances ?? 0) + (c.modifiers ?? []).reduce((a, m) => a + (m.value || 0), 0);
+};
+function populateSkillPicker(doc) {
+  const sel = $('t-skill');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— manual target —</option>';
+  const mods = (l) => (l ?? []).reduce((a, m) => a + (m.value || 0), 0);
+  const rows = [];
+  for (const [name, s] of Object.entries(doc.skills ?? {})) {
+    const cv = charTotalDoc(doc, s.characteristic ?? guessCharRP(name));
+    const target = (adv, extra) => (adv > 0 ? cv + (adv - 1) * 10 : Math.floor(cv / 2)) + mods(s.modifiers) + extra;
+    if (s.specialities && Object.keys(s.specialities).length) {
+      for (const [spec, sv] of Object.entries(s.specialities)) rows.push([`${name} (${spec})`, name, target(sv.advances ?? 0, mods(sv.modifiers))]);
+    } else {
+      rows.push([name, name, target(s.advances ?? 0, 0)]);
+    }
+  }
+  rows.sort((a, b) => a[0].localeCompare(b[0]));
+  for (const [label, skillName, t] of rows) {
+    const o = new Option(`${label} — ${t}`, label);
+    o.dataset.target = t; o.dataset.skill = skillName;
+    sel.add(o);
   }
 }
 async function readCharFile() {
@@ -578,7 +625,9 @@ async function applyCharacter(side) {
     set('a-ws', stats.ws); set('a-bs', stats.bs);
     set('a-s', stats.s); set('a-t', stats.t);
     set('a-un-ws', c.unnatural?.ws ?? 0); set('a-un-bs', c.unnatural?.bs ?? 0); set('a-un-s', c.unnatural?.s ?? 0);
-    const w = (c.weapons ?? [])[0];
+    set('a-psy', c.psy?.rating ?? 0);                       // Force weapons (p.145)
+    populateSkillPicker(c);                                  // d100 box skill targets
+    const w = (c.weapons ?? [])[+($('char-weapon')?.value ?? 0) || 0] ?? (c.weapons ?? [])[0];
     if (w) {
       $('w-select').value = '';
       set('w-damage', w.damage); set('w-pen', w.pen ?? 0); set('w-type', w.damageType ?? 'Impact');
@@ -624,6 +673,7 @@ function exportCharacter(side) {
   if (side === 'a') {
     Object.assign(doc.characteristics, { ws: +$('a-ws').value, bs: +$('a-bs').value, s: +$('a-s').value, t: +$('a-t').value, ag: 30 });
     doc.unnatural = { ws: +$('a-un-ws').value, bs: +$('a-un-bs').value, s: +$('a-un-s').value };
+    if (+$('a-psy').value) doc.psy = { rating: +$('a-psy').value, class: 'bound', sustained: 0 };
     doc.weapons = [{
       name: $('w-select').selectedOptions[0]?.text.split(' (')[0] || 'Custom weapon',
       class: $('w-melee').value === 'yes' ? 'melee' : 'basic',
@@ -632,6 +682,7 @@ function exportCharacter(side) {
       qualities: $('w-qualities').value.split(',').map(x => x.trim()).filter(Boolean),
       craftsmanship: $('w-craft').value,
       sbMultiplier: $('w-melee').value === 'yes' ? +$('w-sbx').value : 0,
+      ...(+$('w-clip-max').value ? { clip: { max: +$('w-clip-max').value, value: +$('w-clip').value } } : {}),
     }];
   } else {
     Object.assign(doc.characteristics, { ws: +$('d-ws').value, ag: +$('d-ag').value, t: +$('d-t').value, s: +$('d-s').value, bs: 30 });
@@ -745,6 +796,14 @@ async function init() {
 }
 init();
 loadPresets();   // campaign preset dropdown (non-blocking; empty if no roster)
+// skill picker → target + test name (test.* rules gate on the skill name)
+$('t-skill').onchange = () => {
+  const o = $('t-skill').selectedOptions[0];
+  if (o?.dataset.target != null) {
+    $('t-target').value = o.dataset.target;
+    $('t-name').value = o.dataset.skill;
+  }
+};
 window.addEventListener('focus', refreshActiveRules); // pick up edits made on the Rules page
 
 const sign = (n) => (n >= 0 ? '+' : '') + n;
@@ -849,6 +908,7 @@ function buildEngagementInputs() {
   const attacker = {
     characteristics: { ws: +$('a-ws').value, bs: +$('a-bs').value, s: +$('a-s').value, t: +$('a-t').value },
     unnatural: { ws: +$('a-un-ws').value, bs: +$('a-un-bs').value, s: +$('a-un-s').value },
+    psyRating: +$('a-psy').value || 0,   // Force weapons (p.145)
     weapon: {
       name: $('w-select').selectedOptions[0]?.text.split(' (')[0] || 'Custom weapon',
       isMelee: $('w-melee').value === 'yes',

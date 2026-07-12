@@ -3889,51 +3889,15 @@ async function importCharacter(raw) {
     ui.notifications.error(`Character invalid: ${v.errors.map((e) => e.path).join(", ")}`);
     return null;
   }
-  const c = doc.characteristics;
-  const char = (base) => ({ base: Number(base) || 0, advance: 0, modifier: 0 });
+  const mapped = characterToFoundryActor(doc);
   const actor = await Actor.create({
-    name: doc.name,
-    type: "acolyte",
-    system: {
-      characteristics: {
-        weaponSkill: char(c.ws),
-        ballisticSkill: char(c.bs),
-        strength: char(c.s),
-        toughness: char(c.t),
-        agility: char(c.ag),
-        intelligence: char(c.int),
-        perception: char(c.per),
-        willpower: char(c.wp),
-        fellowship: char(c.fel)
-      },
-      wounds: { max: doc.wounds?.max ?? 10, value: doc.wounds?.current ?? doc.wounds?.max ?? 10 },
-      fate: { max: doc.fate?.max ?? 0, value: doc.fate?.current ?? doc.fate?.max ?? 0 }
-    }
+    name: mapped.name,
+    type: mapped.type,
+    system: mapped.system,
+    flags: mapped.flags
   });
-  const items = [
-    ...(doc.weapons ?? []).map((w) => ({
-      name: w.name,
-      type: "weapon",
-      system: {
-        class: w.class ?? "basic",
-        damage: w.damage,
-        penetration: w.pen ?? 0,
-        damageType: w.damageType ?? "Impact",
-        craftsmanship: w.craftsmanship ?? "Common",
-        rateOfFire: { single: 1, burst: w.rof?.burst ?? 0, full: w.rof?.full ?? 0 }
-      }
-    })),
-    ...(doc.talents ?? []).map((t) => {
-      const e = typeof t === "object" ? t : { name: t };
-      return { name: e.name, type: "talent", system: {} };
-    }),
-    ...(doc.traits ?? []).map((t) => {
-      const e = typeof t === "object" ? t : { name: t };
-      return { name: e.name, type: "trait", system: e.level != null ? { level: e.level } : {} };
-    })
-  ];
-  if (items.length) await actor.createEmbeddedDocuments("Item", items);
-  ui.notifications.info(`dh2-roll-vm: imported "${doc.name}" (${items.length} items).`);
+  if (mapped.items.length) await actor.createEmbeddedDocuments("Item", mapped.items);
+  ui.notifications.info(`dh2-roll-vm: imported "${doc.name}" (${mapped.items.length} items).`);
   console.log("dh2-roll-vm | imported Actor", actor, "\u2014 schema warnings:", v.warnings);
   return actor;
 }
@@ -3982,6 +3946,7 @@ Hooks.once("ready", () => {
     validateCharacter,
     migrateCharacter,
     characterToCombatant,
+    characterToFoundryActor,
     importCharacter,
     emptyEncounter,
     encounterActor,

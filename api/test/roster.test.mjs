@@ -12,8 +12,13 @@ import { dispatch } from '../lib/api-router.mjs';
 
 test('every roster document validates against the character schema', () => {
     assert.ok(CHARACTER_ROSTER.length >= 8, `expected the active campaign roster, got ${CHARACTER_ROSTER.length}`);
+    const PLAYER_NAMES = /\b(chris|john|matt|ryan|steve|ethan|ian|scott)\b/i;
     for (const { id, name, player, doc } of CHARACTER_ROSTER) {
-        assert.ok(id && name && player, `entry metadata complete for ${name}`);
+        assert.ok(id && name, `entry metadata complete for ${name}`);
+        // privacy: human player names are stripped from the roster entirely
+        assert.equal(player, undefined, `${name}: no player field`);
+        assert.equal(doc.source.player, undefined, `${name}: no source.player`);
+        assert.ok(!PLAYER_NAMES.test(doc.source.file ?? ''), `${name}: player name scrubbed from filename (${doc.source.file})`);
         const r = validateCharacter(migrateCharacter(doc));
         assert.ok(r.ok, `${name}: ${JSON.stringify(r.errors)}`);
         assert.equal(doc.schemaVersion, 3);
@@ -60,10 +65,10 @@ test('v2 blocks import from the sheets: skills, specialities, aptitudes, xp ledg
     assert.ok(aug.xp.ledger.some((e) => e.name === 'Mighty Shot' && e.cost === 600));
 });
 
-test('GET /api/characters serves the roster grouped-ready', () => {
+test('GET /api/characters serves the roster', () => {
     const res = dispatch('GET', '/api/characters');
     const body = res.body ?? res;
     assert.equal(body.characters.length, CHARACTER_ROSTER.length);
     const c = body.characters[0];
-    assert.ok(c.id && c.name && c.player && c.doc?.kind === 'dh2.character');
+    assert.ok(c.id && c.name && c.doc?.kind === 'dh2.character');
 });

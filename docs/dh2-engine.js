@@ -3222,7 +3222,6 @@ roll_table "Power Field Destruction" {
   var CHARACTER_ROSTER = [
     {
       "id": "jack-balvdin-first-officer",
-      "player": "Chris",
       "name": '"Jack" "Balvdin?" (First Officer)',
       "doc": {
         "schemaVersion": 3,
@@ -4024,8 +4023,7 @@ roll_table "Power Field Destruction" {
         "source": {
           "adapter": "xlsx-campaign-v3",
           "file": "_Jack_.xlsx",
-          "player": "Chris",
-          "importedAt": "2026-07-12T00:26:59.186Z",
+          "importedAt": "2026-07-12T00:48:02.367Z",
           "unmapped": [
             "armour worn as items (the STATS AP scalar is the flat armour block)",
             "house content (Dramatic Moments, custom traits)",
@@ -4036,7 +4034,6 @@ roll_table "Power Field Destruction" {
     },
     {
       "id": "augustine-haake",
-      "player": "Chris",
       "name": "Augustine Haake",
       "doc": {
         "schemaVersion": 3,
@@ -5089,8 +5086,492 @@ roll_table "Power Field Destruction" {
         "source": {
           "adapter": "xlsx-campaign-v3",
           "file": "Augustine Haake.xlsx",
-          "player": "Chris",
-          "importedAt": "2026-07-12T00:26:59.089Z",
+          "importedAt": "2026-07-12T00:48:02.259Z",
+          "unmapped": [
+            "armour is the STATS scalar applied to all locations",
+            "armour worn as items (the STATS AP scalar is the flat armour block)",
+            "house content (Dramatic Moments, custom traits)",
+            "weapon trainings"
+          ]
+        }
+      }
+    },
+    {
+      "id": "baron-talvdin-hourace-horp",
+      "name": "Baron Talvdin Hourace Horp",
+      "doc": {
+        "schemaVersion": 3,
+        "kind": "dh2.character",
+        "system": "dh2",
+        "name": "Baron Talvdin Hourace Horp",
+        "characteristics": {
+          "ws": {
+            "base": 66,
+            "advances": 0,
+            "modifiers": []
+          },
+          "bs": {
+            "base": 40,
+            "advances": 0,
+            "modifiers": []
+          },
+          "s": {
+            "base": 30,
+            "advances": 4,
+            "modifiers": []
+          },
+          "t": {
+            "base": 56,
+            "advances": 1,
+            "modifiers": []
+          },
+          "ag": {
+            "base": 18,
+            "advances": 5,
+            "modifiers": []
+          },
+          "int": {
+            "base": 36,
+            "advances": 0,
+            "modifiers": []
+          },
+          "per": {
+            "base": 46,
+            "advances": 4,
+            "modifiers": []
+          },
+          "wp": {
+            "base": 62,
+            "advances": 0,
+            "modifiers": []
+          },
+          "fel": {
+            "base": 24,
+            "advances": 4,
+            "modifiers": []
+          }
+        },
+        "unnatural": {},
+        "armour": {
+          "head": 6,
+          "body": 6,
+          "leftArm": 6,
+          "rightArm": 6,
+          "leftLeg": 6,
+          "rightLeg": 6
+        },
+        "wounds": {
+          "critical": 0,
+          "current": 10,
+          "max": 10
+        },
+        "fate": {
+          "current": 5,
+          "max": 6
+        },
+        "fatigue": {
+          "current": 0
+        },
+        "skills": {
+          "Acrobatics": {
+            "advances": 0
+          },
+          "Athletics": {
+            "advances": 0
+          },
+          "Awareness": {
+            "advances": 0
+          },
+          "Charm": {
+            "advances": 4
+          },
+          "Command": {
+            "advances": 0
+          },
+          "Commerce": {
+            "advances": 0
+          },
+          "Common Lore": {
+            "specialities": {
+              "Underworld": {
+                "advances": 0
+              }
+            }
+          },
+          "Deceive": {
+            "advances": 1
+          },
+          "Dodge": {
+            "advances": 2
+          },
+          "Forbidden Lore": {
+            "specialities": {
+              "The Warp": {
+                "advances": 1,
+                "modifiers": [
+                  {
+                    "value": 5,
+                    "source": "sheet Misc column"
+                  }
+                ]
+              },
+              "Daemonology": {
+                "advances": 0
+              }
+            }
+          },
+          "Inquiry": {
+            "advances": 0
+          },
+          "Interrogation": {
+            "advances": 0
+          },
+          "Intimidate": {
+            "advances": 0
+          },
+          "Linguistics": {
+            "specialities": {}
+          },
+          "Logic": {
+            "advances": 0
+          },
+          "Medicae": {
+            "advances": 0
+          },
+          "Navigate": {
+            "specialities": {}
+          },
+          "Operate": {
+            "specialities": {}
+          },
+          "Parry": {
+            "advances": 0
+          },
+          "Psyniscience": {
+            "advances": 4
+          },
+          "Scholastic Lore": {
+            "specialities": {}
+          },
+          "Scrutiny": {
+            "advances": 0
+          },
+          "Security": {
+            "advances": 0
+          },
+          "Sleight of Hand": {
+            "advances": 1
+          },
+          "Stealth": {
+            "advances": 1,
+            "modifiers": [
+              {
+                "value": 30,
+                "source": "sheet Misc column"
+              }
+            ]
+          },
+          "Survival": {
+            "advances": 0
+          },
+          "Tech-Use": {
+            "advances": 0
+          }
+        },
+        "xp": {
+          "total": 3e4,
+          "ledger": [],
+          "spent": 29900
+        },
+        "aptitudes": [
+          {
+            "name": "Weapon Skill",
+            "source": "Homeworld"
+          },
+          {
+            "name": "Psyker",
+            "source": "BG*"
+          },
+          {
+            "name": "Defense",
+            "source": "Role"
+          },
+          {
+            "name": "Intelligence",
+            "source": "Role"
+          },
+          {
+            "name": "Knowledge",
+            "source": "Role"
+          },
+          {
+            "name": "Perception",
+            "source": "Role"
+          },
+          {
+            "name": "Willpower",
+            "source": "Role"
+          }
+        ],
+        "tarot": {},
+        "psy": {
+          "rating": 8,
+          "class": "bound",
+          "sustained": 0
+        },
+        "psychicPowers": [
+          {
+            "name": "Warp Perception",
+            "equipped": true,
+            "discipline": "Div"
+          },
+          {
+            "name": "Prescience",
+            "equipped": true,
+            "discipline": "Div"
+          },
+          {
+            "name": "Forboding",
+            "equipped": true,
+            "discipline": "Div"
+          },
+          {
+            "name": "Forewarning",
+            "equipped": true,
+            "discipline": "Div"
+          },
+          {
+            "name": "Scrier's Gaze",
+            "equipped": true,
+            "discipline": "Div"
+          },
+          {
+            "name": "Precognition",
+            "equipped": true,
+            "discipline": "Div"
+          },
+          {
+            "name": "Winding Fate",
+            "equipped": true,
+            "discipline": "Div"
+          },
+          {
+            "name": "Perfect Timing",
+            "equipped": true,
+            "discipline": "Div"
+          },
+          {
+            "name": "Erasure",
+            "equipped": true,
+            "discipline": "Telepath"
+          },
+          {
+            "name": "Hallucination",
+            "equipped": true,
+            "discipline": "Telepath"
+          },
+          {
+            "name": "Dominate",
+            "equipped": true,
+            "discipline": "Telepath"
+          },
+          {
+            "name": "Telepathic Link",
+            "equipped": true,
+            "discipline": "Telepath"
+          },
+          {
+            "name": "Invisibility",
+            "equipped": true,
+            "discipline": "Telepath"
+          },
+          {
+            "name": "Terrify",
+            "equipped": true,
+            "discipline": "Telepath"
+          },
+          {
+            "name": "Psychic Shriek",
+            "equipped": true,
+            "discipline": "Telepath"
+          },
+          {
+            "name": "Puppet Master",
+            "equipped": true,
+            "discipline": "Telepath"
+          },
+          {
+            "name": "Invigorate",
+            "equipped": true,
+            "discipline": "Biomancy"
+          },
+          {
+            "name": "Smite",
+            "equipped": true,
+            "discipline": "Biomancy"
+          },
+          {
+            "name": "Shape Flesh",
+            "equipped": true,
+            "discipline": "Biomancy"
+          },
+          {
+            "name": "Iron Arm",
+            "equipped": true,
+            "discipline": "Biomancy"
+          },
+          {
+            "name": "Warp Speed",
+            "equipped": true,
+            "discipline": "Biomancy"
+          },
+          {
+            "name": "Enfeeble",
+            "equipped": true,
+            "discipline": "Biomancy"
+          },
+          {
+            "name": "Life Leech",
+            "equipped": true,
+            "discipline": "Biomancy"
+          },
+          {
+            "name": "Hemmorage",
+            "equipped": true,
+            "discipline": "Biomancy"
+          },
+          {
+            "name": "Endurance",
+            "equipped": true,
+            "discipline": "Biomancy"
+          }
+        ],
+        "insanity": {
+          "points": 9,
+          "disorders": [
+            "Phobia (Daemons)"
+          ]
+        },
+        "corruption": {
+          "points": 10,
+          "malignancies": [],
+          "mutations": []
+        },
+        "criticalInjuries": [],
+        "amputations": [],
+        "talents": [
+          "Enemy Slaanesh"
+        ],
+        "traits": [],
+        "conditions": [],
+        "circumstances": [],
+        "weapons": [
+          {
+            "name": "Laspistol",
+            "class": "basic",
+            "damage": "1d10+2",
+            "pen": 0,
+            "damageType": "Energy",
+            "qualities": [
+              "Reliable"
+            ],
+            "craftsmanship": "Common",
+            "rof": {
+              "single": true,
+              "burst": 2,
+              "full": 0
+            },
+            "clip": {
+              "max": 30,
+              "value": 30
+            }
+          },
+          {
+            "name": "Collapsable Staff",
+            "class": "melee",
+            "damage": "1d10",
+            "pen": 0,
+            "damageType": "Impact",
+            "qualities": [
+              "Balanced"
+            ],
+            "craftsmanship": "Common",
+            "rof": {
+              "single": true,
+              "burst": 0,
+              "full": 0
+            },
+            "sbMultiplier": 1
+          }
+        ],
+        "armourItems": [],
+        "gear": [
+          {
+            "name": "Laspistol",
+            "equipped": true
+          },
+          {
+            "name": "Collapsable Staff",
+            "equipped": true
+          },
+          {
+            "name": "Holo-guard Armor",
+            "equipped": true
+          },
+          {
+            "name": "Iron Lantern - Psy Focus (+10 Psy)",
+            "equipped": true
+          },
+          {
+            "name": "Lho-Sticks",
+            "equipped": true
+          },
+          {
+            "name": "1 Black Fast Suit",
+            "equipped": true,
+            "quantity": 1
+          },
+          {
+            "name": "Armament Belts (6 cylinder clips 3 grenades)",
+            "equipped": true
+          },
+          {
+            "name": "Battered Hilt",
+            "equipped": true
+          },
+          {
+            "name": "Red Dawn the Fhaisorr",
+            "equipped": true
+          },
+          {
+            "name": "Eye of Lokhir (Spyglass)",
+            "equipped": true
+          },
+          {
+            "name": "Nightsky Robe +30 to Stealth tests.",
+            "equipped": true
+          },
+          {
+            "name": "Corpse Starch Ration",
+            "equipped": true
+          },
+          {
+            "name": "Coppa' Channeling Rod",
+            "equipped": true
+          },
+          {
+            "name": "Void Suit",
+            "equipped": true
+          }
+        ],
+        "field": {
+          "rating": 0,
+          "overloadMax": 0
+        },
+        "source": {
+          "adapter": "xlsx-campaign-v3",
+          "file": "Baron Talvdin Horp of Grizdek.xlsx",
+          "importedAt": "2026-07-12T00:48:03.352Z",
           "unmapped": [
             "armour is the STATS scalar applied to all locations",
             "armour worn as items (the STATS AP scalar is the flat armour block)",
@@ -5102,7 +5583,6 @@ roll_table "Power Field Destruction" {
     },
     {
       "id": "gnaeus",
-      "player": "John",
       "name": "Gnaeus",
       "doc": {
         "schemaVersion": 3,
@@ -5675,9 +6155,8 @@ roll_table "Power Field Destruction" {
         },
         "source": {
           "adapter": "xlsx-campaign-v3",
-          "file": "Gnaeus (John).xlsx",
-          "player": "John",
-          "importedAt": "2026-07-12T00:26:59.436Z",
+          "file": "Gnaeus.xlsx",
+          "importedAt": "2026-07-12T00:48:02.624Z",
           "unmapped": [
             "armour worn as items (the STATS AP scalar is the flat armour block)",
             "house content (Dramatic Moments, custom traits)",
@@ -5688,7 +6167,6 @@ roll_table "Power Field Destruction" {
     },
     {
       "id": "harys-abaoth",
-      "player": "John",
       "name": "Harys Abaoth",
       "doc": {
         "schemaVersion": 3,
@@ -6807,9 +7285,8 @@ roll_table "Power Field Destruction" {
         },
         "source": {
           "adapter": "xlsx-campaign-v3",
-          "file": "Harys Abaoth (John).xlsx",
-          "player": "John",
-          "importedAt": "2026-07-12T00:26:59.666Z",
+          "file": "Harys Abaoth.xlsx",
+          "importedAt": "2026-07-12T00:48:02.856Z",
           "unmapped": [
             "armour worn as items (the STATS AP scalar is the flat armour block)",
             "house content (Dramatic Moments, custom traits)",
@@ -6820,7 +7297,6 @@ roll_table "Power Field Destruction" {
     },
     {
       "id": "ogg",
-      "player": "Matt",
       "name": "Ogg",
       "doc": {
         "schemaVersion": 3,
@@ -7137,1348 +7613,9 @@ roll_table "Power Field Destruction" {
         "source": {
           "adapter": "xlsx-campaign-v3",
           "file": "Ogg.xlsx",
-          "player": "Matt",
-          "importedAt": "2026-07-12T00:26:59.827Z",
+          "importedAt": "2026-07-12T00:48:03.017Z",
           "unmapped": [
             "armour is the STATS scalar applied to all locations",
-            "armour worn as items (the STATS AP scalar is the flat armour block)",
-            "house content (Dramatic Moments, custom traits)",
-            "weapon trainings"
-          ]
-        }
-      }
-    },
-    {
-      "id": "shas-ui-kai-ta-ran-y-eldi",
-      "player": "Matt",
-      "name": "Shas\u2019ui Kai ta ran Y\u2019eldi",
-      "doc": {
-        "schemaVersion": 3,
-        "kind": "dh2.character",
-        "system": "dh2",
-        "name": "Shas\u2019ui Kai ta ran Y\u2019eldi",
-        "characteristics": {
-          "ws": {
-            "base": 32,
-            "advances": 0,
-            "modifiers": []
-          },
-          "bs": {
-            "base": 45,
-            "advances": 5,
-            "modifiers": []
-          },
-          "s": {
-            "base": 8,
-            "advances": 5,
-            "modifiers": []
-          },
-          "t": {
-            "base": 44,
-            "advances": 0,
-            "modifiers": []
-          },
-          "ag": {
-            "base": 70,
-            "advances": 0,
-            "modifiers": []
-          },
-          "int": {
-            "base": 38,
-            "advances": 4,
-            "modifiers": []
-          },
-          "per": {
-            "base": 42,
-            "advances": 4,
-            "modifiers": []
-          },
-          "wp": {
-            "base": 63,
-            "advances": 0,
-            "modifiers": []
-          },
-          "fel": {
-            "base": 29,
-            "advances": 1,
-            "modifiers": []
-          }
-        },
-        "unnatural": {},
-        "armour": {
-          "head": 4,
-          "body": 4,
-          "leftArm": 4,
-          "rightArm": 4,
-          "leftLeg": 4,
-          "rightLeg": 4
-        },
-        "wounds": {
-          "critical": 0,
-          "current": 14,
-          "max": 14
-        },
-        "fate": {
-          "current": 4,
-          "max": 7
-        },
-        "fatigue": {
-          "current": 0
-        },
-        "skills": {
-          "Acrobatics": {
-            "advances": 3
-          },
-          "Athletics": {
-            "advances": 2
-          },
-          "Awareness": {
-            "advances": 4
-          },
-          "Charm": {
-            "advances": 0
-          },
-          "Command": {
-            "advances": 0
-          },
-          "Commerce": {
-            "advances": 0
-          },
-          "Common Lore": {
-            "specialities": {
-              "Tau Empire": {
-                "advances": 1
-              }
-            }
-          },
-          "Deceive": {
-            "advances": 0
-          },
-          "Dodge": {
-            "advances": 4
-          },
-          "Forbidden Lore": {
-            "specialities": {
-              "Tau": {
-                "advances": 1,
-                "modifiers": [
-                  {
-                    "value": 3,
-                    "source": "sheet Misc column"
-                  }
-                ]
-              },
-              "Farsight Enclave": {
-                "advances": 1
-              }
-            }
-          },
-          "Inquiry": {
-            "advances": 0
-          },
-          "Interrogation": {
-            "advances": 0
-          },
-          "Intimidate": {
-            "advances": 0
-          },
-          "Linguistics": {
-            "specialities": {
-              "Tau": {
-                "advances": 1
-              }
-            }
-          },
-          "Logic": {
-            "advances": 1
-          },
-          "Medicae": {
-            "advances": 0
-          },
-          "Navigate": {
-            "specialities": {
-              "Surface": {
-                "advances": 1
-              },
-              "Stellar": {
-                "advances": 1
-              },
-              "Warp": {
-                "advances": 0
-              }
-            }
-          },
-          "Operate": {
-            "specialities": {
-              "Voidship": {
-                "advances": 3
-              },
-              "Surface": {
-                "advances": 1
-              },
-              "Aeronautica": {
-                "advances": 1
-              }
-            }
-          },
-          "Parry": {
-            "advances": 0
-          },
-          "Psyniscience": {
-            "advances": 0
-          },
-          "Scholastic Lore": {
-            "specialities": {
-              "Tau Empire": {
-                "advances": 2
-              }
-            }
-          },
-          "Scrutiny": {
-            "advances": 1
-          },
-          "Security": {
-            "advances": 1
-          },
-          "Sleight of Hand": {
-            "advances": 1
-          },
-          "Stealth": {
-            "advances": 1,
-            "modifiers": [
-              {
-                "value": 30,
-                "source": "sheet Misc column"
-              }
-            ]
-          },
-          "Survival": {
-            "advances": 1
-          },
-          "Tech-Use": {
-            "advances": 3,
-            "modifiers": [
-              {
-                "value": 10,
-                "source": "sheet Misc column"
-              }
-            ]
-          }
-        },
-        "xp": {
-          "total": 37e3,
-          "ledger": [],
-          "spent": 37e3
-        },
-        "aptitudes": [
-          {
-            "name": "Intelligence",
-            "source": "Homeworld"
-          },
-          {
-            "name": "Finesse",
-            "source": "Background"
-          },
-          {
-            "name": "BS",
-            "source": "Void-Master"
-          },
-          {
-            "name": "Fieldcraft (Fin Dupe)",
-            "source": "Role"
-          },
-          {
-            "name": "Agility",
-            "source": "Role"
-          },
-          {
-            "name": "Willpower",
-            "source": "Role"
-          },
-          {
-            "name": "Tech",
-            "source": "Role"
-          },
-          {
-            "name": "Perception",
-            "source": "Role"
-          }
-        ],
-        "tarot": {},
-        "psy": {
-          "rating": 0,
-          "class": "none",
-          "sustained": 0
-        },
-        "psychicPowers": [],
-        "insanity": {
-          "points": 13,
-          "disorders": [
-            "Mind-shaped (+30 to resist ethereals)"
-          ]
-        },
-        "corruption": {
-          "points": 0,
-          "malignancies": [],
-          "mutations": []
-        },
-        "criticalInjuries": [],
-        "amputations": [],
-        "talents": [
-          "Hotshot Pilot",
-          "Windstrider",
-          "Fire Caste Weapon Training",
-          "Marksman",
-          "Rapid Reload",
-          "Supporting Fire",
-          "Unshakable Faith",
-          "Target Selection",
-          "Deathdealer",
-          "Mighty Shot",
-          "Step Aside",
-          "Weapon Tech",
-          "Inescapable Attack",
-          "Damage Control",
-          "Quick Draw",
-          "Peer (Ogryn)",
-          "Sniper Training (Tau)",
-          "Precision Killer (Ranged)",
-          "Preternatural Precision",
-          "One shot one kill",
-          "Bait the Trap",
-          "Keen Intuition",
-          "Sprint",
-          "Disciple of Mont'ka",
-          "Improved Initiative",
-          "Eye of Vengeance",
-          "Jaded",
-          "Resistance (Fear)",
-          "Adamantium Faith",
-          "Resistance (Psychic Powers)",
-          "Strong Minded",
-          "Technology Triumphant",
-          "+10 vs fear",
-          "Personal Equipment",
-          "Leap Up",
-          "Catfall",
-          "New Allies",
-          "Tactical Flexibility",
-          "Hard Target",
-          "Favored Item",
-          "Legendary Armament",
-          "Entrant",
-          "Line up the Shot"
-        ],
-        "traits": [],
-        "conditions": [],
-        "circumstances": [],
-        "weapons": [
-          {
-            "name": "Brotherhood",
-            "class": "basic",
-            "damage": "2d10+3",
-            "pen": 4,
-            "damageType": "Energy",
-            "qualities": [
-              "Gyro-Stabilised",
-              "Custom Grip",
-              "Targeter"
-            ],
-            "craftsmanship": "Best",
-            "rof": {
-              "single": true,
-              "burst": 2,
-              "full": 4
-            },
-            "clip": {
-              "max": 36,
-              "value": 36
-            }
-          },
-          {
-            "name": "Tau Pulse Pistol",
-            "class": "basic",
-            "damage": "2d10+2",
-            "pen": 4,
-            "damageType": "Energy",
-            "qualities": [
-              "Gyro-Stabilised"
-            ],
-            "craftsmanship": "Common",
-            "rof": {
-              "single": true,
-              "burst": 2,
-              "full": 0
-            },
-            "clip": {
-              "max": 16,
-              "value": 16
-            }
-          }
-        ],
-        "armourItems": [],
-        "gear": [
-          {
-            "name": "[G] Pulse Rifle",
-            "equipped": true,
-            "weight": 8
-          },
-          {
-            "name": "Tau Photon Grenade x 3",
-            "equipped": true,
-            "weight": 1.5
-          },
-          {
-            "name": "Tau Recon Armor",
-            "equipped": true,
-            "weight": 12
-          },
-          {
-            "name": "* Microbead",
-            "equipped": true
-          },
-          {
-            "name": "* Translator Unit",
-            "equipped": true
-          },
-          {
-            "name": "* Blacksun Filter",
-            "equipped": true
-          },
-          {
-            "name": "[B] Pulse Pistol",
-            "equipped": true,
-            "weight": 3
-          },
-          {
-            "name": "[C] Tau Longshot Pulse Rifle",
-            "equipped": true
-          },
-          {
-            "name": "Combitool",
-            "equipped": true
-          },
-          {
-            "name": "Vial of powder from Deadalus",
-            "equipped": true
-          },
-          {
-            "name": "3000 poke bucks",
-            "equipped": true,
-            "quantity": 3e3
-          },
-          {
-            "name": "fishing rod (G)",
-            "equipped": true
-          },
-          {
-            "name": "spray bottle",
-            "equipped": true
-          },
-          {
-            "name": "poke shotgun",
-            "equipped": true
-          }
-        ],
-        "field": {
-          "rating": 0,
-          "overloadMax": 0
-        },
-        "source": {
-          "adapter": "xlsx-campaign-v3",
-          "file": "Shas\u2019ui Kai_ta_ran Y\u2019eldi (La_y_eldi) (Matt).xlsx",
-          "player": "Matt",
-          "importedAt": "2026-07-12T00:26:59.980Z",
-          "unmapped": [
-            "armour is the STATS scalar applied to all locations",
-            "armour worn as items (the STATS AP scalar is the flat armour block)",
-            "house content (Dramatic Moments, custom traits)",
-            "weapon trainings"
-          ]
-        }
-      }
-    },
-    {
-      "id": "baron-talvdin-hourace-horp",
-      "player": "Ryan",
-      "name": "Baron Talvdin Hourace Horp",
-      "doc": {
-        "schemaVersion": 3,
-        "kind": "dh2.character",
-        "system": "dh2",
-        "name": "Baron Talvdin Hourace Horp",
-        "characteristics": {
-          "ws": {
-            "base": 66,
-            "advances": 0,
-            "modifiers": []
-          },
-          "bs": {
-            "base": 40,
-            "advances": 0,
-            "modifiers": []
-          },
-          "s": {
-            "base": 30,
-            "advances": 4,
-            "modifiers": []
-          },
-          "t": {
-            "base": 56,
-            "advances": 1,
-            "modifiers": []
-          },
-          "ag": {
-            "base": 18,
-            "advances": 5,
-            "modifiers": []
-          },
-          "int": {
-            "base": 36,
-            "advances": 0,
-            "modifiers": []
-          },
-          "per": {
-            "base": 46,
-            "advances": 4,
-            "modifiers": []
-          },
-          "wp": {
-            "base": 62,
-            "advances": 0,
-            "modifiers": []
-          },
-          "fel": {
-            "base": 24,
-            "advances": 4,
-            "modifiers": []
-          }
-        },
-        "unnatural": {},
-        "armour": {
-          "head": 6,
-          "body": 6,
-          "leftArm": 6,
-          "rightArm": 6,
-          "leftLeg": 6,
-          "rightLeg": 6
-        },
-        "wounds": {
-          "critical": 0,
-          "current": 10,
-          "max": 10
-        },
-        "fate": {
-          "current": 5,
-          "max": 6
-        },
-        "fatigue": {
-          "current": 0
-        },
-        "skills": {
-          "Acrobatics": {
-            "advances": 0
-          },
-          "Athletics": {
-            "advances": 0
-          },
-          "Awareness": {
-            "advances": 0
-          },
-          "Charm": {
-            "advances": 4
-          },
-          "Command": {
-            "advances": 0
-          },
-          "Commerce": {
-            "advances": 0
-          },
-          "Common Lore": {
-            "specialities": {
-              "Underworld": {
-                "advances": 0
-              }
-            }
-          },
-          "Deceive": {
-            "advances": 1
-          },
-          "Dodge": {
-            "advances": 2
-          },
-          "Forbidden Lore": {
-            "specialities": {
-              "The Warp": {
-                "advances": 1,
-                "modifiers": [
-                  {
-                    "value": 5,
-                    "source": "sheet Misc column"
-                  }
-                ]
-              },
-              "Daemonology": {
-                "advances": 0
-              }
-            }
-          },
-          "Inquiry": {
-            "advances": 0
-          },
-          "Interrogation": {
-            "advances": 0
-          },
-          "Intimidate": {
-            "advances": 0
-          },
-          "Linguistics": {
-            "specialities": {}
-          },
-          "Logic": {
-            "advances": 0
-          },
-          "Medicae": {
-            "advances": 0
-          },
-          "Navigate": {
-            "specialities": {}
-          },
-          "Operate": {
-            "specialities": {}
-          },
-          "Parry": {
-            "advances": 0
-          },
-          "Psyniscience": {
-            "advances": 4
-          },
-          "Scholastic Lore": {
-            "specialities": {}
-          },
-          "Scrutiny": {
-            "advances": 0
-          },
-          "Security": {
-            "advances": 0
-          },
-          "Sleight of Hand": {
-            "advances": 1
-          },
-          "Stealth": {
-            "advances": 1,
-            "modifiers": [
-              {
-                "value": 30,
-                "source": "sheet Misc column"
-              }
-            ]
-          },
-          "Survival": {
-            "advances": 0
-          },
-          "Tech-Use": {
-            "advances": 0
-          }
-        },
-        "xp": {
-          "total": 3e4,
-          "ledger": [],
-          "spent": 29900
-        },
-        "aptitudes": [
-          {
-            "name": "Weapon Skill",
-            "source": "Homeworld"
-          },
-          {
-            "name": "Psyker",
-            "source": "BG*"
-          },
-          {
-            "name": "Defense",
-            "source": "Role"
-          },
-          {
-            "name": "Intelligence",
-            "source": "Role"
-          },
-          {
-            "name": "Knowledge",
-            "source": "Role"
-          },
-          {
-            "name": "Perception",
-            "source": "Role"
-          },
-          {
-            "name": "Willpower",
-            "source": "Role"
-          }
-        ],
-        "tarot": {},
-        "psy": {
-          "rating": 8,
-          "class": "bound",
-          "sustained": 0
-        },
-        "psychicPowers": [
-          {
-            "name": "Warp Perception",
-            "equipped": true,
-            "discipline": "Div"
-          },
-          {
-            "name": "Prescience",
-            "equipped": true,
-            "discipline": "Div"
-          },
-          {
-            "name": "Forboding",
-            "equipped": true,
-            "discipline": "Div"
-          },
-          {
-            "name": "Forewarning",
-            "equipped": true,
-            "discipline": "Div"
-          },
-          {
-            "name": "Scrier's Gaze",
-            "equipped": true,
-            "discipline": "Div"
-          },
-          {
-            "name": "Precognition",
-            "equipped": true,
-            "discipline": "Div"
-          },
-          {
-            "name": "Winding Fate",
-            "equipped": true,
-            "discipline": "Div"
-          },
-          {
-            "name": "Perfect Timing",
-            "equipped": true,
-            "discipline": "Div"
-          },
-          {
-            "name": "Erasure",
-            "equipped": true,
-            "discipline": "Telepath"
-          },
-          {
-            "name": "Hallucination",
-            "equipped": true,
-            "discipline": "Telepath"
-          },
-          {
-            "name": "Dominate",
-            "equipped": true,
-            "discipline": "Telepath"
-          },
-          {
-            "name": "Telepathic Link",
-            "equipped": true,
-            "discipline": "Telepath"
-          },
-          {
-            "name": "Invisibility",
-            "equipped": true,
-            "discipline": "Telepath"
-          },
-          {
-            "name": "Terrify",
-            "equipped": true,
-            "discipline": "Telepath"
-          },
-          {
-            "name": "Psychic Shriek",
-            "equipped": true,
-            "discipline": "Telepath"
-          },
-          {
-            "name": "Puppet Master",
-            "equipped": true,
-            "discipline": "Telepath"
-          },
-          {
-            "name": "Invigorate",
-            "equipped": true,
-            "discipline": "Biomancy"
-          },
-          {
-            "name": "Smite",
-            "equipped": true,
-            "discipline": "Biomancy"
-          },
-          {
-            "name": "Shape Flesh",
-            "equipped": true,
-            "discipline": "Biomancy"
-          },
-          {
-            "name": "Iron Arm",
-            "equipped": true,
-            "discipline": "Biomancy"
-          },
-          {
-            "name": "Warp Speed",
-            "equipped": true,
-            "discipline": "Biomancy"
-          },
-          {
-            "name": "Enfeeble",
-            "equipped": true,
-            "discipline": "Biomancy"
-          },
-          {
-            "name": "Life Leech",
-            "equipped": true,
-            "discipline": "Biomancy"
-          },
-          {
-            "name": "Hemmorage",
-            "equipped": true,
-            "discipline": "Biomancy"
-          },
-          {
-            "name": "Endurance",
-            "equipped": true,
-            "discipline": "Biomancy"
-          }
-        ],
-        "insanity": {
-          "points": 9,
-          "disorders": [
-            "Phobia (Daemons)"
-          ]
-        },
-        "corruption": {
-          "points": 10,
-          "malignancies": [],
-          "mutations": []
-        },
-        "criticalInjuries": [],
-        "amputations": [],
-        "talents": [
-          "Enemy Slaanesh"
-        ],
-        "traits": [],
-        "conditions": [],
-        "circumstances": [],
-        "weapons": [
-          {
-            "name": "Laspistol",
-            "class": "basic",
-            "damage": "1d10+2",
-            "pen": 0,
-            "damageType": "Energy",
-            "qualities": [
-              "Reliable"
-            ],
-            "craftsmanship": "Common",
-            "rof": {
-              "single": true,
-              "burst": 2,
-              "full": 0
-            },
-            "clip": {
-              "max": 30,
-              "value": 30
-            }
-          },
-          {
-            "name": "Collapsable Staff",
-            "class": "melee",
-            "damage": "1d10",
-            "pen": 0,
-            "damageType": "Impact",
-            "qualities": [
-              "Balanced"
-            ],
-            "craftsmanship": "Common",
-            "rof": {
-              "single": true,
-              "burst": 0,
-              "full": 0
-            },
-            "sbMultiplier": 1
-          }
-        ],
-        "armourItems": [],
-        "gear": [
-          {
-            "name": "Laspistol",
-            "equipped": true
-          },
-          {
-            "name": "Collapsable Staff",
-            "equipped": true
-          },
-          {
-            "name": "Holo-guard Armor",
-            "equipped": true
-          },
-          {
-            "name": "Iron Lantern - Psy Focus (+10 Psy)",
-            "equipped": true
-          },
-          {
-            "name": "Lho-Sticks",
-            "equipped": true
-          },
-          {
-            "name": "1 Black Fast Suit",
-            "equipped": true,
-            "quantity": 1
-          },
-          {
-            "name": "Armament Belts (6 cylinder clips 3 grenades)",
-            "equipped": true
-          },
-          {
-            "name": "Battered Hilt",
-            "equipped": true
-          },
-          {
-            "name": "Red Dawn the Fhaisorr",
-            "equipped": true
-          },
-          {
-            "name": "Eye of Lokhir (Spyglass)",
-            "equipped": true
-          },
-          {
-            "name": "Nightsky Robe +30 to Stealth tests.",
-            "equipped": true
-          },
-          {
-            "name": "Corpse Starch Ration",
-            "equipped": true
-          },
-          {
-            "name": "Coppa' Channeling Rod",
-            "equipped": true
-          },
-          {
-            "name": "Void Suit",
-            "equipped": true
-          }
-        ],
-        "field": {
-          "rating": 0,
-          "overloadMax": 0
-        },
-        "source": {
-          "adapter": "xlsx-campaign-v3",
-          "file": "Baron Talvdin Horp of Grizdek.xlsx",
-          "player": "Ryan",
-          "importedAt": "2026-07-12T00:27:00.146Z",
-          "unmapped": [
-            "armour is the STATS scalar applied to all locations",
-            "armour worn as items (the STATS AP scalar is the flat armour block)",
-            "house content (Dramatic Moments, custom traits)",
-            "weapon trainings"
-          ]
-        }
-      }
-    },
-    {
-      "id": "sgt-reco-tamarin-of-the-401st-trailblaizer-unit",
-      "player": "Ryan",
-      "name": "Sgt. Reco Tamarin of the 401st Trailblaizer Unit",
-      "doc": {
-        "schemaVersion": 3,
-        "kind": "dh2.character",
-        "system": "dh2",
-        "name": "Sgt. Reco Tamarin of the 401st Trailblaizer Unit",
-        "characteristics": {
-          "ws": {
-            "base": 34,
-            "advances": 0,
-            "modifiers": []
-          },
-          "bs": {
-            "base": 39,
-            "advances": 4,
-            "modifiers": []
-          },
-          "s": {
-            "base": 30,
-            "advances": 0,
-            "modifiers": []
-          },
-          "t": {
-            "base": 36,
-            "advances": 0,
-            "modifiers": []
-          },
-          "ag": {
-            "base": 44,
-            "advances": 0,
-            "modifiers": []
-          },
-          "int": {
-            "base": 38,
-            "advances": 0,
-            "modifiers": []
-          },
-          "per": {
-            "base": 43,
-            "advances": 4,
-            "modifiers": []
-          },
-          "wp": {
-            "base": 33,
-            "advances": 0,
-            "modifiers": []
-          },
-          "fel": {
-            "base": 35,
-            "advances": 0,
-            "modifiers": []
-          }
-        },
-        "unnatural": {},
-        "armour": {
-          "head": 0,
-          "body": 0,
-          "leftArm": 0,
-          "rightArm": 0,
-          "leftLeg": 0,
-          "rightLeg": 0
-        },
-        "wounds": {
-          "critical": 0,
-          "current": 0,
-          "max": 13
-        },
-        "fate": {
-          "current": 3,
-          "max": 3
-        },
-        "fatigue": {
-          "current": 0
-        },
-        "skills": {
-          "Acrobatics": {
-            "advances": 2
-          },
-          "Athletics": {
-            "advances": 1
-          },
-          "Awareness": {
-            "advances": 3
-          },
-          "Charm": {
-            "advances": 0
-          },
-          "Command": {
-            "advances": 0
-          },
-          "Commerce": {
-            "advances": 0
-          },
-          "Common Lore": {
-            "specialities": {
-              "Imperial Guard": {
-                "advances": 1
-              }
-            }
-          },
-          "Deceive": {
-            "advances": 0
-          },
-          "Dodge": {
-            "advances": 3
-          },
-          "Forbidden Lore": {
-            "specialities": {
-              "Xenos": {
-                "advances": 0
-              }
-            }
-          },
-          "Inquiry": {
-            "advances": 0
-          },
-          "Interrogation": {
-            "advances": 0
-          },
-          "Intimidate": {
-            "advances": 0
-          },
-          "Linguistics": {
-            "specialities": {}
-          },
-          "Logic": {
-            "advances": 0
-          },
-          "Medicae": {
-            "advances": 0
-          },
-          "Navigate": {
-            "specialities": {
-              "Surface": {
-                "advances": 4
-              }
-            }
-          },
-          "Operate": {
-            "specialities": {
-              "Surface": {
-                "advances": 4
-              }
-            }
-          },
-          "Parry": {
-            "advances": 0
-          },
-          "Psyniscience": {
-            "advances": 0
-          },
-          "Scholastic Lore": {
-            "specialities": {
-              "All": {
-                "advances": 0
-              }
-            }
-          },
-          "Scrutiny": {
-            "advances": 0
-          },
-          "Security": {
-            "advances": 0
-          },
-          "Sleight of Hand": {
-            "advances": 0
-          },
-          "Stealth": {
-            "advances": 4,
-            "modifiers": [
-              {
-                "value": 10,
-                "source": "sheet Misc column"
-              }
-            ]
-          },
-          "Survival": {
-            "advances": 2
-          },
-          "Tech-Use": {
-            "advances": 4
-          }
-        },
-        "xp": {
-          "total": 17e3,
-          "ledger": [],
-          "spent": 16850
-        },
-        "aptitudes": [
-          {
-            "name": "Agility",
-            "source": "HW"
-          },
-          {
-            "name": "Fieldcraft",
-            "source": "BG"
-          },
-          {
-            "name": "Fellowship",
-            "source": "Role"
-          },
-          {
-            "name": "Intelligence",
-            "source": "Role"
-          },
-          {
-            "name": "Perception",
-            "source": "Role"
-          },
-          {
-            "name": "Social",
-            "source": "Role"
-          },
-          {
-            "name": "Tech",
-            "source": "Role"
-          }
-        ],
-        "tarot": {},
-        "psy": {
-          "rating": 0,
-          "class": "none",
-          "sustained": 0
-        },
-        "psychicPowers": [],
-        "insanity": {
-          "points": 0,
-          "disorders": []
-        },
-        "corruption": {
-          "points": 0,
-          "malignancies": [],
-          "mutations": []
-        },
-        "criticalInjuries": [],
-        "amputations": [],
-        "talents": [
-          "Keen Intuition",
-          "Inescapable Attack",
-          "Target Selection",
-          "Preternatural Precision",
-          "Hatred Orcs",
-          "Mighty Shot",
-          "Quick Draw"
-        ],
-        "traits": [],
-        "conditions": [],
-        "circumstances": [],
-        "weapons": [
-          {
-            "name": "Long-Las",
-            "class": "basic",
-            "damage": "1d10+3",
-            "pen": 1,
-            "damageType": "Energy",
-            "qualities": [
-              "Accurate"
-            ],
-            "craftsmanship": "Common",
-            "rof": {
-              "single": true,
-              "burst": 0,
-              "full": 0
-            },
-            "clip": {
-              "max": 40,
-              "value": 40
-            }
-          },
-          {
-            "name": "Lasgun",
-            "class": "basic",
-            "damage": "1d10+3",
-            "pen": 0,
-            "damageType": "Energy",
-            "qualities": [
-              "Reliable"
-            ],
-            "craftsmanship": "Common",
-            "rof": {
-              "single": true,
-              "burst": 0,
-              "full": 0
-            },
-            "clip": {
-              "max": 60,
-              "value": 60
-            }
-          },
-          {
-            "name": "Lasgun",
-            "class": "basic",
-            "damage": "1d10+3",
-            "pen": 0,
-            "damageType": "Energy",
-            "qualities": [
-              "Reliable"
-            ],
-            "craftsmanship": "Common",
-            "rof": {
-              "single": true,
-              "burst": 0,
-              "full": 0
-            },
-            "clip": {
-              "max": 60,
-              "value": 60
-            }
-          },
-          {
-            "name": "Laspistol",
-            "class": "basic",
-            "damage": "1d10+3",
-            "pen": 0,
-            "damageType": "Energy",
-            "qualities": [
-              "Reliable"
-            ],
-            "craftsmanship": "Common",
-            "rof": {
-              "single": true,
-              "burst": 0,
-              "full": 0
-            },
-            "clip": {
-              "max": 60,
-              "value": 60
-            }
-          }
-        ],
-        "armourItems": [],
-        "gear": [
-          {
-            "name": "Long-Las",
-            "equipped": true
-          },
-          {
-            "name": "Coimbat Vest",
-            "equipped": true
-          },
-          {
-            "name": "Imperial Guard Flak Armor",
-            "equipped": true
-          },
-          {
-            "name": "Grapnel and Line",
-            "equipped": true
-          },
-          {
-            "name": "Lho Sticks",
-            "equipped": true
-          },
-          {
-            "name": "Magnoculars",
-            "equipped": true
-          },
-          {
-            "name": "Microbead",
-            "equipped": true
-          },
-          {
-            "name": "Backpack",
-            "equipped": true
-          },
-          {
-            "name": "Auspex",
-            "equipped": true
-          },
-          {
-            "name": "Photo-visor",
-            "equipped": true
-          },
-          {
-            "name": "Rotary Las Weapon",
-            "equipped": true
-          },
-          {
-            "name": "Necron Ambassador Disc",
-            "equipped": true
-          }
-        ],
-        "field": {
-          "rating": 0,
-          "overloadMax": 0
-        },
-        "source": {
-          "adapter": "xlsx-campaign-v3",
-          "file": "Reco Tamarin.xlsx",
-          "player": "Ryan",
-          "importedAt": "2026-07-12T00:27:00.252Z",
-          "unmapped": [
             "armour worn as items (the STATS AP scalar is the flat armour block)",
             "house content (Dramatic Moments, custom traits)",
             "weapon trainings"
@@ -8488,7 +7625,6 @@ roll_table "Power Field Destruction" {
     },
     {
       "id": "rex-hellerand",
-      "player": "Steve",
       "name": "Rex Hellerand",
       "doc": {
         "schemaVersion": 3,
@@ -9321,8 +8457,854 @@ roll_table "Power Field Destruction" {
         "source": {
           "adapter": "xlsx-campaign-v3",
           "file": "Rex Hellerand - Sheet.xlsx",
-          "player": "Steve",
-          "importedAt": "2026-07-12T00:27:00.432Z",
+          "importedAt": "2026-07-12T00:48:03.639Z",
+          "unmapped": [
+            "armour is the STATS scalar applied to all locations",
+            "armour worn as items (the STATS AP scalar is the flat armour block)",
+            "house content (Dramatic Moments, custom traits)",
+            "weapon trainings"
+          ]
+        }
+      }
+    },
+    {
+      "id": "sgt-reco-tamarin-of-the-401st-trailblaizer-unit",
+      "name": "Sgt. Reco Tamarin of the 401st Trailblaizer Unit",
+      "doc": {
+        "schemaVersion": 3,
+        "kind": "dh2.character",
+        "system": "dh2",
+        "name": "Sgt. Reco Tamarin of the 401st Trailblaizer Unit",
+        "characteristics": {
+          "ws": {
+            "base": 34,
+            "advances": 0,
+            "modifiers": []
+          },
+          "bs": {
+            "base": 39,
+            "advances": 4,
+            "modifiers": []
+          },
+          "s": {
+            "base": 30,
+            "advances": 0,
+            "modifiers": []
+          },
+          "t": {
+            "base": 36,
+            "advances": 0,
+            "modifiers": []
+          },
+          "ag": {
+            "base": 44,
+            "advances": 0,
+            "modifiers": []
+          },
+          "int": {
+            "base": 38,
+            "advances": 0,
+            "modifiers": []
+          },
+          "per": {
+            "base": 43,
+            "advances": 4,
+            "modifiers": []
+          },
+          "wp": {
+            "base": 33,
+            "advances": 0,
+            "modifiers": []
+          },
+          "fel": {
+            "base": 35,
+            "advances": 0,
+            "modifiers": []
+          }
+        },
+        "unnatural": {},
+        "armour": {
+          "head": 0,
+          "body": 0,
+          "leftArm": 0,
+          "rightArm": 0,
+          "leftLeg": 0,
+          "rightLeg": 0
+        },
+        "wounds": {
+          "critical": 0,
+          "current": 0,
+          "max": 13
+        },
+        "fate": {
+          "current": 3,
+          "max": 3
+        },
+        "fatigue": {
+          "current": 0
+        },
+        "skills": {
+          "Acrobatics": {
+            "advances": 2
+          },
+          "Athletics": {
+            "advances": 1
+          },
+          "Awareness": {
+            "advances": 3
+          },
+          "Charm": {
+            "advances": 0
+          },
+          "Command": {
+            "advances": 0
+          },
+          "Commerce": {
+            "advances": 0
+          },
+          "Common Lore": {
+            "specialities": {
+              "Imperial Guard": {
+                "advances": 1
+              }
+            }
+          },
+          "Deceive": {
+            "advances": 0
+          },
+          "Dodge": {
+            "advances": 3
+          },
+          "Forbidden Lore": {
+            "specialities": {
+              "Xenos": {
+                "advances": 0
+              }
+            }
+          },
+          "Inquiry": {
+            "advances": 0
+          },
+          "Interrogation": {
+            "advances": 0
+          },
+          "Intimidate": {
+            "advances": 0
+          },
+          "Linguistics": {
+            "specialities": {}
+          },
+          "Logic": {
+            "advances": 0
+          },
+          "Medicae": {
+            "advances": 0
+          },
+          "Navigate": {
+            "specialities": {
+              "Surface": {
+                "advances": 4
+              }
+            }
+          },
+          "Operate": {
+            "specialities": {
+              "Surface": {
+                "advances": 4
+              }
+            }
+          },
+          "Parry": {
+            "advances": 0
+          },
+          "Psyniscience": {
+            "advances": 0
+          },
+          "Scholastic Lore": {
+            "specialities": {
+              "All": {
+                "advances": 0
+              }
+            }
+          },
+          "Scrutiny": {
+            "advances": 0
+          },
+          "Security": {
+            "advances": 0
+          },
+          "Sleight of Hand": {
+            "advances": 0
+          },
+          "Stealth": {
+            "advances": 4,
+            "modifiers": [
+              {
+                "value": 10,
+                "source": "sheet Misc column"
+              }
+            ]
+          },
+          "Survival": {
+            "advances": 2
+          },
+          "Tech-Use": {
+            "advances": 4
+          }
+        },
+        "xp": {
+          "total": 17e3,
+          "ledger": [],
+          "spent": 16850
+        },
+        "aptitudes": [
+          {
+            "name": "Agility",
+            "source": "HW"
+          },
+          {
+            "name": "Fieldcraft",
+            "source": "BG"
+          },
+          {
+            "name": "Fellowship",
+            "source": "Role"
+          },
+          {
+            "name": "Intelligence",
+            "source": "Role"
+          },
+          {
+            "name": "Perception",
+            "source": "Role"
+          },
+          {
+            "name": "Social",
+            "source": "Role"
+          },
+          {
+            "name": "Tech",
+            "source": "Role"
+          }
+        ],
+        "tarot": {},
+        "psy": {
+          "rating": 0,
+          "class": "none",
+          "sustained": 0
+        },
+        "psychicPowers": [],
+        "insanity": {
+          "points": 0,
+          "disorders": []
+        },
+        "corruption": {
+          "points": 0,
+          "malignancies": [],
+          "mutations": []
+        },
+        "criticalInjuries": [],
+        "amputations": [],
+        "talents": [
+          "Keen Intuition",
+          "Inescapable Attack",
+          "Target Selection",
+          "Preternatural Precision",
+          "Hatred Orcs",
+          "Mighty Shot",
+          "Quick Draw"
+        ],
+        "traits": [],
+        "conditions": [],
+        "circumstances": [],
+        "weapons": [
+          {
+            "name": "Long-Las",
+            "class": "basic",
+            "damage": "1d10+3",
+            "pen": 1,
+            "damageType": "Energy",
+            "qualities": [
+              "Accurate"
+            ],
+            "craftsmanship": "Common",
+            "rof": {
+              "single": true,
+              "burst": 0,
+              "full": 0
+            },
+            "clip": {
+              "max": 40,
+              "value": 40
+            }
+          },
+          {
+            "name": "Lasgun",
+            "class": "basic",
+            "damage": "1d10+3",
+            "pen": 0,
+            "damageType": "Energy",
+            "qualities": [
+              "Reliable"
+            ],
+            "craftsmanship": "Common",
+            "rof": {
+              "single": true,
+              "burst": 0,
+              "full": 0
+            },
+            "clip": {
+              "max": 60,
+              "value": 60
+            }
+          },
+          {
+            "name": "Lasgun",
+            "class": "basic",
+            "damage": "1d10+3",
+            "pen": 0,
+            "damageType": "Energy",
+            "qualities": [
+              "Reliable"
+            ],
+            "craftsmanship": "Common",
+            "rof": {
+              "single": true,
+              "burst": 0,
+              "full": 0
+            },
+            "clip": {
+              "max": 60,
+              "value": 60
+            }
+          },
+          {
+            "name": "Laspistol",
+            "class": "basic",
+            "damage": "1d10+3",
+            "pen": 0,
+            "damageType": "Energy",
+            "qualities": [
+              "Reliable"
+            ],
+            "craftsmanship": "Common",
+            "rof": {
+              "single": true,
+              "burst": 0,
+              "full": 0
+            },
+            "clip": {
+              "max": 60,
+              "value": 60
+            }
+          }
+        ],
+        "armourItems": [],
+        "gear": [
+          {
+            "name": "Long-Las",
+            "equipped": true
+          },
+          {
+            "name": "Coimbat Vest",
+            "equipped": true
+          },
+          {
+            "name": "Imperial Guard Flak Armor",
+            "equipped": true
+          },
+          {
+            "name": "Grapnel and Line",
+            "equipped": true
+          },
+          {
+            "name": "Lho Sticks",
+            "equipped": true
+          },
+          {
+            "name": "Magnoculars",
+            "equipped": true
+          },
+          {
+            "name": "Microbead",
+            "equipped": true
+          },
+          {
+            "name": "Backpack",
+            "equipped": true
+          },
+          {
+            "name": "Auspex",
+            "equipped": true
+          },
+          {
+            "name": "Photo-visor",
+            "equipped": true
+          },
+          {
+            "name": "Rotary Las Weapon",
+            "equipped": true
+          },
+          {
+            "name": "Necron Ambassador Disc",
+            "equipped": true
+          }
+        ],
+        "field": {
+          "rating": 0,
+          "overloadMax": 0
+        },
+        "source": {
+          "adapter": "xlsx-campaign-v3",
+          "file": "Reco Tamarin.xlsx",
+          "importedAt": "2026-07-12T00:48:03.451Z",
+          "unmapped": [
+            "armour worn as items (the STATS AP scalar is the flat armour block)",
+            "house content (Dramatic Moments, custom traits)",
+            "weapon trainings"
+          ]
+        }
+      }
+    },
+    {
+      "id": "shas-ui-kai-ta-ran-y-eldi",
+      "name": "Shas\u2019ui Kai ta ran Y\u2019eldi",
+      "doc": {
+        "schemaVersion": 3,
+        "kind": "dh2.character",
+        "system": "dh2",
+        "name": "Shas\u2019ui Kai ta ran Y\u2019eldi",
+        "characteristics": {
+          "ws": {
+            "base": 32,
+            "advances": 0,
+            "modifiers": []
+          },
+          "bs": {
+            "base": 45,
+            "advances": 5,
+            "modifiers": []
+          },
+          "s": {
+            "base": 8,
+            "advances": 5,
+            "modifiers": []
+          },
+          "t": {
+            "base": 44,
+            "advances": 0,
+            "modifiers": []
+          },
+          "ag": {
+            "base": 70,
+            "advances": 0,
+            "modifiers": []
+          },
+          "int": {
+            "base": 38,
+            "advances": 4,
+            "modifiers": []
+          },
+          "per": {
+            "base": 42,
+            "advances": 4,
+            "modifiers": []
+          },
+          "wp": {
+            "base": 63,
+            "advances": 0,
+            "modifiers": []
+          },
+          "fel": {
+            "base": 29,
+            "advances": 1,
+            "modifiers": []
+          }
+        },
+        "unnatural": {},
+        "armour": {
+          "head": 4,
+          "body": 4,
+          "leftArm": 4,
+          "rightArm": 4,
+          "leftLeg": 4,
+          "rightLeg": 4
+        },
+        "wounds": {
+          "critical": 0,
+          "current": 14,
+          "max": 14
+        },
+        "fate": {
+          "current": 4,
+          "max": 7
+        },
+        "fatigue": {
+          "current": 0
+        },
+        "skills": {
+          "Acrobatics": {
+            "advances": 3
+          },
+          "Athletics": {
+            "advances": 2
+          },
+          "Awareness": {
+            "advances": 4
+          },
+          "Charm": {
+            "advances": 0
+          },
+          "Command": {
+            "advances": 0
+          },
+          "Commerce": {
+            "advances": 0
+          },
+          "Common Lore": {
+            "specialities": {
+              "Tau Empire": {
+                "advances": 1
+              }
+            }
+          },
+          "Deceive": {
+            "advances": 0
+          },
+          "Dodge": {
+            "advances": 4
+          },
+          "Forbidden Lore": {
+            "specialities": {
+              "Tau": {
+                "advances": 1,
+                "modifiers": [
+                  {
+                    "value": 3,
+                    "source": "sheet Misc column"
+                  }
+                ]
+              },
+              "Farsight Enclave": {
+                "advances": 1
+              }
+            }
+          },
+          "Inquiry": {
+            "advances": 0
+          },
+          "Interrogation": {
+            "advances": 0
+          },
+          "Intimidate": {
+            "advances": 0
+          },
+          "Linguistics": {
+            "specialities": {
+              "Tau": {
+                "advances": 1
+              }
+            }
+          },
+          "Logic": {
+            "advances": 1
+          },
+          "Medicae": {
+            "advances": 0
+          },
+          "Navigate": {
+            "specialities": {
+              "Surface": {
+                "advances": 1
+              },
+              "Stellar": {
+                "advances": 1
+              },
+              "Warp": {
+                "advances": 0
+              }
+            }
+          },
+          "Operate": {
+            "specialities": {
+              "Voidship": {
+                "advances": 3
+              },
+              "Surface": {
+                "advances": 1
+              },
+              "Aeronautica": {
+                "advances": 1
+              }
+            }
+          },
+          "Parry": {
+            "advances": 0
+          },
+          "Psyniscience": {
+            "advances": 0
+          },
+          "Scholastic Lore": {
+            "specialities": {
+              "Tau Empire": {
+                "advances": 2
+              }
+            }
+          },
+          "Scrutiny": {
+            "advances": 1
+          },
+          "Security": {
+            "advances": 1
+          },
+          "Sleight of Hand": {
+            "advances": 1
+          },
+          "Stealth": {
+            "advances": 1,
+            "modifiers": [
+              {
+                "value": 30,
+                "source": "sheet Misc column"
+              }
+            ]
+          },
+          "Survival": {
+            "advances": 1
+          },
+          "Tech-Use": {
+            "advances": 3,
+            "modifiers": [
+              {
+                "value": 10,
+                "source": "sheet Misc column"
+              }
+            ]
+          }
+        },
+        "xp": {
+          "total": 37e3,
+          "ledger": [],
+          "spent": 37e3
+        },
+        "aptitudes": [
+          {
+            "name": "Intelligence",
+            "source": "Homeworld"
+          },
+          {
+            "name": "Finesse",
+            "source": "Background"
+          },
+          {
+            "name": "BS",
+            "source": "Void-Master"
+          },
+          {
+            "name": "Fieldcraft (Fin Dupe)",
+            "source": "Role"
+          },
+          {
+            "name": "Agility",
+            "source": "Role"
+          },
+          {
+            "name": "Willpower",
+            "source": "Role"
+          },
+          {
+            "name": "Tech",
+            "source": "Role"
+          },
+          {
+            "name": "Perception",
+            "source": "Role"
+          }
+        ],
+        "tarot": {},
+        "psy": {
+          "rating": 0,
+          "class": "none",
+          "sustained": 0
+        },
+        "psychicPowers": [],
+        "insanity": {
+          "points": 13,
+          "disorders": [
+            "Mind-shaped (+30 to resist ethereals)"
+          ]
+        },
+        "corruption": {
+          "points": 0,
+          "malignancies": [],
+          "mutations": []
+        },
+        "criticalInjuries": [],
+        "amputations": [],
+        "talents": [
+          "Hotshot Pilot",
+          "Windstrider",
+          "Fire Caste Weapon Training",
+          "Marksman",
+          "Rapid Reload",
+          "Supporting Fire",
+          "Unshakable Faith",
+          "Target Selection",
+          "Deathdealer",
+          "Mighty Shot",
+          "Step Aside",
+          "Weapon Tech",
+          "Inescapable Attack",
+          "Damage Control",
+          "Quick Draw",
+          "Peer (Ogryn)",
+          "Sniper Training (Tau)",
+          "Precision Killer (Ranged)",
+          "Preternatural Precision",
+          "One shot one kill",
+          "Bait the Trap",
+          "Keen Intuition",
+          "Sprint",
+          "Disciple of Mont'ka",
+          "Improved Initiative",
+          "Eye of Vengeance",
+          "Jaded",
+          "Resistance (Fear)",
+          "Adamantium Faith",
+          "Resistance (Psychic Powers)",
+          "Strong Minded",
+          "Technology Triumphant",
+          "+10 vs fear",
+          "Personal Equipment",
+          "Leap Up",
+          "Catfall",
+          "New Allies",
+          "Tactical Flexibility",
+          "Hard Target",
+          "Favored Item",
+          "Legendary Armament",
+          "Entrant",
+          "Line up the Shot"
+        ],
+        "traits": [],
+        "conditions": [],
+        "circumstances": [],
+        "weapons": [
+          {
+            "name": "Brotherhood",
+            "class": "basic",
+            "damage": "2d10+3",
+            "pen": 4,
+            "damageType": "Energy",
+            "qualities": [
+              "Gyro-Stabilised",
+              "Custom Grip",
+              "Targeter"
+            ],
+            "craftsmanship": "Best",
+            "rof": {
+              "single": true,
+              "burst": 2,
+              "full": 4
+            },
+            "clip": {
+              "max": 36,
+              "value": 36
+            }
+          },
+          {
+            "name": "Tau Pulse Pistol",
+            "class": "basic",
+            "damage": "2d10+2",
+            "pen": 4,
+            "damageType": "Energy",
+            "qualities": [
+              "Gyro-Stabilised"
+            ],
+            "craftsmanship": "Common",
+            "rof": {
+              "single": true,
+              "burst": 2,
+              "full": 0
+            },
+            "clip": {
+              "max": 16,
+              "value": 16
+            }
+          }
+        ],
+        "armourItems": [],
+        "gear": [
+          {
+            "name": "[G] Pulse Rifle",
+            "equipped": true,
+            "weight": 8
+          },
+          {
+            "name": "Tau Photon Grenade x 3",
+            "equipped": true,
+            "weight": 1.5
+          },
+          {
+            "name": "Tau Recon Armor",
+            "equipped": true,
+            "weight": 12
+          },
+          {
+            "name": "* Microbead",
+            "equipped": true
+          },
+          {
+            "name": "* Translator Unit",
+            "equipped": true
+          },
+          {
+            "name": "* Blacksun Filter",
+            "equipped": true
+          },
+          {
+            "name": "[B] Pulse Pistol",
+            "equipped": true,
+            "weight": 3
+          },
+          {
+            "name": "[C] Tau Longshot Pulse Rifle",
+            "equipped": true
+          },
+          {
+            "name": "Combitool",
+            "equipped": true
+          },
+          {
+            "name": "Vial of powder from Deadalus",
+            "equipped": true
+          },
+          {
+            "name": "3000 poke bucks",
+            "equipped": true,
+            "quantity": 3e3
+          },
+          {
+            "name": "fishing rod (G)",
+            "equipped": true
+          },
+          {
+            "name": "spray bottle",
+            "equipped": true
+          },
+          {
+            "name": "poke shotgun",
+            "equipped": true
+          }
+        ],
+        "field": {
+          "rating": 0,
+          "overloadMax": 0
+        },
+        "source": {
+          "adapter": "xlsx-campaign-v3",
+          "file": "Shas\u2019ui Kai_ta_ran Y\u2019eldi (La_y_eldi).xlsx",
+          "importedAt": "2026-07-12T00:48:03.175Z",
           "unmapped": [
             "armour is the STATS scalar applied to all locations",
             "armour worn as items (the STATS AP scalar is the flat armour block)",
@@ -9334,7 +9316,6 @@ roll_table "Power Field Destruction" {
     },
     {
       "id": "uriel-yuri",
-      "player": "Steve",
       "name": 'Uriel "Yuri"',
       "doc": {
         "schemaVersion": 3,
@@ -9964,8 +9945,7 @@ roll_table "Power Field Destruction" {
         "source": {
           "adapter": "xlsx-campaign-v3",
           "file": "Uriel.xlsx",
-          "player": "Steve",
-          "importedAt": "2026-07-12T00:27:00.623Z",
+          "importedAt": "2026-07-12T00:48:03.815Z",
           "unmapped": [
             "armour is the STATS scalar applied to all locations",
             "armour worn as items (the STATS AP scalar is the flat armour block)",

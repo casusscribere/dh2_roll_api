@@ -1,10 +1,45 @@
 # TBD — deferred work, pending decisions, remaining phases
 
-The consolidated to-be-done list (2026-07-08). Three sections: **remaining
-roadmap phases**, **deferred engine/model gaps**, and **decisions pending**.
-Detailed design sketches for the engine gaps live in
-[POTENTIAL_FEATURES.md](POTENTIAL_FEATURES.md); phase lane detail in
-[ROADMAP.md](ROADMAP.md). Suite baseline at time of writing: 311/311.
+The consolidated to-be-done list (updated 2026-07-08). Sections: **planned
+next steps (recommended order)**, **remaining roadmap phases**, **deferred
+engine/model gaps**, and **decisions pending**. Detailed design sketches for
+the engine gaps live in [POTENTIAL_FEATURES.md](POTENTIAL_FEATURES.md); phase
+lane detail in [ROADMAP.md](ROADMAP.md). Suite baseline: 339/339.
+
+## 0. Planned next steps (recommended order)
+
+1. [x] **Roll-page Delta 2 finish** — SHIPPED (2026-07-12): weapon picker on
+   preset apply (name/damage/clip per option), d100 skill picker fed by the
+   skillTarget mirror (sets target + test name for test.* gating), Psy Rating
+   input auto-filled and threaded into the engagement (Force weapons work
+   from the UI); exports carry psy + clip back out.
+2. [x] **Foundry importer v3** — SHIPPED (2026-07-12): pure mapper
+   `api/lib/foundry-actor.mjs` (headlessly tested vs the DH3 template
+   shapes; 7 tests incl. the whole roster) — characteristics with advances +
+   summed modifiers-by-source (attribution in flags), camelCase skills with
+   specialist specialities, xp → experience, tarot → bio.divination, embedded
+   Items for weapons (clip/equipped/weight)/gear/aptitudes/talents/traits/
+   psychic powers (loadout flag)/disorders/malignancies/mutations/critical
+   injuries/force field. `game.dh2vm.importCharacter` uses it. Deliberate
+   simplifications: weapon qualities ride in description+flags (attackSpecial
+   pack-linking is Phase 8); skill modifiers have no DH3 field → flags only.
+   NOT yet live-validated in a Foundry world (join-smoke assertion pending —
+   run `node tools/foundry-test/test-dh2vm-smoke.mjs` with Foundry up).
+3. **Phase 6 — psychic powers** — the pipeline pattern is proven (attack /
+   test / upkeep); both campaign psykers now carry imported power lists with
+   equipped loadouts as immediate test content. Includes the Force-weapon
+   Focus Power rider (the last weapon-quality asterisk).
+4. **Phase 5 talent sweep in tranches**, building the small seams as needed —
+   the critical-damage model first (unblocks Deathdealer AND richer Righteous
+   Fury), then attack-sequence state (Double Tap), shooting-into-melee
+   (Target Selection), the Stun action's special resolution.
+5. **Phase 7 — Rogue Trader policies** — the campaign's actual system;
+   everything above is the DH2 chassis it layers onto via `POLICIES.rt1` +
+   `rt1.*` packs + `ship_attack`.
+6. Along the way: **decide D9** (roster in the public Pages bundle — the
+   roster is now player-name-free, but the PCs' full builds still ship; an
+   exclude flag is one line), and the **engine half of ammo** (refuse-empty,
+   `consume_ammo`, Recharge economy).
 
 ## 1. Remaining roadmap phases
 

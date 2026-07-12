@@ -99,7 +99,7 @@ async function init() {
     try {
       const doc = JSON.parse(await f.text());
       $('file-status').style.display = 'none';
-      CURRENT = { id: null, player: doc.source?.player ?? null, doc };
+      CURRENT = { id: null, doc };
       renderRoster(); renderSheet();
     } catch {
       $('file-status').style.display = 'block';
@@ -111,13 +111,8 @@ async function init() {
 function renderRoster() {
   const box = $('roster-list');
   if (!ROSTER.length) { box.innerHTML = '<span class="dim">no roster (run npm run import:campaign)</span>'; return; }
-  const byPlayer = {};
-  for (const c of ROSTER) (byPlayer[c.player] ??= []).push(c);
-  let h = '';
-  for (const [player, list] of Object.entries(byPlayer)) {
-    h += `<div class="roster-player">${esc(player)}</div>`;
-    for (const c of list) h += `<button class="roster-entry${CURRENT?.id === c.id ? ' active' : ''}" data-id="${esc(c.id)}">${esc(c.name)}</button>`;
-  }
+  let h = '<div class="roster-player">Campaign roster</div>';
+  for (const c of ROSTER) h += `<button class="roster-entry${CURRENT?.id === c.id ? ' active' : ''}" data-id="${esc(c.id)}">${esc(c.name)}</button>`;
   box.innerHTML = h;
   box.querySelectorAll('.roster-entry').forEach((b) => { b.onclick = () => select(ROSTER.find((c) => c.id === b.dataset.id)); });
 }
@@ -370,7 +365,6 @@ function v2Panel(title, items, doc) {
 function bioPanel(entry) {
   const doc = entry.doc, src = doc.source ?? {};
   let h = `<div class="dhpanel" style="grid-column:1/-1"><h3>Provenance</h3>` +
-    `<div>Player: <span class="hl">${esc(entry.player ?? '—')}</span></div>` +
     (src.file ? `<div>Imported from: <span class="hl">${esc(src.file)}</span> <span class="dim">(${esc(src.adapter ?? '')}, ${esc((src.importedAt ?? '').slice(0, 10))})</span></div>` : '<div class="dim">no import provenance</div>');
   if ((src.unmapped ?? []).length) h += `<div style="margin-top:.4rem" class="v2note">Not carried by schema v1: ${esc(src.unmapped.join('; '))}</div>`;
   h += `<details style="margin-top:.6rem"><summary class="toggle">Raw JSON</summary><pre class="tmpl">${esc(JSON.stringify(doc, null, 2))}</pre></details></div>`;
@@ -392,7 +386,7 @@ function renderSheet() {
   const w = doc.wounds ?? {}, f = doc.fate ?? {};
   let h = `<div class="sheet-header">` +
     `<div><div class="cname">${esc(doc.name)}</div>` +
-    `<div class="cmeta">${esc(CURRENT.player ? `${CURRENT.player} · ` : '')}${esc(doc.kind)} v${doc.schemaVersion}</div></div>` +
+    `<div class="cmeta">${esc(doc.kind)} v${doc.schemaVersion}</div></div>` +
     `<div class="pooltiles">` +
     `<div class="pool"><div class="pv">${w.current ?? '—'}/${w.max ?? '—'}</div><div class="pl">Wounds</div></div>` +
     `<div class="pool"><div class="pv">${f.current ?? '—'}/${f.max ?? '—'}</div><div class="pl">Fate</div></div>` +

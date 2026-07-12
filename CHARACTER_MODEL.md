@@ -110,7 +110,6 @@ examined: Augustine Haake (Heretek Sage), Ogg (Ogryn / Tau Convert / Warrior)):
   "kind": "dh2.character",
   "system": "dh2",
   "name": "Augustine Haake",
-  "player": "Chris",
   "origin": { "homeworld": "Research Station", "background": "Heretek",
               "role": "Sage", "eliteAdvances": [] },
   "characteristics": { "ws": { "base": 26, "advances": 1, "misc": 0 }, "…": {} },
@@ -201,8 +200,8 @@ validate` surfacing field-level errors in `#char-status`.
 - `GET /api/characters` → `[{ id, name, player, system, schemaVersion }]`;
   `GET /api/characters/<id>` → the document. Both trivially bundleable for the
   static build (the docs/ shim serves the same JSON).
-- Roll page: a **Preset** `<select>` beside the file input, grouped by player
-  (`<optgroup label="Chris">Augustine Haake / "Jack"…</optgroup>`), plus a
+- Roll page: a **Preset** `<select>` beside the file input (a flat character
+  list — human player names are deliberately NOT stored or shown), plus a
   Refresh. Selecting a preset routes through the SAME path as a file upload:
   fetch → `migrateCharacter` → `validateCharacter` → status panel →
   →Attacker/→Defender buttons. One code path, two sources.
