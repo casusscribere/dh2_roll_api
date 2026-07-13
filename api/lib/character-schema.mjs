@@ -134,6 +134,10 @@ export const CHARACTER_FIELDS = [
     { path: 'wounds.critical', type: 'int ≥ 0', required: false, summary: 'Critical damage taken beyond 0 wounds (the crit-table severity).' },
     { path: 'criticalInjuries[]', type: 'string | { location?, effect, source? }', required: false, summary: 'Lasting critical-injury effects (⇄ Foundry criticalInjury Items).' },
     { path: 'amputations[]', type: AMPUTATION_KEYS.join(' | '), required: false, summary: 'Missing limbs/organs (DH2 core p.251).' },
+    { path: 'size', type: 'int 1–10', required: false, summary: 'Size trait value (DH2 p.138; 4 = Average). Display + future to-hit modifiers.' },
+    { path: 'movementModifier', type: 'int −10–10', required: false, summary: 'Manual movement adjustment: acts as an Agility-Bonus delta for the movement brackets ONLY (does not stack into any other AgB calculation).' },
+    { path: '<weapons|armourItems|gear>[].description', type: 'string', required: false, summary: 'Free-text item description.' },
+    { path: '<weapons|armourItems|gear>[].dsl', type: 'string (DSL source)', required: false, summary: 'Item-granted rules in the DSL. Applied at roll time ONLY while the item is equipped — e.g. `quality "Good Auspex" { on test.MODIFIERS when is_test("Tech-Use") then add modifier "auspex" = 20 }`.' },
     { path: 'armour.<head|body|leftArm|rightArm|leftLeg|rightLeg>', type: 'int ≥ 0', required: false, summary: 'Armour points by hit location.' },
     { path: 'wounds', type: '{ max, current }', required: false, summary: 'Wound track (carried, not yet consumed by the attack loop).' },
     { path: 'fate', type: '{ max, current }', required: false, summary: 'Fate points (carried, not yet consumed).' },
@@ -227,9 +231,11 @@ export function armourByLocation(doc) {
 /** Fatigue threshold = Toughness bonus + Willpower bonus (p.233). */
 export const fatigueThreshold = (doc) => characteristicBonus(doc, 't') + characteristicBonus(doc, 'wp');
 
-/** Structured-time movement (Table 7-23, p.245): AgB / ×2 / ×3 / ×6 metres. */
+/** Structured-time movement (Table 7-23, p.245): AgB / ×2 / ×3 / ×6 metres.
+ *  `movementModifier` is a manual AgB-delta for the brackets ONLY (talents like
+ *  Sprint, injuries, GM fiat) — it never feeds back into any AgB calculation. */
 export function movement(doc) {
-    const agb = characteristicBonus(doc, 'ag');
+    const agb = Math.max(0, characteristicBonus(doc, 'ag') + (doc.movementModifier ?? 0));
     return { half: agb, full: agb * 2, charge: agb * 3, run: agb * 6 };
 }
 
@@ -458,6 +464,18 @@ export function validateCharacter(doc) {
     if (doc.amputations !== undefined) {
         if (!Array.isArray(doc.amputations)) err('amputations', 'Must be an array');
         else doc.amputations.forEach((a, i) => { if (!AMPUTATION_KEYS.includes(a)) warn(`amputations[${i}]`, `Unknown part "${a}" (known: ${AMPUTATION_KEYS.join(', ')})`); });
+    }
+
+    // size / movement modifier / item description+dsl
+    if (doc.size !== undefined && (!isInt(doc.size) || doc.size < 1 || doc.size > 10)) err('size', 'Integer 1–10 required (4 = Average)');
+    if (doc.movementModifier !== undefined && (!isInt(doc.movementModifier) || doc.movementModifier < -10 || doc.movementModifier > 10)) err('movementModifier', 'Integer −10–10 required');
+    for (const listName of ['weapons', 'armourItems', 'gear']) {
+        (Array.isArray(doc[listName]) ? doc[listName] : []).forEach((item, i) => {
+            if (item && typeof item === 'object') {
+                if (item.description !== undefined && typeof item.description !== 'string') err(`${listName}[${i}].description`, 'String required');
+                if (item.dsl !== undefined && typeof item.dsl !== 'string') err(`${listName}[${i}].dsl`, 'String (DSL source) required');
+            }
+        });
     }
     // unnatural
     if (doc.unnatural !== undefined) {

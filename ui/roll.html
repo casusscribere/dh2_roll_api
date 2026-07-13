@@ -251,6 +251,7 @@
 </div>
 
 <script src="rules-store.js"></script>
+<script src="char-store.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const api = (path, body) => fetch(path, {
@@ -466,7 +467,7 @@ async function encTick(phase) {
   const body = { encounter: encounterLoad(), phase };
   const disabled = RulesStore.disabledBuiltins();
   if (disabled.length) body.disabledRules = disabled;
-  const custom = RulesStore.activeDsl();
+  const custom = activeDslPlusItems();
   if (custom.trim()) body.customRules = custom;
   const r = await api('/api/encounter/tick', body);
   if (r.error) { $('enc-events').style.display = 'block'; $('enc-events').innerHTML = `<span class="bad">${r.error}</span>`; return; }
@@ -519,24 +520,41 @@ function setRulePanel(side, cat, entries) {
 // --- campaign preset roster (CHARACTER_MODEL.md §6b) ---------------------------
 // One code path, two sources: a chosen PRESET takes priority over the file
 // input; picking one clears the other so the active source is always explicit.
-let PRESET_DOCS = {};   // id → character document (from GET /api/characters)
+let PRESET_RAW = {};    // id → SERVER baseline character document
+// The document the UI USES: browser edits (made on the Characters page in
+// input mode, stored via CharStore) overlaid on the server baseline.
+const presetDoc = (id) => (id && PRESET_RAW[id]) ? CharStore.effective(id, PRESET_RAW[id]) : null;
+
+// equipped-item DSL (schema: <item>.dsl) from the character applied to the
+// attacker — merged into every roll's customRules. EQUIPPED items only.
+let ITEM_DSL = '';
+function collectItemDsl(doc) {
+  const eq = (x) => x?.equipped !== false;
+  return [...(doc?.weapons ?? []), ...(doc?.armourItems ?? []), ...(doc?.gear ?? [])]
+    .filter((x) => eq(x) && typeof x.dsl === 'string' && x.dsl.trim())
+    .map((x) => `# item: ${x.name}\n${x.dsl}`).join('\n\n');
+}
+const activeDslPlusItems = () => [RulesStore.activeDsl(), ITEM_DSL].filter((s) => s && s.trim()).join('\n\n');
+// entries toggled OFF on the Characters page (input mode) are skipped on apply
+const activeEntries = (list) => (list ?? []).filter((x) => !(x && typeof x === 'object' && x.enabled === false));
+
 async function loadPresets() {
   const sel = $('char-preset');
   if (!sel) return;
   try {
     const d = await fetch('/api/characters').then((r) => r.json());
     for (const c of (d.characters ?? [])) {
-      PRESET_DOCS[c.id] = c.doc;
-      sel.add(new Option(c.name, c.id));
+      PRESET_RAW[c.id] = c.doc;
+      sel.add(new Option(c.name + (CharStore.edited(c.id) ? ' ✎' : ''), c.id));
     }
   } catch { /* offline/static without roster — dropdown stays empty */ }
   sel.onchange = () => {
     if (sel.value) {
       $('char-file').value = '';
-      const doc = PRESET_DOCS[sel.value];
+      const doc = presetDoc(sel.value);
       populateWeaponPicker(doc);
       const un = doc?.source?.unmapped ?? [];
-      charStatus(`Preset <span class="gold">${esc(doc?.name ?? sel.value)}</span> ready — pick a weapon, then →Attacker or →Defender.` +
+      charStatus(`Preset <span class="gold">${esc(doc?.name ?? sel.value)}</span>${CharStore.edited(sel.value) ? ' <span class="dim">(with your local edits)</span>' : ''} ready — pick a weapon, then →Attacker or →Defender.` +
         (un.length ? `\n<span class="dim">not carried: ${esc(un.join('; '))}</span>` : ''));
     }
   };
@@ -546,12 +564,20 @@ async function loadPresets() {
     if (!f) return;
     try { populateWeaponPicker(JSON.parse(await f.text())); } catch { /* apply will report */ }
   });
-  // deep link from the Characters page: roll.html?preset=<id> pre-selects it
-  const want = new URLSearchParams(location.search).get('preset');
-  if (want && PRESET_DOCS[want]) {
+  // deep links from the Characters page: ?preset=<id> pre-selects; &weapon=<i>
+  // picks the weapon and auto-applies to the attacker.
+  const params = new URLSearchParams(location.search);
+  const want = params.get('preset');
+  if (want && PRESET_RAW[want]) {
     sel.value = want;
     sel.onchange();
     sel.closest('details')?.setAttribute('open', '');   // reveal the import panel
+    const wIdx = params.get('weapon');
+    if (wIdx != null) {
+      $('char-weapon').value = String(+wIdx || 0);
+      for (let i = 0; i < 60 && !document.querySelector('#a-rules .rtoggle'); i++) await new Promise((r) => setTimeout(r, 250));
+      applyCharacter('a');
+    }
   }
 }
 
@@ -600,7 +626,7 @@ function populateSkillPicker(doc) {
 }
 async function readCharFile() {
   const preset = $('char-preset')?.value;
-  if (preset && PRESET_DOCS[preset]) return structuredClone(PRESET_DOCS[preset]);
+  if (preset && PRESET_RAW[preset]) return presetDoc(preset);
   const f = $('char-file').files[0];
   if (!f) { charStatus('Choose a preset or a character JSON file first.', true); return null; }
   try { return JSON.parse(await f.text()); }
@@ -626,6 +652,7 @@ async function applyCharacter(side) {
     set('a-un-ws', c.unnatural?.ws ?? 0); set('a-un-bs', c.unnatural?.bs ?? 0); set('a-un-s', c.unnatural?.s ?? 0);
     set('a-psy', c.psy?.rating ?? 0);                       // Force weapons (p.145)
     populateSkillPicker(c);                                  // d100 box skill targets
+    ITEM_DSL = collectItemDsl(c);                            // equipped-item rules join every roll
     const w = (c.weapons ?? [])[+($('char-weapon')?.value ?? 0) || 0] ?? (c.weapons ?? [])[0];
     if (w) {
       $('w-select').value = '';
@@ -641,7 +668,7 @@ async function applyCharacter(side) {
       syncFiringModes();
       renderActionRadios();
     }
-    for (const [cat, list] of [['talents', c.talents], ['traits', c.traits], ['conditions', c.conditions], ['circumstances', c.circumstances]])
+    for (const [cat, list] of [['talents', activeEntries(c.talents)], ['traits', activeEntries(c.traits)], ['conditions', c.conditions], ['circumstances', c.circumstances]])
       unmatched.push(...setRulePanel('a', cat, list));
   } else {
     set('d-ws', stats.ws); set('d-ag', stats.ag);
@@ -653,7 +680,7 @@ async function applyCharacter(side) {
     set('d-field', c.field?.rating ?? 0); set('d-overload', c.field?.overloadMax ?? 0);
     const w = (c.weapons ?? []).find(x => x.class === 'melee');
     if (w) $('d-qualities').value = (w.qualities ?? []).map(q => nameLevel(q).name).join(', ');
-    for (const [cat, list] of [['talents', c.talents], ['traits', c.traits], ['conditions', c.conditions], ['circumstances', c.circumstances]])
+    for (const [cat, list] of [['talents', activeEntries(c.talents)], ['traits', activeEntries(c.traits)], ['conditions', c.conditions], ['circumstances', c.circumstances]])
       unmatched.push(...setRulePanel('d', cat, list));
   }
   const warn = (r.warnings ?? []).map(w => `${w.path} — ${w.message}`);
@@ -820,7 +847,7 @@ async function doTest() {
   };
   const disabled = RulesStore.disabledBuiltins();
   if (disabled.length) body.disabledRules = disabled;
-  const custom = RulesStore.activeDsl();
+  const custom = activeDslPlusItems();
   if (custom.trim()) body.customRules = custom;
   const r = await api('/api/test', body);
   if (r.error) { $('t-result').innerHTML = `<span class="bad">${r.error}</span>`; return; }
@@ -848,7 +875,7 @@ async function doDamage() {
   };
   const disabled = RulesStore.disabledBuiltins();
   if (disabled.length) body.disabledRules = disabled;
-  const custom = RulesStore.activeDsl();
+  const custom = activeDslPlusItems();
   if (custom.trim()) body.customRules = custom;
   const r = await api('/api/damage', body);
   if (r.error) { $('d-result').innerHTML = `<span class="bad">${r.error}</span>`; return; }
@@ -938,7 +965,7 @@ function buildEngagementInputs() {
     circumstances: collectRules('d', 'circumstances'),
   };
   const inputs = { attacker, defender, options: { autoResolveTests: $('a-autotest').checked } };
-  const custom = [RulesStore.activeDsl(), $('a-customrules').value.trim()].filter(Boolean).join('\n\n');
+  const custom = [RulesStore.activeDsl(), ITEM_DSL, $('a-customrules').value.trim()].filter(Boolean).join('\n\n');
   if (custom.trim()) inputs.customRules = custom;
   const disabled = RulesStore.disabledBuiltins();
   if (disabled.length) inputs.disabledRules = disabled;

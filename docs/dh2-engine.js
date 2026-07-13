@@ -1382,6 +1382,9 @@
     { name: "is_action", signature: 'is_action("Name")', returns: "bool", summary: 'The current action is the named one (case-insensitive), e.g. is_action("Parry"). Works in every flow including reactions.', scopes: {
       attacker: (c, [n]) => isAction(c.action, n)
     } },
+    { name: "is_test", signature: 'is_test("Name")', returns: "bool", summary: 'The generic test (test.* pipeline) is the named one, spelling-blind \u2014 is_test("Tech-Use") matches testName "tech_use"/"TechUse". THE way to write "+X to <skill>" item/talent rules: when is_test("Tech-Use") [and <condition>] then add modifier "\u2026" = X.', scopes: {
+      attacker: (c, [n]) => normName(c.testName ?? "") === normName(n)
+    } },
     { name: "is_reaction", signature: "is_reaction()", returns: "bool", summary: "The current action is a Reaction (Parry, Dodge, \u2026).", scopes: {
       attacker: (c) => isReaction(c.action)
     } },
@@ -10158,6 +10161,10 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
     { path: "wounds.critical", type: "int \u2265 0", required: false, summary: "Critical damage taken beyond 0 wounds (the crit-table severity)." },
     { path: "criticalInjuries[]", type: "string | { location?, effect, source? }", required: false, summary: "Lasting critical-injury effects (\u21C4 Foundry criticalInjury Items)." },
     { path: "amputations[]", type: AMPUTATION_KEYS.join(" | "), required: false, summary: "Missing limbs/organs (DH2 core p.251)." },
+    { path: "size", type: "int 1\u201310", required: false, summary: "Size trait value (DH2 p.138; 4 = Average). Display + future to-hit modifiers." },
+    { path: "movementModifier", type: "int \u221210\u201310", required: false, summary: "Manual movement adjustment: acts as an Agility-Bonus delta for the movement brackets ONLY (does not stack into any other AgB calculation)." },
+    { path: "<weapons|armourItems|gear>[].description", type: "string", required: false, summary: "Free-text item description." },
+    { path: "<weapons|armourItems|gear>[].dsl", type: "string (DSL source)", required: false, summary: 'Item-granted rules in the DSL. Applied at roll time ONLY while the item is equipped \u2014 e.g. `quality "Good Auspex" { on test.MODIFIERS when is_test("Tech-Use") then add modifier "auspex" = 20 }`.' },
     { path: "armour.<head|body|leftArm|rightArm|leftLeg|rightLeg>", type: "int \u2265 0", required: false, summary: "Armour points by hit location." },
     { path: "wounds", type: "{ max, current }", required: false, summary: "Wound track (carried, not yet consumed by the attack loop)." },
     { path: "fate", type: "{ max, current }", required: false, summary: "Fate points (carried, not yet consumed)." },
@@ -10419,6 +10426,16 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
       if (!Array.isArray(doc.amputations)) err("amputations", "Must be an array");
       else doc.amputations.forEach((a, i) => {
         if (!AMPUTATION_KEYS.includes(a)) warn(`amputations[${i}]`, `Unknown part "${a}" (known: ${AMPUTATION_KEYS.join(", ")})`);
+      });
+    }
+    if (doc.size !== void 0 && (!isInt(doc.size) || doc.size < 1 || doc.size > 10)) err("size", "Integer 1\u201310 required (4 = Average)");
+    if (doc.movementModifier !== void 0 && (!isInt(doc.movementModifier) || doc.movementModifier < -10 || doc.movementModifier > 10)) err("movementModifier", "Integer \u221210\u201310 required");
+    for (const listName of ["weapons", "armourItems", "gear"]) {
+      (Array.isArray(doc[listName]) ? doc[listName] : []).forEach((item, i) => {
+        if (item && typeof item === "object") {
+          if (item.description !== void 0 && typeof item.description !== "string") err(`${listName}[${i}].description`, "String required");
+          if (item.dsl !== void 0 && typeof item.dsl !== "string") err(`${listName}[${i}].dsl`, "String (DSL source) required");
+        }
       });
     }
     if (doc.unnatural !== void 0) {

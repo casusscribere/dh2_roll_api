@@ -150,6 +150,8 @@ export const FUNCTION_DEFS = [
         attacker: (c, [n]) => hasNamed(c.configs ?? c.firingModes, n) } },
     { name: 'is_action', signature: 'is_action("Name")', returns: 'bool', summary: 'The current action is the named one (case-insensitive), e.g. is_action("Parry"). Works in every flow including reactions.', scopes: {
         attacker: (c, [n]) => isAction(c.action, n) } },
+    { name: 'is_test', signature: 'is_test("Name")', returns: 'bool', summary: 'The generic test (test.* pipeline) is the named one, spelling-blind — is_test("Tech-Use") matches testName "tech_use"/"TechUse". THE way to write "+X to <skill>" item/talent rules: when is_test("Tech-Use") [and <condition>] then add modifier "…" = X.', scopes: {
+        attacker: (c, [n]) => normName(c.testName ?? '') === normName(n) } },
     { name: 'is_reaction', signature: 'is_reaction()', returns: 'bool', summary: 'The current action is a Reaction (Parry, Dodge, …).', scopes: {
         attacker: (c) => isReaction(c.action) } },
     { name: 'action_subtype', signature: 'action_subtype("Name")', returns: 'bool', summary: 'The current action carries the named subtype (declared via `subtype`/`attack` on the action). `is_attack` is shorthand for action_subtype("attack").', scopes: {

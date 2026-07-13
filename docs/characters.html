@@ -72,6 +72,7 @@
   </fieldset>
 </div>
 
+<script src="char-store.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -118,9 +119,41 @@ function renderRoster() {
 }
 
 function select(entry) {
-  CURRENT = entry;
+  // work on the EFFECTIVE document: local browser edits over the server baseline
+  CURRENT = { id: entry.id, doc: CharStore.effective(entry.id, entry.doc) };
   history.replaceState(null, '', `characters.html?c=${encodeURIComponent(entry.id)}`);
   renderRoster(); renderSheet();
+}
+
+// --- input mode + persistence -------------------------------------------------
+// INPUT_MODE reveals the manual-edit fields; every edit runs through mutate():
+// change the working doc, persist to CharStore (roster characters only), and
+// re-render. The Roll page reads the same store, so edits follow the preset.
+let INPUT_MODE = false;
+function mutate(fn) {
+  if (!CURRENT) return;
+  fn(CURRENT.doc);
+  if (CURRENT.id) CharStore.save(CURRENT.id, CURRENT.doc);
+  renderSheet();
+}
+const getManual = (mods) => (mods ?? []).find((m) => m.source === 'manual')?.value ?? 0;
+// exactly ONE 'manual' modifier per target, separate from every derived source
+function setManual(holder, v) {
+  const val = Math.max(-100, Math.min(100, Math.trunc(+v || 0)));
+  holder.modifiers = (holder.modifiers ?? []).filter((m) => m.source !== 'manual');
+  if (val) holder.modifiers.push({ value: val, source: 'manual' });
+}
+// resolve a data-path like "char:ws" / "skill:Dodge" / "spec:Forbidden Lore:Archaeotech"
+function pathHolder(doc, path) {
+  const [kind, a, b] = path.split(':');
+  if (kind === 'char') {
+    const c = doc.characteristics[a];
+    if (typeof c === 'number') doc.characteristics[a] = { base: c, advances: 0, modifiers: [] };
+    return doc.characteristics[a];
+  }
+  if (kind === 'skill') return (doc.skills[a] ??= { advances: 0 });
+  if (kind === 'spec') { const s = (doc.skills[a] ??= { specialities: {} }); s.specialities ??= {}; return (s.specialities[b] ??= { advances: 0 }); }
+  return null;
 }
 
 // --- schema v2 derivation (mirrors character-schema.mjs helpers) ---------------
@@ -143,9 +176,20 @@ function skillRow(doc, charKey, advances, mods) {
 }
 
 // --- panels (each mirrors a Foundry acolyte-sheet panel) -----------------------
+// +/- stepper and manual-modifier input (input mode). data- attributes are
+// handled by the delegated sheet listeners; path = char:ws / skill:X / spec:X:Y.
+const stepper = (path, val) =>
+  `<span style="white-space:nowrap"><button class="minibtn" style="margin:0;padding:0 .4rem" data-act="adv" data-path="${esc(path)}" data-delta="-1">−</button>` +
+  ` ${val} <button class="minibtn" style="margin:0;padding:0 .4rem" data-act="adv" data-path="${esc(path)}" data-delta="1">+</button></span>`;
+const manualInput = (path, mods) =>
+  `<input type="number" data-act="mod" data-path="${esc(path)}" value="${getManual(mods)}" min="-100" max="100" style="width:4.2rem" title="manual modifier (−100…100), kept separate from derived sources">`;
+
 function characteristicsPanel(doc) {
-  let h = '<div class="dhpanel" style="grid-column:1/-1"><h3>Characteristics</h3><div class="chartable" style="grid-template-columns:auto repeat(6, 1fr)">';
-  h += '<div class="h"></div><div class="h">Base</div><div class="h">Advances</div><div class="h">Modifiers</div><div class="h">Current</div><div class="h">Unnatural</div><div class="h">Bonus</div>';
+  const cols = INPUT_MODE ? 'auto repeat(7, 1fr)' : 'auto repeat(6, 1fr)';
+  let h = `<div class="dhpanel" style="grid-column:1/-1"><h3>Characteristics</h3><div class="chartable" style="grid-template-columns:${cols}">`;
+  h += '<div class="h"></div><div class="h">Base</div><div class="h">Advances</div><div class="h">Modifiers</div>' +
+    (INPUT_MODE ? '<div class="h">Manual ±</div>' : '') +
+    '<div class="h">Current</div><div class="h">Unnatural</div><div class="h">Bonus</div>';
   for (const [k, label] of Object.entries(CHAR_LABELS)) {
     const p = charParts(doc, k);
     const un = doc.unnatural?.[k] ?? 0;
@@ -153,8 +197,9 @@ function characteristicsPanel(doc) {
       ? `<span title="${esc(modTitle(p.mods))}" style="cursor:help">${modSum(p.mods) >= 0 ? '+' : ''}${modSum(p.mods)} <span class="dim">(${p.mods.length})</span></span>` : '—';
     h += `<div class="k" title="${esc(label)}">${k.toUpperCase()}</div>` +
       `<div>${p.base}</div>` +
-      `<div>${p.advances ? `+${p.advances * 5} <span class="dim">(${p.advances})</span>` : '—'}</div>` +
+      `<div>${INPUT_MODE ? stepper(`char:${k}`, p.advances) : (p.advances ? `+${p.advances * 5} <span class="dim">(${p.advances})</span>` : '—')}</div>` +
       `<div>${modCell}</div>` +
+      (INPUT_MODE ? `<div>${manualInput(`char:${k}`, p.mods)}</div>` : '') +
       `<div class="hl">${p.total}</div>` +
       `<div class="${un ? 'un' : ''}">${un || '—'}</div>` +
       `<div class="hl">${bonus(doc, k)}</div>`;
@@ -168,15 +213,19 @@ function skillsPanel(doc) {
   const names = Object.keys(skills);
   let h = `<div class="dhpanel" style="grid-column:1/-1"><h3>Skills (${names.length})</h3>`;
   if (!names.length) return h + '<div class="v2note">none recorded</div></div>';
-  h += '<div class="chartable" style="grid-template-columns:2fr auto auto auto 1fr">';
-  h += '<div class="h">Skill</div><div class="h">Char</div><div class="h">Adv</div><div class="h">Target</div><div class="h">Modifiers</div>';
+  const cols = INPUT_MODE ? '2fr auto auto auto auto 1fr' : '2fr auto auto auto 1fr';
+  h += `<div class="chartable" style="grid-template-columns:${cols}">`;
+  h += '<div class="h">Skill</div><div class="h">Char</div><div class="h">Adv</div>' +
+    (INPUT_MODE ? '<div class="h">Manual ±</div>' : '') +
+    '<div class="h">Target</div><div class="h">Modifiers</div>';
   const modCell = (mods) => (mods ?? []).length
     ? `<span title="${esc(modTitle(mods))}" style="cursor:help">${modSum(mods) >= 0 ? '+' : ''}${modSum(mods)} <span class="dim">(${mods.length})</span></span>` : '—';
-  const row = (name, charKey, advances, mods, indent = false) => {
+  const row = (name, charKey, advances, mods, path, ownMods, indent = false) => {
     const r = skillRow(doc, charKey, advances, mods);
     h += `<div class="${indent ? '' : 'k'}" style="${indent ? 'padding-left:1.4rem' : ''}">${esc(name)}</div>` +
       `<div>${charKey.toUpperCase()}</div>` +
-      `<div>${advances || '—'}</div>` +
+      `<div>${INPUT_MODE ? stepper(path, advances) : (advances || '—')}</div>` +
+      (INPUT_MODE ? `<div>${manualInput(path, ownMods)}</div>` : '') +
       `<div class="hl" title="${r.trained ? 'trained' : 'untrained — ½ characteristic (RAW; the campaign sheets house-rule −20)'}">${r.target}${r.trained ? '' : '*'}</div>` +
       `<div>${modCell(mods)}</div>`;
   };
@@ -186,10 +235,11 @@ function skillsPanel(doc) {
     if (s.specialities && Object.keys(s.specialities).length) {
       h += `<div class="k" style="grid-column:1/-1">${esc(name)} <span class="dim">(specialist)</span></div>`;
       for (const [spec, sv] of Object.entries(s.specialities)) {
-        row(spec, charKey, sv.advances ?? 0, [...(s.modifiers ?? []), ...(sv.modifiers ?? [])], true);
+        row(spec, charKey, sv.advances ?? 0, [...(s.modifiers ?? []), ...(sv.modifiers ?? [])],
+          `spec:${name}:${spec}`, sv.modifiers, true);
       }
     } else {
-      row(name, charKey, s.advances ?? 0, s.modifiers ?? []);
+      row(name, charKey, s.advances ?? 0, s.modifiers ?? [], `skill:${name}`, s.modifiers);
     }
   }
   h += '</div><div class="v2note" style="margin-top:.4rem">* untrained (½ characteristic, RAW). Hover a Modifiers cell for the per-source breakdown.</div></div>';
@@ -245,7 +295,14 @@ function encumbrancePanel(doc) {
     `<div class="v2note" style="margin-top:.3rem">Only EQUIPPED items count — toggle equipment in the document's gear/weapons/armourItems.</div></div>`;
 }
 function inventoryPanel(doc) {
-  const badge = (x) => x.equipped !== false ? '<span class="badge" style="color:var(--gold)">equipped</span>' : '<span class="badge">stored</span>';
+  // the equipped/stored badge IS the toggle: click to flip; encumbrance,
+  // derived armour, and item-DSL activation all recompute from it
+  const badge = (x, list, idx) => {
+    const on = x.equipped !== false;
+    return `<button class="badge" data-act="equip" data-list="${list}" data-idx="${idx}" style="cursor:pointer;${on ? 'color:var(--gold)' : ''}" title="click to ${on ? 'unequip (stops counting weight / granting effects)' : 'equip'}">${on ? 'equipped' : 'stored'}</button>` +
+      (INPUT_MODE ? ` <button class="badge" data-act="del" data-list="${list}" data-idx="${idx}" title="remove this item" style="cursor:pointer;color:#a33">✕</button>` : '');
+  };
+  const dslTag = (x) => (x.dsl && x.dsl.trim()) ? ' <span class="badge" title="grants DSL rules while equipped">DSL</span>' : '';
   let h = `<div class="dhpanel" style="grid-column:1/-1"><h3>Inventory</h3>`;
   const section = (title, rows) => {
     if (!rows.length) return;
@@ -253,29 +310,63 @@ function inventoryPanel(doc) {
       '<div class="h">Item</div><div class="h">Qty</div><div class="h">Weight</div><div class="h">State</div>' +
       rows.join('') + '</div>';
   };
-  section('Weapons', (doc.weapons ?? []).map((w) =>
-    `<div>${esc(w.name)}</div><div>—</div><div>${w.weight != null ? w.weight + ' kg' : '—'}</div><div>${badge(w)}</div>`));
-  section('Armour', (doc.armourItems ?? []).map((a) =>
-    `<div>${esc(a.name)} <span class="dim">(AP ${a.ap}, ${(a.locations ?? ['all']).join('/')})</span></div><div>—</div><div>${a.weight != null ? a.weight + ' kg' : '—'}</div><div>${badge(a)}</div>`));
-  section('Gear', (doc.gear ?? []).map((g) =>
-    `<div>${esc(g.name)}</div><div>${g.quantity ?? 1}</div><div>${g.weight != null ? (Math.round(g.weight * (g.quantity ?? 1) * 100) / 100) + ' kg' : '—'}</div><div>${badge(g)}</div>`));
+  section('Weapons', (doc.weapons ?? []).map((w, i) =>
+    `<div>${esc(w.name)}${dslTag(w)}${w.description ? ` <span class="dim" title="${esc(w.description)}">ⓘ</span>` : ''}</div><div>—</div><div>${w.weight != null ? w.weight + ' kg' : '—'}</div><div>${badge(w, 'weapons', i)}</div>`));
+  section('Armour', (doc.armourItems ?? []).map((a, i) =>
+    `<div>${esc(a.name)} <span class="dim">(AP ${a.ap}, ${(a.locations ?? ['all']).join('/')})</span>${dslTag(a)}</div><div>—</div><div>${a.weight != null ? a.weight + ' kg' : '—'}</div><div>${badge(a, 'armourItems', i)}</div>`));
+  section('Gear', (doc.gear ?? []).map((g, i) =>
+    `<div>${esc(g.name)}${dslTag(g)}${g.description ? ` <span class="dim" title="${esc(g.description)}">ⓘ</span>` : ''}</div><div>${g.quantity ?? 1}</div><div>${g.weight != null ? (Math.round(g.weight * (g.quantity ?? 1) * 100) / 100) + ' kg' : '—'}</div><div>${badge(g, 'gear', i)}</div>`));
   if (!(doc.weapons ?? []).length && !(doc.armourItems ?? []).length && !(doc.gear ?? []).length) h += '<div class="v2note">no inventory recorded</div>';
-  return h + '</div>';
+  return h + '</div>' + (INPUT_MODE ? itemEditorPanel() : '');
+}
+
+// input mode: add a new item (weapon / armour / gear) with description,
+// quality, weight, and OPTIONAL item-granted DSL rules — validated by the
+// engine, applied at roll time only while the item is equipped.
+function itemEditorPanel() {
+  return `<div class="dhpanel" style="grid-column:1/-1"><h3>Add item</h3>
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:.5rem">
+      <div><label>Name</label><input id="ie-name" placeholder="Good-quality Auspex"></div>
+      <div><label>Subtype</label><select id="ie-type"><option value="gear">gear</option><option value="weapon">weapon</option><option value="armour">armour</option></select></div>
+      <div><label>Quality</label><select id="ie-quality"><option>Poor</option><option selected>Common</option><option>Good</option><option>Best</option></select></div>
+      <div><label>Weight (kg)</label><input id="ie-weight" type="number" value="0" min="0" step="0.1"></div>
+    </div>
+    <div id="ie-weapon-extra" style="display:none;margin-top:.3rem"><label>Damage / Pen</label>
+      <div style="display:flex;gap:.5rem"><input id="ie-damage" placeholder="1d10+3" style="width:8rem"><input id="ie-pen" type="number" value="0" min="0" style="width:5rem"></div></div>
+    <div id="ie-armour-extra" style="display:none;margin-top:.3rem"><label>AP (all locations)</label><input id="ie-ap" type="number" value="0" min="0" style="width:5rem"></div>
+    <div style="margin-top:.3rem"><label>Description</label><input id="ie-desc" placeholder="what it is / where it came from"></div>
+    <div style="margin-top:.3rem"><label>Item rules (DSL, optional — active while EQUIPPED; use is_test("Skill") for skill bonuses)</label>
+      <textarea id="ie-dsl" rows="3" placeholder='quality "Good Auspex" { on test.MODIFIERS when is_test("Tech-Use") then add modifier "auspex" = 20 }'></textarea></div>
+    <div style="margin-top:.4rem">
+      <button class="minibtn" data-act="ie-add">Validate & add</button>
+      <span id="ie-status" class="dim"></span>
+    </div></div>`;
+}
+// movement brackets: AgB + the MANUAL movement modifier (an AgB-delta for the
+// brackets ONLY — it never feeds any other AgB calculation)
+function moveBrackets(doc) {
+  const agb = Math.max(0, bonus(doc, 'ag') + (doc.movementModifier ?? 0));
+  return { half: agb, full: agb * 2, charge: agb * 3, run: agb * 6 };
 }
 function statePanel(doc) {
   const ft = bonus(doc, 't') + bonus(doc, 'wp');
-  const agb = bonus(doc, 'ag');
   const fat = doc.fatigue?.current ?? 0;
+  const mv = moveBrackets(doc);
   return `<div class="dhpanel"><h3>Fatigue & Movement</h3>` +
     `<div>Fatigue <span class="${fat > ft ? 'bad' : 'hl'}">${fat}</span> / threshold <span class="hl">${ft}</span> <span class="dim">(TB+WB, p.233${fat > ft ? ' — UNCONSCIOUS' : ''})</span></div>` +
-    `<div style="margin-top:.3rem">Move <span class="hl">${agb}</span> / <span class="hl">${agb * 2}</span> / <span class="hl">${agb * 3}</span> / <span class="hl">${agb * 6}</span> m <span class="dim">(half/full/charge/run, p.245)</span></div></div>`;
+    `<div style="margin-top:.3rem">Move <span class="hl">${mv.half}</span> / <span class="hl">${mv.full}</span> / <span class="hl">${mv.charge}</span> / <span class="hl">${mv.run}</span> m <span class="dim">(half/full/charge/run, p.245)</span></div>` +
+    (INPUT_MODE ? `<div style="margin-top:.3rem">Movement modifier <input type="number" data-act="movemod" value="${doc.movementModifier ?? 0}" min="-10" max="10" style="width:4rem" title="acts like an Agility-Bonus change for the brackets only — no stacking into other AB calculations"></div>` : '') +
+    '</div>';
 }
 function mindPanel(doc) {
   const ins = doc.insanity ?? {}, cor = doc.corruption ?? {};
   const list = (arr) => (arr ?? []).length ? (arr).map((x) => `<span class="chip">${esc(nameOf(x))}</span>`).join(' ') : '<span class="dim">none</span>';
+  const pts = (label, act, v) => INPUT_MODE
+    ? `${label} <input type="number" data-act="${act}" value="${v}" min="0" max="100" style="width:4.2rem">/100`
+    : `${label} <span class="hl">${v}</span>/100`;
   return `<div class="dhpanel"><h3>Insanity & Corruption</h3>` +
-    `<div>Insanity <span class="hl">${ins.points ?? 0}</span>/100 — disorders: ${list(ins.disorders)}</div>` +
-    `<div style="margin-top:.3rem">Corruption <span class="hl">${cor.points ?? 0}</span>/100 — malignancies: ${list(cor.malignancies)}</div>` +
+    `<div>${pts('Insanity', 'insanity', ins.points ?? 0)} — disorders: ${list(ins.disorders)}</div>` +
+    `<div style="margin-top:.3rem">${pts('Corruption', 'corruption', cor.points ?? 0)} — malignancies: ${list(cor.malignancies)}</div>` +
     `<div style="margin-top:.3rem">Mutations: ${list(cor.mutations)}</div></div>`;
 }
 function injuriesPanel(doc) {
@@ -313,41 +404,56 @@ function tarotPanel(doc) {
              `${t.effect ? `<div style="margin-top:.3rem">${esc(t.effect)}</div>` : ''}`
            : '<div class="v2note">not drawn — edit the document\'s <code>tarot</code> block (⇄ Foundry bio.divination)</div>') + '</div>';
 }
-function armourPanel(doc) {
-  let h = '<div class="dhpanel"><h3>Armour</h3><div class="loctable">';
+// Defenses: per-location AP + TB + total soak, with the force field folded in.
+function defensesPanel(doc) {
+  const tb = bonus(doc, 't');
+  let h = '<div class="dhpanel"><h3>Defenses</h3><div class="loctable" style="grid-template-columns:1fr auto auto auto">';
+  h += '<div class="h" style="color:var(--dim);font-size:.7rem;text-transform:uppercase">Location</div><div class="h" style="color:var(--dim);font-size:.7rem">AP</div><div class="h" style="color:var(--dim);font-size:.7rem">TB</div><div class="h" style="color:var(--dim);font-size:.7rem">Soak</div>';
   for (const [k, label] of Object.entries(LOC_LABELS)) {
-    h += `<div>${esc(label)}</div><div class="hl">${doc.armour?.[k] ?? 0}</div>`;
+    const ap = doc.armour?.[k] ?? 0;
+    h += `<div>${esc(label)}</div><div class="hl">${ap}</div><div>${tb}</div><div class="hl">${ap + tb}</div>`;
   }
   h += '</div>';
-  const tb = Math.floor((doc.characteristics?.t ?? 0) / 10);
-  h += `<div class="v2note" style="margin-top:.4rem">Soak/location = AP + Toughness Bonus (${tb}).</div></div>`;
+  const f = doc.field ?? {};
+  h += `<div style="margin-top:.4rem">Force field: ` +
+    (f.rating ? `rating <span class="hl">${f.rating}</span> — absorbs on ≤ rating${f.overloadMax ? `; overloads on ≤ ${f.overloadMax}` : ''}` : '<span class="dim">none</span>') + '</div>';
+  h += '<div class="v2note" style="margin-top:.3rem">Soak = AP + Toughness Bonus (incl. Unnatural); wounds = damage − max(0, AP − Pen) − TB.</div></div>';
   return h;
 }
-function fieldPanel(doc) {
-  const f = doc.field ?? {};
-  return `<div class="dhpanel"><h3>Force Field</h3>` +
-    (f.rating ? `<div>Rating <span class="hl">${f.rating}</span> — absorbs on a roll ≤ rating${f.overloadMax ? `; overloads on ≤ ${f.overloadMax}` : ''}</div>`
-              : '<div class="v2note">none</div>') + '</div>';
+// talents/traits: in input mode the chips become toggles (like the Rules
+// page's built-in toggles). Disabled entries stay on the document as
+// { name, enabled: false } and are EXCLUDED when the Roll page applies the
+// character — the document itself keeps the full list.
+function entryChips(list, listName) {
+  return list.map((x, i) => {
+    const name = nameOf(x);
+    const off = x && typeof x === 'object' && x.enabled === false;
+    const style = off ? 'text-decoration:line-through;color:var(--dim)' : '';
+    return INPUT_MODE
+      ? `<button class="chip" data-act="toggle-entry" data-list="${listName}" data-idx="${i}" style="cursor:pointer;${style}" title="click to ${off ? 'enable' : 'disable'} (disabled entries are skipped when loading onto the Roll page)">${esc(name)}</button>`
+      : `<span class="chip" style="${style}">${esc(name)}</span>`;
+  }).join('');
 }
 function talentsPanel(doc) {
   const t = doc.talents ?? [];
   return `<div class="dhpanel"><h3>Talents (${t.length})</h3>` +
-    (t.length ? `<div class="chiplist">${t.map((x) => `<span class="chip">${esc(nameOf(x))}</span>`).join('')}</div>` : '<div class="v2note">none recorded</div>') + '</div>';
+    (t.length ? `<div class="chiplist">${entryChips(t, 'talents')}</div>` : '<div class="v2note">none recorded</div>') + '</div>';
 }
 function traitsPanel(doc) {
   const t = doc.traits ?? [];
   return `<div class="dhpanel"><h3>Traits (${t.length})</h3>` +
-    (t.length ? `<div class="chiplist">${t.map((x) => `<span class="chip">${esc(nameOf(x))}</span>`).join('')}</div>` : '<div class="v2note">none recorded</div>') + '</div>';
+    (t.length ? `<div class="chiplist">${entryChips(t, 'traits')}</div>` : '<div class="v2note">none recorded</div>') + '</div>';
 }
 function weaponsPanel(doc) {
   const ws = doc.weapons ?? [];
   let h = `<div class="dhpanel" style="grid-column:1/-1"><h3>Weapons (${ws.length})</h3>`;
   if (!ws.length) h += '<div class="v2note">none recorded</div>';
-  for (const w of ws) {
+  for (const [wi, w] of ws.entries()) {
     const rof = w.rof ? `${w.rof.single ? 'S' : '–'}/${w.rof.burst || '–'}/${w.rof.full || '–'}` : '—';
     h += `<div class="weapon-card"><span class="wname">${esc(w.name)}</span>` +
       `<span class="badge">${esc(w.class ?? 'basic')}</span>` +
       (w.craftsmanship && w.craftsmanship !== 'Common' ? `<span class="badge">${esc(w.craftsmanship)}</span>` : '') +
+      (CURRENT?.id ? ` <button class="minibtn" style="margin:0;float:right" onclick="location.href='roll.html?preset=${encodeURIComponent(CURRENT.id)}&weapon=${wi}'" title="load this character with THIS weapon into the Roll page's combat panel">→ Roll</button>` : '') +
       `<div class="wline">Damage <span class="hl">${esc(w.damage)}</span> ${esc(w.damageType ?? '')} · Pen <span class="hl">${w.pen ?? 0}</span> · RoF <span class="hl">${rof}</span>` +
       (w.clip ? ` · Clip <span class="hl">${w.clip.value ?? w.clip.max}/${w.clip.max}</span>` : '') +
       (w.sbMultiplier ? ` · SB×${w.sbMultiplier}` : '') + `</div>` +
@@ -372,8 +478,8 @@ function bioPanel(entry) {
 }
 
 const TABS = {
-  main:    (e) => characteristicsPanel(e.doc) + skillsPanel(e.doc) + statePanel(e.doc) + mindPanel(e.doc) + injuriesPanel(e.doc) + armourPanel(e.doc) + fieldPanel(e.doc) + talentsPanel(e.doc) + traitsPanel(e.doc),
-  combat:  (e) => weaponsPanel(e.doc) + injuriesPanel(e.doc) + armourPanel(e.doc) + fieldPanel(e.doc),
+  main:    (e) => characteristicsPanel(e.doc) + skillsPanel(e.doc) + statePanel(e.doc) + mindPanel(e.doc) + injuriesPanel(e.doc) + defensesPanel(e.doc) + talentsPanel(e.doc) + traitsPanel(e.doc),
+  combat:  (e) => weaponsPanel(e.doc) + injuriesPanel(e.doc) + defensesPanel(e.doc),
   gear:    (e) => encumbrancePanel(e.doc) + inventoryPanel(e.doc),
   advances: (e) => xpPanel(e.doc) + aptitudesPanel(e.doc) + talentsPanel(e.doc),
   psychic: (e) => psyPanel(e.doc),
@@ -390,16 +496,106 @@ function renderSheet() {
     `<div class="pooltiles">` +
     `<div class="pool"><div class="pv">${w.current ?? '—'}/${w.max ?? '—'}</div><div class="pl">Wounds</div></div>` +
     `<div class="pool"><div class="pv">${f.current ?? '—'}/${f.max ?? '—'}</div><div class="pl">Fate</div></div>` +
+    `<div class="pool"><div class="pv">${doc.size ?? 4}</div><div class="pl">Size</div></div>` +
+    `<div class="pool"><div class="pv">${doc.psy?.rating ?? 0}</div><div class="pl">Psy Rating</div></div>` +
+    `<div class="pool"><div class="pv">${(() => { const m = moveBrackets(doc); return `${m.half}/${m.full}/${m.charge}/${m.run}`; })()}</div><div class="pl">Move m</div></div>` +
     `<div class="pool"><div class="pv">${doc.fatigue?.current ?? 0}/${bonus(doc, 't') + bonus(doc, 'wp')}</div><div class="pl">Fatigue</div></div>` +
     `<div class="pool"><div class="pv">${encumbrance(doc).carried}/${encumbrance(doc).carry}</div><div class="pl">Carry kg</div></div>` +
     `<div class="pool"><div class="pv">${(doc.xp?.total ?? 0) - (doc.xp?.spent ?? (doc.xp?.ledger ?? []).reduce((a, e) => a + (e.cost || 0), 0))}</div><div class="pl">XP Left</div></div>` +
-    (CURRENT.id ? `<button class="minibtn" style="align-self:center" onclick="location.href='roll.html?preset=${encodeURIComponent(CURRENT.id)}'">→ load on Roll page</button>` : '') +
+    `<div style="align-self:center;display:flex;flex-direction:column;gap:.3rem">` +
+    (CURRENT.id ? `<button class="minibtn" style="margin:0" onclick="location.href='roll.html?preset=${encodeURIComponent(CURRENT.id)}'">→ load on Roll page</button>` : '') +
+    `<label class="dim" style="margin:0;font-size:.75rem;cursor:pointer" title="reveal manual-edit fields; edits persist in THIS browser and follow the preset onto the Roll page">` +
+    `<input type="checkbox" id="input-mode" ${INPUT_MODE ? 'checked' : ''} style="width:auto"> ✎ input mode</label>` +
+    (CURRENT.id && CharStore.edited(CURRENT.id) ? `<button class="minibtn" style="margin:0" data-act="reset-edits" title="discard this browser's edits, back to the imported baseline">↺ reset edits</button>` : '') +
     `</div></div>`;
   h += `<div class="tabbar">` + Object.keys(TABS).map((t) =>
     `<button class="${TAB === t ? 'active' : ''}" data-tab="${t}">${t[0].toUpperCase() + t.slice(1)}</button>`).join('') + `</div>`;
   h += `<div class="panelgrid">${TABS[TAB](CURRENT)}</div>`;
   $('sheet').innerHTML = h;
   $('sheet').querySelectorAll('.tabbar button').forEach((b) => { b.onclick = () => { TAB = b.dataset.tab; renderSheet(); }; });
+  const im = $('input-mode');
+  if (im) im.onchange = () => { INPUT_MODE = im.checked; renderSheet(); };
+}
+
+// --- delegated edit handlers (persistent — panels re-render freely) -----------
+const clampInt = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.trunc(+v || 0)));
+document.getElementById('sheet').addEventListener('click', (e) => {
+  const el = e.target.closest('[data-act]');
+  if (!el || !CURRENT) return;
+  const act = el.dataset.act;
+  if (act === 'adv') {
+    mutate((d) => {
+      const h = pathHolder(d, el.dataset.path);
+      const max = el.dataset.path.startsWith('char:') ? 5 : 4;
+      h.advances = clampInt((h.advances ?? 0) + (+el.dataset.delta), 0, max);
+    });
+  } else if (act === 'equip') {
+    mutate((d) => { const it = d[el.dataset.list][+el.dataset.idx]; it.equipped = it.equipped === false; });
+  } else if (act === 'del') {
+    mutate((d) => { d[el.dataset.list].splice(+el.dataset.idx, 1); });
+  } else if (act === 'toggle-entry') {
+    mutate((d) => {
+      const list = d[el.dataset.list], i = +el.dataset.idx;
+      const o = (list[i] && typeof list[i] === 'object') ? list[i] : { name: String(list[i]) };
+      o.enabled = o.enabled === false;   // flip (undefined counts as enabled)
+      list[i] = o;
+    });
+  } else if (act === 'reset-edits') {
+    CharStore.reset(CURRENT.id);
+    const base = ROSTER.find((c) => c.id === CURRENT.id);
+    if (base) select(base);
+  } else if (act === 'ie-add') {
+    addItemFromEditor();
+  }
+});
+document.getElementById('sheet').addEventListener('change', (e) => {
+  const el = e.target;
+  if (el.id === 'ie-type') {
+    $('ie-weapon-extra').style.display = el.value === 'weapon' ? '' : 'none';
+    $('ie-armour-extra').style.display = el.value === 'armour' ? '' : 'none';
+    return;
+  }
+  const act = el.dataset?.act;
+  if (!act || !CURRENT) return;
+  if (act === 'mod') mutate((d) => setManual(pathHolder(d, el.dataset.path), el.value));
+  else if (act === 'movemod') mutate((d) => { d.movementModifier = clampInt(el.value, -10, 10); });
+  else if (act === 'insanity') mutate((d) => { (d.insanity ??= {}).points = clampInt(el.value, 0, 100); });
+  else if (act === 'corruption') mutate((d) => { (d.corruption ??= {}).points = clampInt(el.value, 0, 100); });
+});
+
+// item editor: validate the optional DSL with the engine, then add the item
+// (equipped) to the working document.
+async function addItemFromEditor() {
+  const status = $('ie-status');
+  const name = $('ie-name').value.trim();
+  if (!name) { status.innerHTML = '<span class="bad">name required</span>'; return; }
+  const dsl = $('ie-dsl').value.trim();
+  if (dsl) {
+    const r = await fetch('/api/rules/validate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rules: dsl }),
+    }).then((x) => x.json()).catch(() => ({ ok: false, message: 'validation unavailable' }));
+    if (!r.ok) { status.innerHTML = `<span class="bad">DSL error${r.line ? ` (line ${r.line})` : ''}: ${esc(r.message ?? 'invalid')}</span>`; return; }
+  }
+  const type = $('ie-type').value;
+  const quality = $('ie-quality').value;
+  const desc = $('ie-desc').value.trim();
+  const base = { name, equipped: true, weight: +$('ie-weight').value || 0 };
+  if (dsl) base.dsl = dsl;
+  mutate((d) => {
+    if (type === 'weapon') {
+      (d.weapons ??= []).push({
+        ...base, class: 'basic', damage: $('ie-damage').value.trim() || '1d10', pen: +$('ie-pen').value || 0,
+        damageType: 'Impact', rof: { single: true, burst: 0, full: 0 }, craftsmanship: quality,
+        ...(desc ? { description: desc } : {}),
+      });
+    } else if (type === 'armour') {
+      (d.armourItems ??= []).push({ ...base, ap: +$('ie-ap').value || 0, locations: ['all'],
+        ...(desc || quality !== 'Common' ? { description: [quality !== 'Common' ? `${quality} quality` : '', desc].filter(Boolean).join(' — ') } : {}) });
+    } else {
+      (d.gear ??= []).push({ ...base,
+        ...(desc || quality !== 'Common' ? { description: [quality !== 'Common' ? `${quality} quality` : '', desc].filter(Boolean).join(' — ') } : {}) });
+    }
+  });
 }
 
 init();
