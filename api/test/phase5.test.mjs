@@ -196,14 +196,36 @@ test('Hatred: +10 WS in melee against a Hated Foe (and the retreat reminder)', (
     assert.ok(r.effects.some((e) => e.name === 'Hatred' && /retreat/.test(e.effect)));
 });
 
-// --- Auto-Stabilised vs the Unbraced circumstance (p.134 / p.219) ---------------------
+// --- Auto-Stabilised vs the Unbraced CONFIGURATION (p.134 / p.219) --------------------
 test('Unbraced heavy fire is -30; Auto-Stabilised always counts as braced', () => {
-    const unbraced = resolveAttack(shoot({ circumstances: ['Unbraced'] }),
+    const unbraced = resolveAttack(shoot({ configs: ['Unbraced'] }),
         riggedDice([d100(20), die(5, 10)]), buildRegistry());
     assert.equal(unbraced.test.modifiers.unbraced, -30);
-    const stabilised = resolveAttack(shoot({ circumstances: ['Unbraced'], traits: ['Auto-Stabilised'] }),
+    const stabilised = resolveAttack(shoot({ configs: ['Unbraced'], traits: ['Auto-Stabilised'] }),
         riggedDice([d100(20), die(5, 10)]), buildRegistry());
     assert.equal(stabilised.test.modifiers.unbraced, undefined);
+});
+
+// --- DualWield configurations (replacing the Off-Hand entry, p.228) --------------------
+test('DualWield configs drive the combat facts: off-hand -20, TWW penalty, advisory', () => {
+    // off-hand alone (single weapon in the off hand): -20, no dual-wield penalty
+    const off = resolveAttack(shoot({ configs: ['DualWield (off-hand)'] }),
+        riggedDice([d100(20), die(5, 10)]), buildRegistry());
+    assert.equal(off.test.modifiers.off_hand, -20);
+    assert.equal(off.test.modifiers.two_weapon, undefined);
+    // Ambidextrous cancels it
+    const ambi = resolveAttack(shoot({ configs: ['DualWield (off-hand)'], talents: ['Ambidextrous'] }),
+        riggedDice([d100(20), die(5, 10)]), buildRegistry());
+    assert.equal(ambi.test.modifiers.off_hand, undefined);
+    // main hand + Two-Weapon Wielder: the -20 two-weapon penalty, no off-hand
+    const dual = resolveAttack(shoot({ configs: ['DualWield (main hand)'], talents: ['Two-Weapon Wielder'] }),
+        riggedDice([d100(20), die(5, 10)]), buildRegistry());
+    assert.equal(dual.test.modifiers.two_weapon, -20);
+    assert.equal(dual.test.modifiers.off_hand, undefined);
+    // main hand WITHOUT the talent: the RAW advisory fires
+    const raw = resolveAttack(shoot({ configs: ['DualWield (main hand)'] }),
+        riggedDice([d100(20), die(5, 10)]), buildRegistry());
+    assert.ok(raw.effects.some((e) => e.name === 'DualWield' && /Two-Weapon Wielder/.test(e.effect)));
 });
 
 // --- Fear (X) + From Beyond in the generic test pipeline (p.136) ----------------------

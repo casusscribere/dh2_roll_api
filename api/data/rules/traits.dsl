@@ -19,13 +19,13 @@ trait "Brutal Charge" {
 
 # --- Auto-Stabilised (DH2 core p.134) ------------------------------------------
 # "These beings always count as braced when firing heavy weapons … and not
-# suffer any penalties to hit." Cancels the Unbraced circumstance penalty
-# (circumstances.dsl, -30 per p.219).
+# suffer any penalties to hit." Cancels the Unbraced configuration penalty
+# (configurations.dsl, -30 per p.219).
 trait "Auto-Stabilised" {
   meta { page 134 }
   on MODIFIERS
   priority 100
-  when has_trait("Auto-Stabilised") and has_circumstance("Unbraced")
+  when has_trait("Auto-Stabilised") and configuration("Unbraced")
   then cancel modifier "unbraced"
 }
 

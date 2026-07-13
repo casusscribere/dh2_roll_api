@@ -175,8 +175,9 @@
           <select id="a-calledshot"></select></div>
         <label style="margin-top:.6rem">Combat state</label>
         <div class="checks">
-          <label><input type="checkbox" id="a-dualwield"> Dual-wielding</label>
-          <label><input type="checkbox" id="a-offhand"> Off-hand</label>
+          <label title="fighting with two weapons, this attack with the MAIN hand — Two-Weapon Fighting penalties apply (p.228)"><input type="checkbox" id="a-dualwield"> DualWield (main hand)</label>
+          <label title="this attack uses the OFF hand (−20, cancelled by Ambidextrous). Check BOTH for a dual-wield off-hand attack; alone = a single weapon in the off hand."><input type="checkbox" id="a-offhand"> DualWield (off-hand)</label>
+          <label title="firing an unbraced heavy weapon: −30 (p.219; Auto-Stabilised ignores it)"><input type="checkbox" id="a-unbraced"> Unbraced (heavy weapon)</label>
         </div>
       </div>
 
@@ -944,7 +945,12 @@ function buildEngagementInputs() {
       qualities: $('w-qualities').value.split(',').map(x => x.trim()).filter(Boolean),
       craftsmanship: $('w-craft').value,
     },
-    configs: [...document.querySelectorAll('.firing-mode:checked')].map(x => x.value),
+    configs: [
+      ...[...document.querySelectorAll('.firing-mode:checked')].map(x => x.value),
+      ...($('a-dualwield').checked ? ['DualWield (main hand)'] : []),
+      ...($('a-offhand').checked ? ['DualWield (off-hand)'] : []),
+      ...($('a-unbraced').checked ? ['Unbraced'] : []),
+    ],
     action: $('a-action').value, aim: $('a-aim').value, rangeBand: $('a-range').value,
     customModifier: +$('a-mod').value, calledShotLocation: $('a-calledshot').value,
     talents: collectRules('a', 'talents'),

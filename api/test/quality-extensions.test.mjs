@@ -56,9 +56,10 @@ test('Haywire Field circumstance penalises powered ranged attacks by severity', 
     assert.equal(fld(4, ['Primitive (7)']).test.modifiers['haywire field'], undefined);  // Primitive exempt
 });
 
-// --- (7) Off-Hand is now a Configuration ------------------------------------
-test('Off-Hand is a Configuration and still applies the -20 off-hand penalty', () => {
-    assert.equal(builtinRules.find((b) => b.id === 'off-hand')?.category, 'Configurations');
+// --- (7) the off-hand -20 lives on the DualWield (off-hand) Configuration ----
+test('DualWield (off-hand) is a Configuration and applies the -20 off-hand penalty', () => {
+    assert.equal(builtinRules.find((b) => b.id === 'dualwield-off-hand')?.category, 'Configurations');
+    // the legacy combat flag still drives it (facts read flag OR config)
     const r = resolveAttack({ characteristics: { bs: 50, s: 30, t: 30 }, weapon: ranged([]), action: 'Standard Attack', combat: { firingOffhand: true } },
         riggedDice([d100(20), die(5, 10)]), buildRegistry());
     assert.equal(r.test.modifiers.off_hand, -20);

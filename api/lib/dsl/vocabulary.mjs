@@ -109,10 +109,10 @@ export const FACT_DEFS = [
     { name: 'is_psyker', type: 'bool', summary: 'The attacker has a psy rating > 0.', scopes: {
         attacker: (c) => (Number(c.psyRating) || 0) > 0 } },
     // --- combat state ----------------------------------------------------------
-    { name: 'dual_wielding', type: 'bool', summary: 'Wielding and firing two weapons this turn (set via combat.dualWielding).', scopes: {
-        attacker: (c) => !!c.combat?.dualWielding } },
-    { name: 'firing_offhand', type: 'bool', summary: 'This attack uses the off-hand weapon (set via combat.firingOffhand).', scopes: {
-        attacker: (c) => !!c.combat?.firingOffhand } },
+    { name: 'dual_wielding', type: 'bool', summary: 'Wielding two weapons this turn — the "DualWield (main hand)" configuration, or the legacy combat.dualWielding flag.', scopes: {
+        attacker: (c) => !!c.combat?.dualWielding || hasNamed(c.configs ?? c.firingModes, 'DualWield (main hand)') } },
+    { name: 'firing_offhand', type: 'bool', summary: 'This attack uses the off-hand weapon — the "DualWield (off-hand)" configuration, or the legacy combat.firingOffhand flag.', scopes: {
+        attacker: (c) => !!c.combat?.firingOffhand || hasNamed(c.configs ?? c.firingModes, 'DualWield (off-hand)') } },
     { name: 'firing_both', type: 'bool', summary: 'Firing both weapons this turn (set via combat.firingBoth).', scopes: {
         attacker: (c) => !!c.combat?.firingBoth } },
 ];

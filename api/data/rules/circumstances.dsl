@@ -30,16 +30,8 @@ circumstance "Darkness" {
 # Powered ranged attacks (non-Primitive) suffer the field penalty, worsening by
 # severity threshold: 2 Minor = -10, 3 Major = -20, 4-5 Dead Zone = -60 (technology
 # ceases — powered weapons effectively cannot fire). Primitive weapons are exempt.
-# --- Unbraced heavy weapon (DH2 core p.219) ----------------------------------
-# "If a character fires an unbraced Heavy weapon, he suffers a -30 penalty to
-# his [attack test]." Weapon class is not modelled, so flag the shot with the
-# "Unbraced" circumstance; Auto-Stabilised (traits.dsl) cancels it.
-circumstance "Unbraced" {
-  meta { page 219 }
-  on MODIFIERS
-  when has_circumstance("Unbraced") and is_ranged
-  then add modifier "unbraced" = -30
-}
+# (Unbraced moved to configurations.dsl — it is a per-shot stance the PLAYER
+#  chooses, not an environmental circumstance.)
 
 circumstance "Haywire Field" {
   meta { page 147 }
