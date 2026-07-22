@@ -50,3 +50,10 @@ desktop.ini
 
 # Local tool config (keep shared .claude settings tracked)
 .claude/settings.local.json
+
+# Foundry LevelDB runtime churn (regenerated on every Foundry launch;
+# the *.ldb data files stay tracked)
+foundry/dh2-roll-vm/packs/*/LOG*
+foundry/dh2-roll-vm/packs/*/LOCK
+foundry/dh2-roll-vm/packs/*/CURRENT
+foundry/dh2-roll-vm/packs/*/MANIFEST-*
