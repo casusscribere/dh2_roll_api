@@ -32,6 +32,20 @@ export const CHARACTER_SCHEMA_VERSION = 4;
 
 /** Typed xp-ledger purchase kinds (builder addendum; unknown kinds WARN). */
 export const LEDGER_KINDS = ['characteristic', 'skill', 'talent', 'psychic_power', 'psy_rating', 'elite_advance', 'other'];
+/** Canonicalize an aptitude entry's `source` casing ("Homeworld"/"BG"/"Role" →
+ *  homeworld|background|role|elite_advance); unknown sources pass through.
+ *  Used by the v3→v4 migration AND the adapters (which emit v4 directly). */
+export function normalizeAptitudeSource(a) {
+    if (!a || typeof a !== 'object' || typeof a.source !== 'string') return a;
+    const s = a.source.trim();
+    const canon =
+        /^home\s*world$/i.test(s) ? 'homeworld'
+        : /^(bg|background)$/i.test(s) ? 'background'
+        : /^role$/i.test(s) ? 'role'
+        : /^elite([\s_-]?advance)?s?$/i.test(s) ? 'elite_advance'
+        : null;
+    return canon ? { ...a, source: canon } : a;
+}
 /** Corpus-ref shape: `<system>:<type>:<snake_id>` (nonconforming refs WARN). */
 const REF_PATTERN = /^[a-z0-9_]+:[a-z0-9_]+:[a-z0-9_]+$/;
 
@@ -699,19 +713,7 @@ export function migrateCharacter(doc) {
             d.weaponTrainings ??= [];
             d.cybernetics ??= [];
             d.extensions ??= {};
-            if (Array.isArray(d.aptitudes)) {
-                const canonSource = (s) =>
-                    /^home\s*world$/i.test(s) ? 'homeworld'
-                    : /^(bg|background)$/i.test(s) ? 'background'
-                    : /^role$/i.test(s) ? 'role'
-                    : /^elite([\s_-]?advance)?s?$/i.test(s) ? 'elite_advance'
-                    : null;
-                d.aptitudes = d.aptitudes.map((a) => {
-                    if (!a || typeof a !== 'object' || typeof a.source !== 'string') return a;
-                    const c = canonSource(a.source.trim());
-                    return c ? { ...a, source: c } : a;
-                });
-            }
+            if (Array.isArray(d.aptitudes)) d.aptitudes = d.aptitudes.map(normalizeAptitudeSource);
             d.schemaVersion = 4;
             // fallthrough:
         }

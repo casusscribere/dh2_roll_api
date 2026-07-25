@@ -1,29 +1,35 @@
 /**
- * Campaign roster import (CHARACTER_MODEL.md §6b Delta 3 — schema v2 edition).
+ * Campaign roster import (CHARACTER_MODEL.md §6b Delta 3 — schema v4 edition;
+ * pipeline plan Task 2.2).
  *
  * Reads the RT campaign's character workbooks ("Character Sheets/" in
- * RT_GDRIVE) and emits SCHEMA V2 character documents into
+ * RT_GDRIVE) and emits SCHEMA V4 character documents into
  * api/data/characters/roster.mjs — the preset dropdown's data source.
  *
- * v2 carries: characteristics as { base, advances, modifiers } (advances from
+ * Carries: characteristics as { base, advances, modifiers } (advances from
  * the sheet's Upgrades column; base = total − 5×advances so totals round-trip),
  * SKILLS incl. specialist categories (the Lore/Linguistics/Navigate/Operate
  * group rows become per-speciality advances; the Misc column becomes a
- * modifier-by-source), APTITUDES (+origin), and XP (Total/Used + the spending
- * tab as the ledger). Still unmapped (recorded per doc): psy rating, weapon
- * clip/range/mods, gear, house content.
+ * modifier-by-source), APTITUDES (+origin, sources normalized to the v4 enum),
+ * XP (Total/Used + the spending tab as the ledger), and the v4 blocks:
+ * ORIGIN (Home World / Background / Role / Elite Advances labels + Divination
+ * → tarot), INFLUENCE (characteristics-block row or labelled cell), WEAPON
+ * TRAINING → weaponTrainings[], CYBERNETICS → cybernetics[], and the DRAMATIC
+ * MOMENTS house block → extensions["dramatic-moments"]. Still unmapped
+ * (recorded per doc): weapon range/mods, armour-as-items.
  *
  * The sheets drift between players (columns shift, extra blocks), so parsing
  * is ANCHOR-LABEL based (find the labelled cell, read relative to it), never
  * fixed cell coordinates.
  *
  * Usage: node tools/import-campaign.mjs [--dry]
+ * (parseGrids is exported for tests — grids in, document out, no filesystem.)
  */
 import XLSX from 'xlsx';
 import { readdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { canonicalSkillName, SKILL_DEFS } from '../api/lib/character-schema.mjs';
+import { canonicalSkillName, SKILL_DEFS, normalizeAptitudeSource } from '../api/lib/character-schema.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SHEETS_DIR = join(__dirname, '..', '..', '..',
@@ -100,15 +106,20 @@ function findCell(g, pred, fromRow = 0) {
 }
 const at = (g, r, c) => norm((g[r] ?? [])[c]);
 
-/** Parse one workbook into a schema-v3 character document. */
+/** Parse one workbook into a schema-v4 character document. */
 function parseSheet(file) {
-    const { sheet: g, xp: xpGrid, stored: storedGrid } = loadWorkbook(file);
+    return parseGrids(loadWorkbook(file), basename(file));
+}
+
+/** Grid-level parse (exported for tests): { sheet, xp, stored } grids +
+ *  a file label → schema-v4 character document. */
+export function parseGrids({ sheet: g, xp: xpGrid, stored: storedGrid }, fileLabel) {
     const unmapped = new Set();
 
     // --- name: A1, else the cleaned filename stem ----------------------------
     let name = at(g, 0, 0);
     if (!name || name === '[Name]') {
-        name = basename(file, '.xlsx').replace(/\s*\([^)]*\)\s*/g, ' ').replace(/[_]+/g, ' ')
+        name = fileLabel.replace(/\.xlsx$/i, '').replace(/\s*\([^)]*\)\s*/g, ' ').replace(/[_]+/g, ' ')
             .replace(/\s*-\s*(sheet|rt)\s*$/i, '').replace(/\s+/g, ' ').trim();
     }
     name = name.replace(PLAYER_NAMES, '').replace(/\s+/g, ' ').trim();   // privacy: no player names
@@ -131,8 +142,8 @@ function parseSheet(file) {
             const label = low(at(g, r, typeCol));
             const key = CHAR_KEYS[label];
             if (key) totals[key] = int(at(g, r, typeCol + 1)) ?? 0;
-            // Insanity/Corruption live in the same column on these sheets
-            else if (label === 'insanity' || label === 'corruption') totals[label] = int(at(g, r, typeCol + 1)) ?? 0;
+            // Insanity/Corruption/Influence live in the same column on these sheets
+            else if (label === 'insanity' || label === 'corruption' || label === 'influence') totals[label] = int(at(g, r, typeCol + 1)) ?? 0;
         }
         const upHead = findCell(g, (v) => low(v) === 'upgrades');
         if (upHead) {
@@ -369,23 +380,60 @@ function parseSheet(file) {
     const malignancies = mutmal.filter((n) => !/mutation/i.test(n));
     const disorders = parseNamedSection(g, (v) => /^(MENTAL )?DISORDERS$/i.test(norm(v)));
 
-    if (findCell(g, (v) => /WEAPON TRAINING/i.test(norm(v)))) unmapped.add('weapon trainings');
-    unmapped.add('house content (Dramatic Moments, custom traits)');
+    // --- v4: weapon trainings / cybernetics (named-list sections) -------------
+    const weaponTrainings = parseNamedSection(g, (v) => /^WEAPON TRAININGS?$/i.test(norm(v)));
+    const cybernetics = parseNamedSection(g, (v) => /^CYBERNETICS$/i.test(norm(v)));
+
+    // --- v4: origin + divination (CREATION-block labels; label → value at c+1)
+    const labelled = (...labels) => {
+        for (const l of labels) {
+            const hit = findCell(g, (v) => low(v) === l);
+            if (hit) { const v = at(g, hit.r, hit.c + 1); if (v) return v; }
+        }
+        return null;
+    };
+    const asOrigin = (v) => (v ? { name: v } : null);
+    const origin = {
+        homeworld: asOrigin(labelled('home world', 'homeworld')),
+        background: asOrigin(labelled('background')),
+        role: asOrigin(labelled('role')),
+        eliteAdvances: (() => {
+            const label = labelled('elite advance', 'elite advances');
+            const section = parseNamedSection(g, (v) => /^ELITE ADVANCES?$/i.test(norm(v)));
+            return [...(label ? [{ name: label }] : []), ...section.map((n) => ({ name: n }))];
+        })(),
+    };
+    const divination = labelled('divination');
+    const tarot = divination ? { text: divination } : {};
+
+    // --- v4: influence (characteristics-block row, else a labelled cell) ------
+    let influence = totals.influence ?? null;
+    if (influence == null) {
+        const infHit = findCell(g, (v) => low(v) === 'influence');
+        if (infHit) influence = int(at(g, infHit.r, infHit.c + 1));
+    }
+
+    // --- v4: house content → extensions (opaque namespaces) -------------------
+    const extensions = {};
+    const dramatic = parseNamedSection(g, (v) => /^DRAMATIC MOMENTS$/i.test(norm(v)));
+    if (dramatic.length) extensions['dramatic-moments'] = { entries: dramatic };
+
     unmapped.add('armour worn as items (the STATS AP scalar is the flat armour block)');
 
     return {
-        schemaVersion: 3, kind: 'dh2.character', system: 'dh2', name,
+        schemaVersion: 4, kind: 'dh2.character', system: 'dh2', name,
         characteristics, unnatural, armour, wounds, fate, fatigue,
-        skills, xp, aptitudes, tarot: {},
+        skills, xp, aptitudes: aptitudes.map(normalizeAptitudeSource), tarot,
         psy, psychicPowers,
         insanity: { points: totals.insanity ?? 0, disorders },
         corruption: { points: totals.corruption ?? 0, malignancies, mutations },
         criticalInjuries: [], amputations: [],
         talents, traits: [], conditions: [], circumstances: [],
         weapons, armourItems: [], gear, field,
+        origin, influence: influence ?? 0, weaponTrainings, cybernetics, extensions,
         source: {
-            adapter: 'xlsx-campaign-v3',
-            file: basename(file).replace(PLAYER_NAMES, '').replace(/\s+/g, ' ').trim(),
+            adapter: 'xlsx-campaign-v4',
+            file: fileLabel.replace(PLAYER_NAMES, '').replace(/\s+/g, ' ').trim(),
             importedAt: new Date().toISOString(), unmapped: [...unmapped].sort(),
         },
     };
@@ -454,8 +502,9 @@ function parseNamedSection(g, headerPred, maxRows = 25) {
     return out;
 }
 
-// ---------------------------------------------------------------------------
+// ---- CLI main (guarded: importing this module never touches the fs) --------
 const kebab = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
 const roster = [];
 for (const dir of ROSTER_DIRS) {
     const full = join(SHEETS_DIR, dir);
@@ -476,9 +525,10 @@ roster.sort((a, b) => a.name.localeCompare(b.name));
 const out = `/**
  * Campaign character roster — GENERATED by \`node tools/import-campaign.mjs\`.
  * Do not edit by hand; re-run the importer when the sheets change.
- * Schema v2 (residual gaps in each doc's source.unmapped). ${roster.length} characters.
+ * Schema v4 (residual gaps in each doc's source.unmapped). ${roster.length} characters.
  */
 export const CHARACTER_ROSTER = ${JSON.stringify(roster, null, 2)};
 `;
 if (process.argv.includes('--dry')) console.log(`\n(dry run) would write ${OUT}`);
 else { writeFileSync(OUT, out); console.log(`\n→ ${OUT} (${roster.length} characters)`); }
+}
