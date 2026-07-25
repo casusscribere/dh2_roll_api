@@ -13,7 +13,8 @@
     "import:campaign": "node tools/import-campaign.mjs",
     "deploy:foundry": "node scripts/build-foundry.mjs && node scripts/export-packs.mjs && node scripts/deploy-foundry.mjs",
     "serve:static": "node scripts/serve-static.mjs",
-    "schema:json": "node tools/generate-json-schema.mjs"
+    "schema:json": "node tools/generate-json-schema.mjs",
+    "sync:chargen": "node tools/sync-chargen.mjs"
   },
   "dependencies": {
     "express": "^4.19.0"

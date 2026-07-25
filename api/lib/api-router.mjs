@@ -24,6 +24,10 @@ import {
 import { weaponsJson } from './rules/sources.mjs';
 import { checkDependencies } from './rules/dependencies.mjs';
 import { CHARACTER_ROSTER } from '../data/characters/roster.mjs';
+import { CHARGEN_PACK } from '../data/chargen/pack.mjs';
+import {
+    listAvailableAdvances, applyAdvance, applyOrigin, validateBuild, xpSummary,
+} from './advancement.mjs';
 import { compile } from './dsl/compiler.mjs';
 import { DslError } from './dsl/tokenizer.mjs';
 import { DSL_DOCS } from './dsl/docs.mjs';
@@ -61,6 +65,10 @@ const GET = {
     }),
     '/api/dsl-docs': () => DSL_DOCS,
     '/api/rules/source': () => ({ builtins: builtinSources, rules: builtinRules }),
+    // Chargen data pack (Task CB-1): prose-stripped corpus snapshot for the
+    // Builder — aptitudes, cost tables, homeworlds/backgrounds/roles,
+    // talent/skill/trait catalogs with refs. Regenerate: npm run sync:chargen.
+    '/api/chargen/pack': () => CHARGEN_PACK,
     // Character schema v1 (Phase 2): the field reference + an empty template.
     '/api/character/schema': () => ({
         version: CHARACTER_SCHEMA_VERSION,
@@ -75,15 +83,37 @@ const POST = {
     // Generic test through the test.* pipeline (Phase 3): rules gated on
     // test_name / talents / conditions apply; response stays flat (v1 shape)
     // plus `effects`. customRules/disabledRules select the rule layers.
-    '/api/test': (body) => resolveTest(body, undefined, buildRegistry(body.customRules, body.disabledRules)),
+    // Chargen/advancement (Task CB-2): pure advancement.mjs over the chargen
+    // pack; doc migrated at the boundary (schema contract). Same code path the
+    // Foundry sheet's XP-spend will call through the VM bundle.
+    '/api/chargen/advances': (body) => {
+        const doc = migrateCharacter(body.doc ?? body.character ?? {});
+        return { advances: listAvailableAdvances(doc, CHARGEN_PACK), xp: xpSummary(doc) };
+    },
+    '/api/chargen/advance': (body) => {
+        const doc = migrateCharacter(body.doc ?? {});
+        const { doc: next, entry } = applyAdvance(doc, CHARGEN_PACK, body.advance ?? {}, { confirmed: !!body.confirmed });
+        return { doc: next, entry, xp: xpSummary(next) };
+    },
+    '/api/chargen/origin': (body) => {
+        const doc = migrateCharacter(body.doc ?? {});
+        return applyOrigin(doc, CHARGEN_PACK, body);
+    },
+    '/api/chargen/validate': (body) => {
+        const doc = migrateCharacter(body.doc ?? {});
+        return { ...validateBuild(doc, CHARGEN_PACK), xp: xpSummary(doc) };
+    },
+    // forcedRolls: caller-supplied die results (Foundry rolls its own dice for
+    // the table UX; the engine judges them — the dh2-roll-vm pattern).
+    '/api/test': (body) => resolveTest(body, body.forcedRolls ? rollScript(body.forcedRolls) : undefined, buildRegistry(body.customRules, body.disabledRules)),
     '/api/damage': (body) => {
-        const out = rollDamage(body, undefined, buildRegistry(body.customRules, body.disabledRules));
+        const out = rollDamage(body, body.forcedRolls ? rollScript(body.forcedRolls) : undefined, buildRegistry(body.customRules, body.disabledRules));
         if (out.error) throw new Error(out.error);
         return out;
     },
     '/api/soak': (body) => applySoak(body),
-    '/api/parry': (body) => resolveParry(body, undefined, buildRegistry(body.customRules, body.disabledRules)),
-    '/api/attack': (body) => resolveAttack(body, undefined, buildRegistry(body.customRules, body.disabledRules)),
+    '/api/parry': (body) => resolveParry(body, body.forcedRolls ? rollScript(body.forcedRolls) : undefined, buildRegistry(body.customRules, body.disabledRules)),
+    '/api/attack': (body) => resolveAttack(body, body.forcedRolls ? rollScript(body.forcedRolls) : undefined, buildRegistry(body.customRules, body.disabledRules)),
     '/api/resolve': (body) => {
         const rng = rollScript(body.forcedRolls ?? []);
         const input = withEncounter(body);
