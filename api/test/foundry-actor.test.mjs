@@ -90,7 +90,7 @@ test('every roster character maps without throwing and yields a full actor paylo
     for (const { name, doc } of CHARACTER_ROSTER) {
         const m = characterToFoundryActor(migrateCharacter(structuredClone(doc)));
         assert.equal(m.type, 'acolyte', name);
-        assert.equal(Object.keys(m.system.characteristics).length, 9, name);
+        assert.equal(Object.keys(m.system.characteristics).length, 10, name);   // 9 + influence (v4)
         assert.ok(m.items.length > 0, name);
         assert.ok(m.flags['dh2-roll-vm'].schemaVersion >= 3, name);
     }

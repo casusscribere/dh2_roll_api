@@ -22,8 +22,8 @@ const withStats = (s, t, ag = 30, wp = 30) => {
     return doc;
 };
 
-test('empty character is a valid v3 document', () => {
-    assert.equal(CHARACTER_SCHEMA_VERSION, 3);
+test('empty character is a valid document (v3 features present)', () => {
+    assert.ok(CHARACTER_SCHEMA_VERSION >= 3);       // v4+ builds keep v3 behavior
     const r = validateCharacter(emptyCharacter());
     assert.ok(r.ok, JSON.stringify(r.errors));
 });
@@ -31,7 +31,7 @@ test('empty character is a valid v3 document', () => {
 test('v2 (and v1) documents migrate to v3 with equipment/state defaults', () => {
     const v1 = { schemaVersion: 1, kind: 'dh2.character', name: 'Old', characteristics: { ws: 30, bs: 30, s: 30, t: 30, ag: 30, int: 30, per: 30, wp: 30, fel: 30 }, weapons: [{ name: 'Knife', damage: '1d5' }], wounds: { max: 10, current: 8 } };
     const d = migrateCharacter(v1);
-    assert.equal(d.schemaVersion, 3);
+    assert.equal(d.schemaVersion, CHARACTER_SCHEMA_VERSION);   // migrates to current
     assert.deepEqual(d.gear, []);
     assert.deepEqual(d.psy, { rating: 0, class: 'none', sustained: 0 });
     assert.equal(d.wounds.critical, 0);

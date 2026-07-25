@@ -24,6 +24,12 @@
  *   + flags (DH3 nests them as attackSpecial container items — pack-linking
  *   them is Phase 8 work).
  * - tarot → bio.divination; amputations + the XP ledger → module flags.
+ * - v4: origin → bio.homeWorld/background/role/elite (+ verbatim copy in
+ *   flags for lossless round-trip); influence → characteristics.influence;
+ *   weaponTrainings → `Weapon Training (X)` talent Items; cybernetics →
+ *   cybernetic Items; extensions → flags; entry-level ref/dsl (builder
+ *   addendum) ride each Item's flags; typed ledger fields ride flags.xpLedger
+ *   verbatim.
  */
 import {
     SKILL_DEFS, canonicalSkillName, modifierTotal, fatigueThreshold,
@@ -42,6 +48,11 @@ export const camelKey = (name) => String(name ?? '')
     .join('');
 
 const asEntry = (x) => (x && typeof x === 'object') ? x : { name: String(x ?? '') };
+
+/** Item flags for an entry carrying ref/dsl (builder addendum) — {} when bare. */
+const entryFlags = (e) => (e.ref !== undefined || e.dsl !== undefined)
+    ? { flags: { 'dh2-roll-vm': { ...(e.ref !== undefined && { ref: e.ref }), ...(e.dsl !== undefined && { dsl: e.dsl }) } } }
+    : {};
 
 /**
  * Map a MIGRATED character document to Foundry Actor data.
@@ -88,6 +99,10 @@ export function characterToFoundryActor(doc) {
     const spent = doc.xp?.spent ?? (doc.xp?.ledger ?? []).reduce((a, e) => a + (e.cost || 0), 0);
     const tarotBits = [doc.tarot?.card, doc.tarot?.text, doc.tarot?.effect].filter(Boolean);
 
+    // v4 origin → DH3 bio strings (verbatim object preserved in flags)
+    const originName = (m) => (m == null ? '' : (typeof m === 'string' ? m : m.name ?? ''));
+    characteristics.influence = { base: doc.influence ?? 0, advance: 0, modifier: 0, unnatural: 0 };
+
     const system = {
         characteristics,
         skills,
@@ -107,7 +122,13 @@ export function characterToFoundryActor(doc) {
         insanity: doc.insanity?.points ?? 0,
         corruption: doc.corruption?.points ?? 0,
         experience: { total: doc.xp?.total ?? 0, used: spent },
-        bio: { divination: tarotBits.join(' — ') },
+        bio: {
+            divination: tarotBits.join(' — '),
+            homeWorld: originName(doc.origin?.homeworld),
+            background: originName(doc.origin?.background),
+            role: originName(doc.origin?.role),
+            elite: (doc.origin?.eliteAdvances ?? []).map((e) => originName(e)).filter(Boolean).join(', '),
+        },
     };
 
     // --- embedded items ---------------------------------------------------------
@@ -155,18 +176,30 @@ export function characterToFoundryActor(doc) {
     }
     for (const t of doc.talents ?? []) {
         const e = asEntry(t);
-        items.push({ name: e.name, type: 'talent', system: { tier: e.tier ?? 0, benefit: e.notes ?? '', description: e.source ? `Source: ${e.source}` : '' } });
+        items.push({ name: e.name, type: 'talent', system: { tier: e.tier ?? 0, benefit: e.notes ?? '', description: e.source ? `Source: ${e.source}` : '' }, ...entryFlags(e) });
+    }
+    for (const w of doc.weaponTrainings ?? []) {
+        items.push({ name: `Weapon Training (${w})`, type: 'talent', system: { tier: 1, benefit: '', description: '' } });
     }
     for (const t of doc.traits ?? []) {
         const e = asEntry(t);
-        items.push({ name: e.name, type: 'trait', system: e.level != null ? { level: e.level } : {} });
+        items.push({ name: e.name, type: 'trait', system: e.level != null ? { level: e.level } : {}, ...entryFlags(e) });
+    }
+    for (const c of doc.cybernetics ?? []) {
+        const e = asEntry(c);
+        items.push({
+            name: e.name, type: 'cybernetic',
+            system: { description: [e.location && `Location: ${e.location}`, e.notes].filter(Boolean).join(' — ') },
+            ...entryFlags(e),
+        });
     }
     for (const p of doc.psychicPowers ?? []) {
         const e = asEntry(p);
+        const extra = entryFlags(e).flags?.['dh2-roll-vm'] ?? {};
         items.push({
             name: e.name, type: 'psychicPower',
             system: { discipline: e.discipline ?? '', cost: e.cost ?? 0, sustained: 'No', description: e.notes ?? '' },
-            flags: { 'dh2-roll-vm': { equipped: e.equipped !== false } },   // loadout state (no DH3 field)
+            flags: { 'dh2-roll-vm': { equipped: e.equipped !== false, ...extra } },   // loadout state (no DH3 field)
         });
     }
     for (const d of doc.insanity?.disorders ?? []) {
@@ -194,8 +227,10 @@ export function characterToFoundryActor(doc) {
             schemaVersion: doc.schemaVersion,
             modifierSources,
             amputations: doc.amputations ?? [],
-            xpLedger: doc.xp?.ledger ?? [],
+            xpLedger: doc.xp?.ledger ?? [],          // typed fields (kind/ref/rank/matches) ride verbatim
             source: doc.source ?? null,
+            origin: doc.origin ?? null,              // verbatim (refs incl.) for lossless round-trip
+            extensions: doc.extensions ?? {},
         },
     };
 

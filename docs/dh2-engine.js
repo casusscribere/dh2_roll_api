@@ -10113,7 +10113,9 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
   var DOCUMENTED_FUNCTIONS = DSL_DOCS.functions.map((f) => f.signature.split("(")[0]);
 
   // api/lib/character-schema.mjs
-  var CHARACTER_SCHEMA_VERSION = 3;
+  var CHARACTER_SCHEMA_VERSION = 4;
+  var LEDGER_KINDS = ["characteristic", "skill", "talent", "psychic_power", "psy_rating", "elite_advance", "other"];
+  var REF_PATTERN = /^[a-z0-9_]+:[a-z0-9_]+:[a-z0-9_]+$/;
   var CHARACTERISTIC_KEYS = ["ws", "bs", "s", "t", "ag", "int", "per", "wp", "fel"];
   var UNNATURAL_KEYS = ["ws", "bs", "s", "t", "ag"];
   var ARMOUR_KEYS = ["head", "body", "leftArm", "rightArm", "leftLeg", "rightLeg"];
@@ -10170,9 +10172,23 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
     { path: "skills.<Name>", type: "{ advances 0\u20134, characteristic?, modifiers[], specialities? }", required: false, summary: `A DH2 skill (canonical names: ${Object.keys(SKILL_DEFS).join(", ")}). Target derived RAW: untrained = \xBD characteristic; advances 1\u20134 \u2192 +0/+10/+20/+30 (use skillTarget).` },
     { path: "skills.<Name>.specialities.<X>", type: "{ advances 0\u20134, modifiers[] }", required: false, summary: "Specialist-skill entries \u2014 Scholastic Lore (Occult), Operate (Surface), \u2026 Only valid on specialist skills." },
     { path: "skills.<Name>.modifiers[]", type: "{ value, source?, note? }", required: false, summary: 'Skill modifiers BY SOURCE \u2014 e.g. { value: 20, source: "Good Bionic Eyes" } on Tech-Use.' },
-    { path: "xp", type: "{ total, spent?, ledger[] }", required: false, summary: "Experience: earned total, spent (defaults to the ledger sum), and the per-purchase ledger." },
-    { path: "xp.ledger[]", type: "{ name, cost, source?, date? }", required: false, summary: 'One purchase \u2014 "Mighty Shot", 600, "Core RB".' },
-    { path: "aptitudes[]", type: "string | { name, source? }", required: false, summary: "Aptitudes with their origin (Homeworld / Background / Role / \u2026)." },
+    { path: "xp", type: "{ total, spent?, ledger[] }", required: false, summary: "Experience: earned total (starting grant included), spent (defaults to the ledger sum), and the per-purchase ledger." },
+    { path: "xp.ledger[]", type: "{ name, cost, kind?, ref?, rank?, matches?, source?, date? }", required: false, summary: 'One purchase \u2014 "Mighty Shot", 600. Typed fields (builder addendum) make it a cost-audited advancement record; untyped legacy entries stay valid.' },
+    { path: "xp.ledger[].kind", type: LEDGER_KINDS.join(" | "), required: false, summary: "What kind of advance was bought (unknown kinds warn, for forward compatibility)." },
+    { path: "xp.ledger[].ref", type: "string", required: false, summary: "What was bought: a corpus ref (dh2:<type>:<snake_id>), a characteristic key (ws\u2026fel), or a skill name (+speciality)." },
+    { path: "xp.ledger[].rank", type: "int \u2265 1", required: false, summary: "Advance rank purchased (characteristic 1\u20135 Simple\u2192Expert, skill 1\u20134; psy rating = the new rating)." },
+    { path: "xp.ledger[].matches", type: "int 0\u20132", required: false, summary: "Aptitude matches at purchase time \u2014 the cost audit trail." },
+    { path: "aptitudes[]", type: "string | { name, source? }", required: false, summary: "Aptitudes with their origin (source \u2208 homeworld|background|role|elite_advance|extra; legacy casings normalize at migration)." },
+    { path: "origin", type: "{ homeworld?, background?, role?, eliteAdvances[] }", required: false, summary: "Character-creation origin. Members are { name, ref? } or null; bare strings normalize to { name } at migration. \u21C4 Foundry bio.homeWorld/background/role/elite." },
+    { path: "origin.eliteAdvances[]", type: "{ name, ref?, cost? }", required: false, summary: "Elite advances taken (Psyker, Untouchable, \u2026) with their XP cost." },
+    { path: "influence", type: "int \u2265 0", required: false, summary: "Influence (the DH2 social resource-characteristic). \u21C4 Foundry characteristics.influence.base." },
+    { path: "weaponTrainings[]", type: "string[]", required: false, summary: 'Weapon Training groups held ("Bolt", "Las", \u2026) \u2014 mapped to Weapon Training (X) talent Items in Foundry.' },
+    { path: "cybernetics[]", type: "string | { name, location?, notes?, ref?, dsl? }", required: false, summary: "Installed cybernetics (\u21C4 Foundry cybernetic Items)." },
+    { path: "extensions", type: "{ <namespace>: any }", required: false, summary: "Opaque campaign extensions (Dramatic Moments, builder wizard state under extensions.builder, \u2026). Preserved verbatim, never validated." },
+    { path: "player", type: "string", required: false, summary: "Player attribution \u2014 PRIVACY-GUARDED: validation warns unless { allowPlayer: true }; omitted by default (pipeline decision D9)." },
+    { path: "pools.profitFactor", type: "(reserved)", required: false, summary: "Reserved for Rogue Trader \u2014 not populated by any current adapter." },
+    { path: "<talents|traits|psychicPowers>[].ref", type: 'string "dh2:<type>:<snake_id>"', required: false, summary: "Corpus ref \u2014 resolves mechanically to compendium UUIDs (deterministic slug ids; no name-matching)." },
+    { path: "<talents|traits|psychicPowers>[].dsl", type: "string (DSL source)", required: false, summary: "Entry-granted rules in the DSL (custom talents/traits/powers) \u2014 compiled into the customRules layer at roll time; portable between the Pages UI and Foundry." },
     { path: "tarot", type: "{ card?, text?, effect? }", required: false, summary: "The Emperor's Tarot / divination drawn at creation (\u21C4 Foundry bio.divination)." },
     { path: "weapons[].weight", type: "number \u2265 0 (kg)", required: false, summary: "Weapon weight \u2014 counts toward encumbrance while equipped." },
     { path: "weapons[].equipped", type: "bool (default true)", required: false, summary: "On the character (counts weight; available in combat). false = stored." },
@@ -10194,8 +10210,8 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
     { path: "armour.<head|body|leftArm|rightArm|leftLeg|rightLeg>", type: "int \u2265 0", required: false, summary: "Armour points by hit location." },
     { path: "wounds", type: "{ max, current }", required: false, summary: "Wound track (carried, not yet consumed by the attack loop)." },
     { path: "fate", type: "{ max, current }", required: false, summary: "Fate points (carried, not yet consumed)." },
-    { path: "talents", type: "(string | {name, level})[]", required: false, summary: 'Talent list. "Name (X)" strings or {name, level} objects.' },
-    { path: "traits", type: "(string | {name, level})[]", required: false, summary: "Trait list (innate DH2.0 traits, e.g. Brutal Charge (3), Daemonic (4))." },
+    { path: "talents", type: "(string | {name, level?, ref?, dsl?})[]", required: false, summary: 'Talent list. "Name (X)" strings or {name, \u2026} objects (ref/dsl per the builder addendum).' },
+    { path: "traits", type: "(string | {name, level?, ref?, dsl?})[]", required: false, summary: "Trait list (innate DH2.0 traits, e.g. Brutal Charge (3), Daemonic (4)). Traits are granted, never XP-purchased." },
     { path: "conditions", type: "(string | {name, severity, duration, location})[]", required: false, summary: "Active Conditions (Stunned, On Fire, \u2026)." },
     { path: "circumstances", type: "(string | {name, severity})[]", required: false, summary: "Environmental Circumstances (Darkness, Haywire Field, \u2026)." },
     { path: "weapons[]", type: "weapon", required: false, summary: "Weapon profiles (see weapon fields)." },
@@ -10240,7 +10256,12 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
       weapons: [],
       armourItems: [],
       gear: [],
-      field: { rating: 0, overloadMax: 0 }
+      field: { rating: 0, overloadMax: 0 },
+      origin: { homeworld: null, background: null, role: null, eliteAdvances: [] },
+      influence: 0,
+      weaponTrainings: [],
+      cybernetics: [],
+      extensions: {}
     };
   }
   function armourByLocation(doc) {
@@ -10262,10 +10283,18 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
   var isInt = (v) => Number.isInteger(v);
   var isNonNegInt = (v) => Number.isInteger(v) && v >= 0;
   var isNamedEntry = (v) => typeof v === "string" || v && typeof v === "object" && typeof v.name === "string";
-  function validateCharacter(doc) {
+  function validateCharacter(doc, opts = {}) {
     const errors = [], warnings = [];
     const err = (path, message) => errors.push({ path, message });
     const warn = (path, message) => warnings.push({ path, message });
+    const checkRefDsl = (entry, path) => {
+      if (!entry || typeof entry !== "object") return;
+      if (entry.ref !== void 0) {
+        if (typeof entry.ref !== "string") err(`${path}.ref`, "String ref required (dh2:<type>:<snake_id>)");
+        else if (!REF_PATTERN.test(entry.ref)) warn(`${path}.ref`, `Ref "${entry.ref}" does not match <system>:<type>:<snake_id>`);
+      }
+      if (entry.dsl !== void 0 && typeof entry.dsl !== "string") err(`${path}.dsl`, "String (DSL source) required");
+    };
     if (!doc || typeof doc !== "object") return { ok: false, errors: [{ path: "", message: "Not an object" }], warnings };
     if (!isInt(doc.schemaVersion)) err("schemaVersion", "Required integer");
     else if (doc.schemaVersion > CHARACTER_SCHEMA_VERSION) warn("schemaVersion", `Document is v${doc.schemaVersion}; this build knows v${CHARACTER_SCHEMA_VERSION} \u2014 fields may be ignored`);
@@ -10343,7 +10372,17 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
         if (doc.xp.ledger !== void 0) {
           if (!Array.isArray(doc.xp.ledger)) err("xp.ledger", "Must be an array");
           else doc.xp.ledger.forEach((e, i) => {
-            if (!e || typeof e !== "object" || typeof e.name !== "string" || !isNonNegInt(e.cost)) err(`xp.ledger[${i}]`, "{ name: string, cost: int \u2265 0, source?, date? } required");
+            if (!e || typeof e !== "object" || typeof e.name !== "string" || !isNonNegInt(e.cost)) {
+              err(`xp.ledger[${i}]`, "{ name: string, cost: int \u2265 0, kind?, ref?, rank?, matches?, source?, date? } required");
+              return;
+            }
+            if (e.kind !== void 0) {
+              if (typeof e.kind !== "string") err(`xp.ledger[${i}].kind`, "String required");
+              else if (!LEDGER_KINDS.includes(e.kind)) warn(`xp.ledger[${i}].kind`, `Unknown kind "${e.kind}" (known: ${LEDGER_KINDS.join(", ")})`);
+            }
+            if (e.ref !== void 0 && typeof e.ref !== "string") err(`xp.ledger[${i}].ref`, "String required");
+            if (e.rank !== void 0 && (!isInt(e.rank) || e.rank < 1)) err(`xp.ledger[${i}].rank`, "Integer \u2265 1 required");
+            if (e.matches !== void 0 && (!isInt(e.matches) || e.matches < 0 || e.matches > 2)) err(`xp.ledger[${i}].matches`, "Integer 0\u20132 required");
           });
         }
       }
@@ -10414,6 +10453,7 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
           return;
         }
         if (p && typeof p === "object") {
+          checkRefDsl(p, `psychicPowers[${i}]`);
           if (p.equipped !== void 0 && typeof p.equipped !== "boolean") err(`psychicPowers[${i}].equipped`, "Boolean required");
           if (p.cost !== void 0 && !isNonNegInt(p.cost)) err(`psychicPowers[${i}].cost`, "Non-negative integer required");
           for (const f of ["discipline", "notes"]) if (p[f] !== void 0 && typeof p[f] !== "string") err(`psychicPowers[${i}].${f}`, "String required");
@@ -10495,7 +10535,11 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
         continue;
       }
       list.forEach((entry, i) => {
-        if (!isNamedEntry(entry)) err(`${listName}[${i}]`, "Must be a string or { name, \u2026 } object");
+        if (!isNamedEntry(entry)) {
+          err(`${listName}[${i}]`, "Must be a string or { name, \u2026 } object");
+          return;
+        }
+        if (listName === "talents" || listName === "traits") checkRefDsl(entry, `${listName}[${i}]`);
       });
     }
     if (doc.weapons !== void 0) {
@@ -10532,6 +10576,59 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
       if (typeof doc.field !== "object") err("field", "Must be { rating, overloadMax }");
       else for (const p of ["rating", "overloadMax"]) if (doc.field[p] !== void 0 && !isNonNegInt(doc.field[p])) err(`field.${p}`, "Non-negative integer required");
     }
+    if (doc.origin !== void 0) {
+      if (!doc.origin || typeof doc.origin !== "object" || Array.isArray(doc.origin)) err("origin", "Must be { homeworld?, background?, role?, eliteAdvances[] }");
+      else {
+        for (const k of ["homeworld", "background", "role"]) {
+          const v = doc.origin[k];
+          if (v === void 0 || v === null) continue;
+          if (!isNamedEntry(v)) {
+            err(`origin.${k}`, "Must be null, a string, or { name, ref? }");
+            continue;
+          }
+          checkRefDsl(v, `origin.${k}`);
+        }
+        if (doc.origin.eliteAdvances !== void 0) {
+          if (!Array.isArray(doc.origin.eliteAdvances)) err("origin.eliteAdvances", "Must be an array");
+          else doc.origin.eliteAdvances.forEach((e, i) => {
+            if (!isNamedEntry(e)) {
+              err(`origin.eliteAdvances[${i}]`, "Must be a string or { name, ref?, cost? }");
+              return;
+            }
+            checkRefDsl(e, `origin.eliteAdvances[${i}]`);
+            if (e && typeof e === "object" && e.cost !== void 0 && !isNonNegInt(e.cost)) err(`origin.eliteAdvances[${i}].cost`, "Non-negative integer required");
+          });
+        }
+      }
+    }
+    if (doc.influence !== void 0 && !isNonNegInt(doc.influence)) err("influence", "Non-negative integer required");
+    if (doc.weaponTrainings !== void 0) {
+      if (!Array.isArray(doc.weaponTrainings)) err("weaponTrainings", "Must be an array of strings");
+      else doc.weaponTrainings.forEach((w, i) => {
+        if (typeof w !== "string" || !w.trim()) err(`weaponTrainings[${i}]`, "Non-empty string required");
+      });
+    }
+    if (doc.cybernetics !== void 0) {
+      if (!Array.isArray(doc.cybernetics)) err("cybernetics", "Must be an array");
+      else doc.cybernetics.forEach((c, i) => {
+        if (!isNamedEntry(c)) {
+          err(`cybernetics[${i}]`, "Must be a string or { name, location?, notes?, ref?, dsl? }");
+          return;
+        }
+        if (c && typeof c === "object") {
+          checkRefDsl(c, `cybernetics[${i}]`);
+          for (const f of ["location", "notes"]) if (c[f] !== void 0 && typeof c[f] !== "string") err(`cybernetics[${i}].${f}`, "String required");
+        }
+      });
+    }
+    if (doc.extensions !== void 0 && (!doc.extensions || typeof doc.extensions !== "object" || Array.isArray(doc.extensions))) {
+      err("extensions", "Must be an object of { <namespace>: any }");
+    }
+    if (doc.player !== void 0) {
+      if (typeof doc.player !== "string") err("player", "String required");
+      else if (!opts.allowPlayer) warn("player", "Player attribution present \u2014 omitted by default for privacy (pass { allowPlayer: true } to accept)");
+    }
+    if (doc.pools !== void 0 && (!doc.pools || typeof doc.pools !== "object" || Array.isArray(doc.pools))) err("pools", "Must be an object (reserved)");
     return { ok: errors.length === 0, errors, warnings };
   }
   function migrateCharacter(doc) {
@@ -10565,7 +10662,30 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
         if (d2.wounds && typeof d2.wounds === "object") d2.wounds = { critical: 0, ...d2.wounds };
         d2.schemaVersion = 3;
       // fallthrough:
-      case 3:
+      case 3: {
+        const normMember = (v) => v == null ? null : typeof v === "string" ? { name: v } : { ...v };
+        const o = d2.origin && typeof d2.origin === "object" && !Array.isArray(d2.origin) ? d2.origin : {};
+        d2.origin = {
+          homeworld: normMember(o.homeworld ?? null),
+          background: normMember(o.background ?? null),
+          role: normMember(o.role ?? null),
+          eliteAdvances: Array.isArray(o.eliteAdvances) ? o.eliteAdvances.map((e) => typeof e === "string" ? { name: e } : e) : []
+        };
+        d2.influence ?? (d2.influence = 0);
+        d2.weaponTrainings ?? (d2.weaponTrainings = []);
+        d2.cybernetics ?? (d2.cybernetics = []);
+        d2.extensions ?? (d2.extensions = {});
+        if (Array.isArray(d2.aptitudes)) {
+          const canonSource = (s) => /^home\s*world$/i.test(s) ? "homeworld" : /^(bg|background)$/i.test(s) ? "background" : /^role$/i.test(s) ? "role" : /^elite([\s_-]?advance)?s?$/i.test(s) ? "elite_advance" : null;
+          d2.aptitudes = d2.aptitudes.map((a) => {
+            if (!a || typeof a !== "object" || typeof a.source !== "string") return a;
+            const c = canonSource(a.source.trim());
+            return c ? { ...a, source: c } : a;
+          });
+        }
+        d2.schemaVersion = 4;
+      }
+      case 4:
         break;
       default:
         break;

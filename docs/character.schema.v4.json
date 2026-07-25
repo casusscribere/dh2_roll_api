@@ -1,0 +1,663 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DH2 character document",
+  "description": "dh2_roll_api character schema v4 — generated from CHARACTER_FIELDS (api/lib/character-schema.mjs). Permissive: unknown keys are validator warnings, not schema errors.",
+  "x-schema-version": 4,
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "description": "Document schema version (current: 4). Migrations keep old documents loadable."
+    },
+    "kind": {
+      "const": "dh2.character",
+      "description": "Document discriminator."
+    },
+    "name": {
+      "type": "string",
+      "description": "Character name."
+    },
+    "system": {
+      "type": "string",
+      "description": "Rule system id (default \"dh2\")."
+    },
+    "xp": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Experience: earned total (starting grant included), spent (defaults to the ledger sum), and the per-purchase ledger.",
+      "properties": {
+        "ledger": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "One purchase — \"Mighty Shot\", 600. Typed fields (builder addendum) make it a cost-audited advancement record; untyped legacy entries stay valid.",
+            "properties": {
+              "kind": {
+                "enum": [
+                  "characteristic",
+                  "skill",
+                  "talent",
+                  "psychic_power",
+                  "psy_rating",
+                  "elite_advance",
+                  "other"
+                ],
+                "description": "What kind of advance was bought (unknown kinds warn, for forward compatibility)."
+              },
+              "ref": {
+                "type": "string",
+                "description": "What was bought: a corpus ref (dh2:<type>:<snake_id>), a characteristic key (ws…fel), or a skill name (+speciality)."
+              },
+              "rank": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Advance rank purchased (characteristic 1–5 Simple→Expert, skill 1–4; psy rating = the new rating)."
+              },
+              "matches": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2,
+                "description": "Aptitude matches at purchase time — the cost audit trail."
+              }
+            }
+          }
+        }
+      }
+    },
+    "aptitudes": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": true
+          }
+        ],
+        "description": "Aptitudes with their origin (source ∈ homeworld|background|role|elite_advance|extra; legacy casings normalize at migration)."
+      }
+    },
+    "origin": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Character-creation origin. Members are { name, ref? } or null; bare strings normalize to { name } at migration. ⇄ Foundry bio.homeWorld/background/role/elite.",
+      "properties": {
+        "eliteAdvances": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Elite advances taken (Psyker, Untouchable, …) with their XP cost."
+          }
+        }
+      }
+    },
+    "influence": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Influence (the DH2 social resource-characteristic). ⇄ Foundry characteristics.influence.base."
+    },
+    "weaponTrainings": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Weapon Training groups held (\"Bolt\", \"Las\", …) — mapped to Weapon Training (X) talent Items in Foundry."
+      }
+    },
+    "cybernetics": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": true
+          }
+        ],
+        "description": "Installed cybernetics (⇄ Foundry cybernetic Items)."
+      }
+    },
+    "extensions": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Opaque campaign extensions (Dramatic Moments, builder wizard state under extensions.builder, …). Preserved verbatim, never validated."
+    },
+    "player": {
+      "type": "string",
+      "description": "Player attribution — PRIVACY-GUARDED: validation warns unless { allowPlayer: true }; omitted by default (pipeline decision D9)."
+    },
+    "tarot": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "The Emperor's Tarot / divination drawn at creation (⇄ Foundry bio.divination)."
+    },
+    "armourItems": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Worn armour as items: AP + covered locations (\"all\" or head/body/…). Equipped items derive per-location AP (highest wins — armour does not stack); the flat `armour` block is a manual override used when no item is equipped.",
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "Free-text item description."
+          },
+          "dsl": {
+            "type": "string",
+            "description": "Item-granted rules in the DSL. Applied at roll time ONLY while the item is equipped — e.g. `quality \"Good Auspex\" { on test.MODIFIERS when is_test(\"Tech-Use\") then add modifier \"auspex\" = 20 }`."
+          }
+        }
+      }
+    },
+    "gear": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Equipment. equipped=true (default) counts weight × quantity toward encumbrance; false = stored (quarters/ship).",
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "Free-text item description."
+          },
+          "dsl": {
+            "type": "string",
+            "description": "Item-granted rules in the DSL. Applied at roll time ONLY while the item is equipped — e.g. `quality \"Good Auspex\" { on test.MODIFIERS when is_test(\"Tech-Use\") then add modifier \"auspex\" = 20 }`."
+          }
+        }
+      }
+    },
+    "fatigue": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Fatigue levels. Threshold is DERIVED: TB + WB (p.233; fatigueThreshold())."
+    },
+    "psy": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Psy rating (0 = not a psyker), psyker class, powers currently sustained."
+    },
+    "psychicPowers": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "ref": {
+                "type": "string",
+                "description": "Corpus ref — resolves mechanically to compendium UUIDs (deterministic slug ids; no name-matching)."
+              },
+              "dsl": {
+                "type": "string",
+                "description": "Entry-granted rules in the DSL (custom talents/traits/powers) — compiled into the customRules layer at roll time; portable between the Pages UI and Foundry."
+              }
+            }
+          }
+        ],
+        "description": "Known psychic powers. equipped=true (default) = in the active loadout / prepared; the power.* pipeline consumes these in Phase 6."
+      }
+    },
+    "insanity": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Insanity points and acquired Mental Disorders."
+    },
+    "corruption": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Corruption points, Malignancies, and Mutations."
+    },
+    "criticalInjuries": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": true
+          }
+        ],
+        "description": "Lasting critical-injury effects (⇄ Foundry criticalInjury Items)."
+      }
+    },
+    "amputations": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "leftArm",
+          "rightArm",
+          "leftHand",
+          "rightHand",
+          "leftLeg",
+          "rightLeg",
+          "leftFoot",
+          "rightFoot",
+          "leftEye",
+          "rightEye"
+        ],
+        "description": "Missing limbs/organs (DH2 core p.251)."
+      }
+    },
+    "size": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10,
+      "description": "Size trait value (DH2 p.138; 4 = Average). Display + future to-hit modifiers."
+    },
+    "movementModifier": {
+      "type": "integer",
+      "minimum": -10,
+      "maximum": 10,
+      "description": "Manual movement adjustment: acts as an Agility-Bonus delta for the movement brackets ONLY (does not stack into any other AgB calculation)."
+    },
+    "wounds": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Wound track (carried, not yet consumed by the attack loop).",
+      "properties": {
+        "critical": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Critical damage taken beyond 0 wounds (the crit-table severity)."
+        }
+      }
+    },
+    "fate": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Fate points (carried, not yet consumed)."
+    },
+    "talents": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "ref": {
+                "type": "string",
+                "description": "Corpus ref — resolves mechanically to compendium UUIDs (deterministic slug ids; no name-matching)."
+              },
+              "dsl": {
+                "type": "string",
+                "description": "Entry-granted rules in the DSL (custom talents/traits/powers) — compiled into the customRules layer at roll time; portable between the Pages UI and Foundry."
+              }
+            }
+          }
+        ]
+      },
+      "description": "Talent list. \"Name (X)\" strings or {name, …} objects (ref/dsl per the builder addendum)."
+    },
+    "traits": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "ref": {
+                "type": "string",
+                "description": "Corpus ref — resolves mechanically to compendium UUIDs (deterministic slug ids; no name-matching)."
+              },
+              "dsl": {
+                "type": "string",
+                "description": "Entry-granted rules in the DSL (custom talents/traits/powers) — compiled into the customRules layer at roll time; portable between the Pages UI and Foundry."
+              }
+            }
+          }
+        ]
+      },
+      "description": "Trait list (innate DH2.0 traits, e.g. Brutal Charge (3), Daemonic (4)). Traits are granted, never XP-purchased."
+    },
+    "conditions": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": true
+          }
+        ]
+      },
+      "description": "Active Conditions (Stunned, On Fire, …)."
+    },
+    "circumstances": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": true
+          }
+        ]
+      },
+      "description": "Environmental Circumstances (Darkness, Haywire Field, …)."
+    },
+    "weapons": {
+      "type": "array",
+      "items": {
+        "description": "Weapon profiles (see weapon fields).",
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "weight": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Weapon weight — counts toward encumbrance while equipped."
+          },
+          "equipped": {
+            "type": "boolean",
+            "description": "On the character (counts weight; available in combat). false = stored."
+          },
+          "clip": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Magazine size and rounds remaining (consumed when ammo tracking lands)."
+          },
+          "description": {
+            "type": "string",
+            "description": "Free-text item description."
+          },
+          "dsl": {
+            "type": "string",
+            "description": "Item-granted rules in the DSL. Applied at roll time ONLY while the item is equipped — e.g. `quality \"Good Auspex\" { on test.MODIFIERS when is_test(\"Tech-Use\") then add modifier \"auspex\" = 20 }`."
+          },
+          "name": {
+            "type": "string",
+            "description": "Weapon name."
+          },
+          "class": {
+            "enum": [
+              "melee",
+              "pistol",
+              "basic",
+              "heavy",
+              "thrown"
+            ],
+            "description": "Weapon class; \"melee\" and \"thrown\" drive Strength-Bonus damage."
+          },
+          "damage": {
+            "type": "string",
+            "description": "Damage formula."
+          },
+          "pen": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Penetration."
+          },
+          "damageType": {
+            "enum": [
+              "Impact",
+              "Energy",
+              "Explosive",
+              "Rending"
+            ],
+            "description": "Damage type."
+          },
+          "rof": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Rate of fire (burst/full as ints)."
+          },
+          "qualities": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              ]
+            },
+            "description": "Weapon qualities."
+          },
+          "craftsmanship": {
+            "enum": [
+              "Poor",
+              "Common",
+              "Good",
+              "Best"
+            ],
+            "description": "Craftsmanship tier."
+          },
+          "sbMultiplier": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2,
+            "description": "Strength-Bonus multiple added to damage for melee/thrown (default 1 for melee)."
+          }
+        },
+        "required": [
+          "name",
+          "damage"
+        ]
+      }
+    },
+    "field": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Force field (absorbs on roll ≤ rating; overloads on roll ≤ overloadMax)."
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Import provenance (adapter name, source identifiers, timestamp)."
+    },
+    "characteristics": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "modifiers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Manual modifiers BY SOURCE — e.g. { value: 5, source: \"Custom Grip\" }."
+            }
+          }
+        }
+      },
+      "properties": {
+        "ws": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "The nine DH2 characteristics. total = base + 5×advances + Σmodifiers (derived — use characteristicTotal). v1 flat ints migrate automatically."
+        },
+        "bs": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "The nine DH2 characteristics. total = base + 5×advances + Σmodifiers (derived — use characteristicTotal). v1 flat ints migrate automatically."
+        },
+        "s": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "The nine DH2 characteristics. total = base + 5×advances + Σmodifiers (derived — use characteristicTotal). v1 flat ints migrate automatically."
+        },
+        "t": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "The nine DH2 characteristics. total = base + 5×advances + Σmodifiers (derived — use characteristicTotal). v1 flat ints migrate automatically."
+        },
+        "ag": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "The nine DH2 characteristics. total = base + 5×advances + Σmodifiers (derived — use characteristicTotal). v1 flat ints migrate automatically."
+        },
+        "int": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "The nine DH2 characteristics. total = base + 5×advances + Σmodifiers (derived — use characteristicTotal). v1 flat ints migrate automatically."
+        },
+        "per": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "The nine DH2 characteristics. total = base + 5×advances + Σmodifiers (derived — use characteristicTotal). v1 flat ints migrate automatically."
+        },
+        "wp": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "The nine DH2 characteristics. total = base + 5×advances + Σmodifiers (derived — use characteristicTotal). v1 flat ints migrate automatically."
+        },
+        "fel": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "The nine DH2 characteristics. total = base + 5×advances + Σmodifiers (derived — use characteristicTotal). v1 flat ints migrate automatically."
+        }
+      },
+      "required": [
+        "ws",
+        "bs",
+        "s",
+        "t",
+        "ag",
+        "int",
+        "per",
+        "wp",
+        "fel"
+      ]
+    },
+    "unnatural": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "ws": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Unnatural Characteristic values (p.139): +X to the bonus, ⌈X/2⌉ bonus DoS on successful tests."
+        },
+        "bs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Unnatural Characteristic values (p.139): +X to the bonus, ⌈X/2⌉ bonus DoS on successful tests."
+        },
+        "s": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Unnatural Characteristic values (p.139): +X to the bonus, ⌈X/2⌉ bonus DoS on successful tests."
+        },
+        "t": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Unnatural Characteristic values (p.139): +X to the bonus, ⌈X/2⌉ bonus DoS on successful tests."
+        },
+        "ag": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Unnatural Characteristic values (p.139): +X to the bonus, ⌈X/2⌉ bonus DoS on successful tests."
+        }
+      }
+    },
+    "skills": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "A DH2 skill (canonical names: Acrobatics, Athletics, Awareness, Charm, Command, Commerce, Common Lore, Deceive, Dodge, Forbidden Lore, Inquiry, Interrogation, Intimidate, Linguistics, Logic, Medicae, Navigate, Operate, Parry, Psyniscience, Scholastic Lore, Scrutiny, Security, Sleight of Hand, Stealth, Survival, Tech-Use, Trade). Target derived RAW: untrained = ½ characteristic; advances 1–4 → +0/+10/+20/+30 (use skillTarget).",
+        "properties": {
+          "modifiers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Skill modifiers BY SOURCE — e.g. { value: 20, source: \"Good Bionic Eyes\" } on Tech-Use."
+            }
+          },
+          "specialities": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Specialist-skill entries — Scholastic Lore (Occult), Operate (Surface), … Only valid on specialist skills."
+            }
+          }
+        }
+      }
+    },
+    "pools": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "profitFactor": {
+          "description": "Reserved for Rogue Trader — not populated by any current adapter."
+        }
+      }
+    },
+    "armour": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "head": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Armour points by hit location."
+        },
+        "body": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Armour points by hit location."
+        },
+        "leftArm": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Armour points by hit location."
+        },
+        "rightArm": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Armour points by hit location."
+        },
+        "leftLeg": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Armour points by hit location."
+        },
+        "rightLeg": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Armour points by hit location."
+        }
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "kind",
+    "name",
+    "characteristics"
+  ],
+  "additionalProperties": true
+}

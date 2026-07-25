@@ -1,24 +1,26 @@
 /**
- * Character schema v2 (ROADMAP.md Phase 2 Lane A; upgraded per
- * CHARACTER_MODEL.md §4 — modeled on the Foundry dark-heresy-3rd-edition
- * acolyte Actor).
+ * Character schema v4 (pipeline plan docs/ROLL20_CHARACTER_PIPELINE_PLAN Part 2
+ * + builder addendum docs/CHARACTER_BUILDER_PLAN_2026-07-24.md Part 2.2, both
+ * in the monorepo; upgraded per CHARACTER_MODEL.md).
  *
  * THE canonical, versioned character document — the interchange format between
- * the import adapters (tools/*), the Roll/Characters UI, and the Foundry Actor
- * importer (foundry/dh2-roll-vm).
+ * the import adapters (tools/*), the Roll/Characters/Builder UI, and the
+ * Foundry Actor importer (foundry/dh2-roll-vm; the rogue-trader-2e actor
+ * DataModel is generated from CHARACTER_FIELDS).
  *
- * v2 additions (all optional — v1 documents migrate losslessly):
- * - characteristics are OBJECTS `{ base, advances, modifiers[] }` with the
- *   total DERIVED (base + 5×advances + Σmodifiers) — the Foundry shape.
- * - skills, including specialist skills (Scholastic Lore (X), …) with a
- *   per-speciality advances map; targets derived RAW (untrained = ½
- *   characteristic; known/+10/+20/+30 at advances 1–4).
- * - MODIFIERS BY SOURCE everywhere a number can be adjusted: a modifier is
- *   `{ value, source?, note? }` — e.g. `{ value: 20, source: "Good Bionic
- *   Eyes" }` on Tech-Use ties the +20 to the item that grants it.
- * - xp tracking: total + spent + a per-purchase ledger.
- * - aptitudes `[{ name, source? }]` and the Emperor's Tarot
- *   (`tarot { card, text, effect }` ⇄ Foundry bio.divination).
+ * v2: characteristics as `{ base, advances, modifiers[] }` (total DERIVED:
+ *   base + 5×advances + Σmodifiers); skills incl. specialist specialities;
+ *   MODIFIERS BY SOURCE everywhere (`{ value, source?, note? }`); xp ledger;
+ *   aptitudes; the Emperor's Tarot.
+ * v3: equipment items (weights + equip toggle), fatigue, psy, psychicPowers,
+ *   insanity/corruption, critical wounds, amputations.
+ * v4 (additive): `origin { homeworld, background, role, eliteAdvances[] }`
+ *   (refs-capable — members are `{ name, ref? }`), `influence`,
+ *   `weaponTrainings[]`, `cybernetics[]`, `extensions{}` (opaque namespaces),
+ *   privacy-guarded `player`, plus the BUILDER ADDENDUM: typed xp-ledger
+ *   entries (`kind`/`ref`/`rank`/`matches`) and uniform `{ name, ref?, dsl? }`
+ *   talent/trait/psychic-power entries. `ref` is a corpus slug
+ *   (`dh2:<type>:<snake_id>`) that resolves mechanically to compendium UUIDs.
  *
  * Single-sourced: the FIELDS table drives validateCharacter and
  * /api/character/schema; fields map 1:1 onto Foundry DataFields (Phase 8).
@@ -26,7 +28,12 @@
  */
 import { canonList, normName } from './rules/_util.mjs';
 
-export const CHARACTER_SCHEMA_VERSION = 3;
+export const CHARACTER_SCHEMA_VERSION = 4;
+
+/** Typed xp-ledger purchase kinds (builder addendum; unknown kinds WARN). */
+export const LEDGER_KINDS = ['characteristic', 'skill', 'talent', 'psychic_power', 'psy_rating', 'elite_advance', 'other'];
+/** Corpus-ref shape: `<system>:<type>:<snake_id>` (nonconforming refs WARN). */
+const REF_PATTERN = /^[a-z0-9_]+:[a-z0-9_]+:[a-z0-9_]+$/;
 
 const CHARACTERISTIC_KEYS = ['ws', 'bs', 's', 't', 'ag', 'int', 'per', 'wp', 'fel'];
 const UNNATURAL_KEYS = ['ws', 'bs', 's', 't', 'ag'];
@@ -117,9 +124,23 @@ export const CHARACTER_FIELDS = [
     { path: 'skills.<Name>', type: '{ advances 0–4, characteristic?, modifiers[], specialities? }', required: false, summary: `A DH2 skill (canonical names: ${Object.keys(SKILL_DEFS).join(', ')}). Target derived RAW: untrained = ½ characteristic; advances 1–4 → +0/+10/+20/+30 (use skillTarget).` },
     { path: 'skills.<Name>.specialities.<X>', type: '{ advances 0–4, modifiers[] }', required: false, summary: 'Specialist-skill entries — Scholastic Lore (Occult), Operate (Surface), … Only valid on specialist skills.' },
     { path: 'skills.<Name>.modifiers[]', type: '{ value, source?, note? }', required: false, summary: 'Skill modifiers BY SOURCE — e.g. { value: 20, source: "Good Bionic Eyes" } on Tech-Use.' },
-    { path: 'xp', type: '{ total, spent?, ledger[] }', required: false, summary: 'Experience: earned total, spent (defaults to the ledger sum), and the per-purchase ledger.' },
-    { path: 'xp.ledger[]', type: '{ name, cost, source?, date? }', required: false, summary: 'One purchase — "Mighty Shot", 600, "Core RB".' },
-    { path: 'aptitudes[]', type: 'string | { name, source? }', required: false, summary: 'Aptitudes with their origin (Homeworld / Background / Role / …).' },
+    { path: 'xp', type: '{ total, spent?, ledger[] }', required: false, summary: 'Experience: earned total (starting grant included), spent (defaults to the ledger sum), and the per-purchase ledger.' },
+    { path: 'xp.ledger[]', type: '{ name, cost, kind?, ref?, rank?, matches?, source?, date? }', required: false, summary: 'One purchase — "Mighty Shot", 600. Typed fields (builder addendum) make it a cost-audited advancement record; untyped legacy entries stay valid.' },
+    { path: 'xp.ledger[].kind', type: LEDGER_KINDS.join(' | '), required: false, summary: 'What kind of advance was bought (unknown kinds warn, for forward compatibility).' },
+    { path: 'xp.ledger[].ref', type: 'string', required: false, summary: 'What was bought: a corpus ref (dh2:<type>:<snake_id>), a characteristic key (ws…fel), or a skill name (+speciality).' },
+    { path: 'xp.ledger[].rank', type: 'int ≥ 1', required: false, summary: 'Advance rank purchased (characteristic 1–5 Simple→Expert, skill 1–4; psy rating = the new rating).' },
+    { path: 'xp.ledger[].matches', type: 'int 0–2', required: false, summary: 'Aptitude matches at purchase time — the cost audit trail.' },
+    { path: 'aptitudes[]', type: 'string | { name, source? }', required: false, summary: 'Aptitudes with their origin (source ∈ homeworld|background|role|elite_advance|extra; legacy casings normalize at migration).' },
+    { path: 'origin', type: '{ homeworld?, background?, role?, eliteAdvances[] }', required: false, summary: 'Character-creation origin. Members are { name, ref? } or null; bare strings normalize to { name } at migration. ⇄ Foundry bio.homeWorld/background/role/elite.' },
+    { path: 'origin.eliteAdvances[]', type: '{ name, ref?, cost? }', required: false, summary: 'Elite advances taken (Psyker, Untouchable, …) with their XP cost.' },
+    { path: 'influence', type: 'int ≥ 0', required: false, summary: 'Influence (the DH2 social resource-characteristic). ⇄ Foundry characteristics.influence.base.' },
+    { path: 'weaponTrainings[]', type: 'string[]', required: false, summary: 'Weapon Training groups held ("Bolt", "Las", …) — mapped to Weapon Training (X) talent Items in Foundry.' },
+    { path: 'cybernetics[]', type: 'string | { name, location?, notes?, ref?, dsl? }', required: false, summary: 'Installed cybernetics (⇄ Foundry cybernetic Items).' },
+    { path: 'extensions', type: '{ <namespace>: any }', required: false, summary: 'Opaque campaign extensions (Dramatic Moments, builder wizard state under extensions.builder, …). Preserved verbatim, never validated.' },
+    { path: 'player', type: 'string', required: false, summary: 'Player attribution — PRIVACY-GUARDED: validation warns unless { allowPlayer: true }; omitted by default (pipeline decision D9).' },
+    { path: 'pools.profitFactor', type: '(reserved)', required: false, summary: 'Reserved for Rogue Trader — not populated by any current adapter.' },
+    { path: '<talents|traits|psychicPowers>[].ref', type: 'string "dh2:<type>:<snake_id>"', required: false, summary: 'Corpus ref — resolves mechanically to compendium UUIDs (deterministic slug ids; no name-matching).' },
+    { path: '<talents|traits|psychicPowers>[].dsl', type: 'string (DSL source)', required: false, summary: 'Entry-granted rules in the DSL (custom talents/traits/powers) — compiled into the customRules layer at roll time; portable between the Pages UI and Foundry.' },
     { path: 'tarot', type: '{ card?, text?, effect? }', required: false, summary: "The Emperor's Tarot / divination drawn at creation (⇄ Foundry bio.divination)." },
     { path: 'weapons[].weight', type: 'number ≥ 0 (kg)', required: false, summary: 'Weapon weight — counts toward encumbrance while equipped.' },
     { path: 'weapons[].equipped', type: 'bool (default true)', required: false, summary: 'On the character (counts weight; available in combat). false = stored.' },
@@ -141,8 +162,8 @@ export const CHARACTER_FIELDS = [
     { path: 'armour.<head|body|leftArm|rightArm|leftLeg|rightLeg>', type: 'int ≥ 0', required: false, summary: 'Armour points by hit location.' },
     { path: 'wounds', type: '{ max, current }', required: false, summary: 'Wound track (carried, not yet consumed by the attack loop).' },
     { path: 'fate', type: '{ max, current }', required: false, summary: 'Fate points (carried, not yet consumed).' },
-    { path: 'talents', type: '(string | {name, level})[]', required: false, summary: 'Talent list. "Name (X)" strings or {name, level} objects.' },
-    { path: 'traits', type: '(string | {name, level})[]', required: false, summary: 'Trait list (innate DH2.0 traits, e.g. Brutal Charge (3), Daemonic (4)).' },
+    { path: 'talents', type: '(string | {name, level?, ref?, dsl?})[]', required: false, summary: 'Talent list. "Name (X)" strings or {name, …} objects (ref/dsl per the builder addendum).' },
+    { path: 'traits', type: '(string | {name, level?, ref?, dsl?})[]', required: false, summary: 'Trait list (innate DH2.0 traits, e.g. Brutal Charge (3), Daemonic (4)). Traits are granted, never XP-purchased.' },
     { path: 'conditions', type: '(string | {name, severity, duration, location})[]', required: false, summary: 'Active Conditions (Stunned, On Fire, …).' },
     { path: 'circumstances', type: '(string | {name, severity})[]', required: false, summary: 'Environmental Circumstances (Darkness, Haywire Field, …).' },
     { path: 'weapons[]', type: 'weapon', required: false, summary: 'Weapon profiles (see weapon fields).' },
@@ -187,6 +208,11 @@ export function emptyCharacter(name = 'New Character') {
         armourItems: [],
         gear: [],
         field: { rating: 0, overloadMax: 0 },
+        origin: { homeworld: null, background: null, role: null, eliteAdvances: [] },
+        influence: 0,
+        weaponTrainings: [],
+        cybernetics: [],
+        extensions: {},
     };
 }
 
@@ -292,11 +318,21 @@ const isNamedEntry = (v) => typeof v === 'string' || (v && typeof v === 'object'
  * Validate a character document. Returns { ok, errors, warnings } where each
  * entry is { path, message } — field-level, for the importer UI.
  * Unknown keys are warnings (forward compatibility), not errors.
+ * `opts.allowPlayer` suppresses the `player` privacy warning (decision D9).
  */
-export function validateCharacter(doc) {
+export function validateCharacter(doc, opts = {}) {
     const errors = [], warnings = [];
     const err = (path, message) => errors.push({ path, message });
     const warn = (path, message) => warnings.push({ path, message });
+    // ref/dsl checks shared by named entries (talents/traits/powers/cybernetics/origin members)
+    const checkRefDsl = (entry, path) => {
+        if (!entry || typeof entry !== 'object') return;
+        if (entry.ref !== undefined) {
+            if (typeof entry.ref !== 'string') err(`${path}.ref`, 'String ref required (dh2:<type>:<snake_id>)');
+            else if (!REF_PATTERN.test(entry.ref)) warn(`${path}.ref`, `Ref "${entry.ref}" does not match <system>:<type>:<snake_id>`);
+        }
+        if (entry.dsl !== undefined && typeof entry.dsl !== 'string') err(`${path}.dsl`, 'String (DSL source) required');
+    };
 
     if (!doc || typeof doc !== 'object') return { ok: false, errors: [{ path: '', message: 'Not an object' }], warnings };
 
@@ -364,7 +400,15 @@ export function validateCharacter(doc) {
             if (doc.xp.ledger !== undefined) {
                 if (!Array.isArray(doc.xp.ledger)) err('xp.ledger', 'Must be an array');
                 else doc.xp.ledger.forEach((e, i) => {
-                    if (!e || typeof e !== 'object' || typeof e.name !== 'string' || !isNonNegInt(e.cost)) err(`xp.ledger[${i}]`, '{ name: string, cost: int ≥ 0, source?, date? } required');
+                    if (!e || typeof e !== 'object' || typeof e.name !== 'string' || !isNonNegInt(e.cost)) { err(`xp.ledger[${i}]`, '{ name: string, cost: int ≥ 0, kind?, ref?, rank?, matches?, source?, date? } required'); return; }
+                    // typed fields (builder addendum) — all optional
+                    if (e.kind !== undefined) {
+                        if (typeof e.kind !== 'string') err(`xp.ledger[${i}].kind`, 'String required');
+                        else if (!LEDGER_KINDS.includes(e.kind)) warn(`xp.ledger[${i}].kind`, `Unknown kind "${e.kind}" (known: ${LEDGER_KINDS.join(', ')})`);
+                    }
+                    if (e.ref !== undefined && typeof e.ref !== 'string') err(`xp.ledger[${i}].ref`, 'String required');
+                    if (e.rank !== undefined && (!isInt(e.rank) || e.rank < 1)) err(`xp.ledger[${i}].rank`, 'Integer ≥ 1 required');
+                    if (e.matches !== undefined && (!isInt(e.matches) || e.matches < 0 || e.matches > 2)) err(`xp.ledger[${i}].matches`, 'Integer 0–2 required');
                 });
             }
         }
@@ -433,6 +477,7 @@ export function validateCharacter(doc) {
         else doc.psychicPowers.forEach((p, i) => {
             if (!isNamedEntry(p)) { err(`psychicPowers[${i}]`, 'Must be a string or { name, … }'); return; }
             if (p && typeof p === 'object') {
+                checkRefDsl(p, `psychicPowers[${i}]`);
                 if (p.equipped !== undefined && typeof p.equipped !== 'boolean') err(`psychicPowers[${i}].equipped`, 'Boolean required');
                 if (p.cost !== undefined && !isNonNegInt(p.cost)) err(`psychicPowers[${i}].cost`, 'Non-negative integer required');
                 for (const f of ['discipline', 'notes']) if (p[f] !== undefined && typeof p[f] !== 'string') err(`psychicPowers[${i}].${f}`, 'String required');
@@ -500,12 +545,15 @@ export function validateCharacter(doc) {
         if (typeof track !== 'object') { err(trackName, 'Must be { max, current }'); continue; }
         for (const p of ['max', 'current']) if (track[p] !== undefined && !isInt(track[p])) err(`${trackName}.${p}`, 'Integer required');
     }
-    // rule lists
+    // rule lists (talents/traits may carry ref/dsl per the builder addendum)
     for (const listName of ['talents', 'traits', 'conditions', 'circumstances']) {
         const list = doc[listName];
         if (list === undefined) continue;
         if (!Array.isArray(list)) { err(listName, 'Must be an array'); continue; }
-        list.forEach((entry, i) => { if (!isNamedEntry(entry)) err(`${listName}[${i}]`, 'Must be a string or { name, … } object'); });
+        list.forEach((entry, i) => {
+            if (!isNamedEntry(entry)) { err(`${listName}[${i}]`, 'Must be a string or { name, … } object'); return; }
+            if (listName === 'talents' || listName === 'traits') checkRefDsl(entry, `${listName}[${i}]`);
+        });
     }
     // weapons
     if (doc.weapons !== undefined) {
@@ -538,6 +586,57 @@ export function validateCharacter(doc) {
         if (typeof doc.field !== 'object') err('field', 'Must be { rating, overloadMax }');
         else for (const p of ['rating', 'overloadMax']) if (doc.field[p] !== undefined && !isNonNegInt(doc.field[p])) err(`field.${p}`, 'Non-negative integer required');
     }
+
+    // --- v4 blocks -----------------------------------------------------------
+    // origin (members: null | string (pre-migration) | { name, ref? })
+    if (doc.origin !== undefined) {
+        if (!doc.origin || typeof doc.origin !== 'object' || Array.isArray(doc.origin)) err('origin', 'Must be { homeworld?, background?, role?, eliteAdvances[] }');
+        else {
+            for (const k of ['homeworld', 'background', 'role']) {
+                const v = doc.origin[k];
+                if (v === undefined || v === null) continue;
+                if (!isNamedEntry(v)) { err(`origin.${k}`, 'Must be null, a string, or { name, ref? }'); continue; }
+                checkRefDsl(v, `origin.${k}`);
+            }
+            if (doc.origin.eliteAdvances !== undefined) {
+                if (!Array.isArray(doc.origin.eliteAdvances)) err('origin.eliteAdvances', 'Must be an array');
+                else doc.origin.eliteAdvances.forEach((e, i) => {
+                    if (!isNamedEntry(e)) { err(`origin.eliteAdvances[${i}]`, 'Must be a string or { name, ref?, cost? }'); return; }
+                    checkRefDsl(e, `origin.eliteAdvances[${i}]`);
+                    if (e && typeof e === 'object' && e.cost !== undefined && !isNonNegInt(e.cost)) err(`origin.eliteAdvances[${i}].cost`, 'Non-negative integer required');
+                });
+            }
+        }
+    }
+    // influence
+    if (doc.influence !== undefined && !isNonNegInt(doc.influence)) err('influence', 'Non-negative integer required');
+    // weapon trainings
+    if (doc.weaponTrainings !== undefined) {
+        if (!Array.isArray(doc.weaponTrainings)) err('weaponTrainings', 'Must be an array of strings');
+        else doc.weaponTrainings.forEach((w, i) => { if (typeof w !== 'string' || !w.trim()) err(`weaponTrainings[${i}]`, 'Non-empty string required'); });
+    }
+    // cybernetics
+    if (doc.cybernetics !== undefined) {
+        if (!Array.isArray(doc.cybernetics)) err('cybernetics', 'Must be an array');
+        else doc.cybernetics.forEach((c, i) => {
+            if (!isNamedEntry(c)) { err(`cybernetics[${i}]`, 'Must be a string or { name, location?, notes?, ref?, dsl? }'); return; }
+            if (c && typeof c === 'object') {
+                checkRefDsl(c, `cybernetics[${i}]`);
+                for (const f of ['location', 'notes']) if (c[f] !== undefined && typeof c[f] !== 'string') err(`cybernetics[${i}].${f}`, 'String required');
+            }
+        });
+    }
+    // extensions (opaque namespaces — object shape only, contents never validated)
+    if (doc.extensions !== undefined && (!doc.extensions || typeof doc.extensions !== 'object' || Array.isArray(doc.extensions))) {
+        err('extensions', 'Must be an object of { <namespace>: any }');
+    }
+    // player (privacy guard, pipeline decision D9)
+    if (doc.player !== undefined) {
+        if (typeof doc.player !== 'string') err('player', 'String required');
+        else if (!opts.allowPlayer) warn('player', 'Player attribution present — omitted by default for privacy (pass { allowPlayer: true } to accept)');
+    }
+    // pools (reserved for RT)
+    if (doc.pools !== undefined && (!doc.pools || typeof doc.pools !== 'object' || Array.isArray(doc.pools))) err('pools', 'Must be an object (reserved)');
 
     return { ok: errors.length === 0, errors, warnings };
 }
@@ -582,7 +681,41 @@ export function migrateCharacter(doc) {
             if (d.wounds && typeof d.wounds === 'object') d.wounds = { critical: 0, ...d.wounds };
             d.schemaVersion = 3;
             // fallthrough:
-        case 3:
+        case 3: {
+            // v3 → v4: origin (strings normalize to { name }), influence,
+            // weapon trainings, cybernetics, extensions — all additive.
+            // Aptitude-source casings normalize to the builder enum.
+            const normMember = (v) => (v == null ? null : (typeof v === 'string' ? { name: v } : { ...v }));
+            const o = (d.origin && typeof d.origin === 'object' && !Array.isArray(d.origin)) ? d.origin : {};
+            d.origin = {
+                homeworld: normMember(o.homeworld ?? null),
+                background: normMember(o.background ?? null),
+                role: normMember(o.role ?? null),
+                eliteAdvances: Array.isArray(o.eliteAdvances)
+                    ? o.eliteAdvances.map((e) => (typeof e === 'string' ? { name: e } : e))
+                    : [],
+            };
+            d.influence ??= 0;
+            d.weaponTrainings ??= [];
+            d.cybernetics ??= [];
+            d.extensions ??= {};
+            if (Array.isArray(d.aptitudes)) {
+                const canonSource = (s) =>
+                    /^home\s*world$/i.test(s) ? 'homeworld'
+                    : /^(bg|background)$/i.test(s) ? 'background'
+                    : /^role$/i.test(s) ? 'role'
+                    : /^elite([\s_-]?advance)?s?$/i.test(s) ? 'elite_advance'
+                    : null;
+                d.aptitudes = d.aptitudes.map((a) => {
+                    if (!a || typeof a !== 'object' || typeof a.source !== 'string') return a;
+                    const c = canonSource(a.source.trim());
+                    return c ? { ...a, source: c } : a;
+                });
+            }
+            d.schemaVersion = 4;
+            // fallthrough:
+        }
+        case 4:
             break;
         default:
             break;   // newer than us — validateCharacter warns

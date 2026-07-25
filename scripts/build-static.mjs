@@ -17,6 +17,8 @@
  */
 import { build } from 'esbuild';
 import { readFileSync, writeFileSync, mkdirSync, rmSync, readdirSync, copyFileSync, statSync } from 'fs';
+import { buildJsonSchema } from '../tools/generate-json-schema.mjs';
+import { CHARACTER_SCHEMA_VERSION } from '../api/lib/character-schema.mjs';
 import { fileURLToPath } from 'url';
 import { dirname, join, resolve } from 'path';
 import { ruleSources, weaponsJson, RULE_FILES } from '../api/lib/rules/sources.mjs';
@@ -80,6 +82,9 @@ for (const name of readdirSync(uiDir)) {
 
 // ---- 4. Pages housekeeping -------------------------------------------------
 writeFileSync(join(outDir, '.nojekyll'), '');
+// docs/ was wiped above — regenerate the JSON Schema artifact into the build
+writeFileSync(join(outDir, `character.schema.v${CHARACTER_SCHEMA_VERSION}.json`),
+    JSON.stringify(buildJsonSchema(), null, 2) + '\n');
 
 const files = readdirSync(outDir);
 const bundleKb = (statSync(join(outDir, 'dh2-engine.js')).size / 1024).toFixed(0);

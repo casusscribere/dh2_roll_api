@@ -12,7 +12,8 @@
     "export:packs": "node scripts/export-packs.mjs",
     "import:campaign": "node tools/import-campaign.mjs",
     "deploy:foundry": "node scripts/build-foundry.mjs && node scripts/export-packs.mjs && node scripts/deploy-foundry.mjs",
-    "serve:static": "node scripts/serve-static.mjs"
+    "serve:static": "node scripts/serve-static.mjs",
+    "schema:json": "node tools/generate-json-schema.mjs"
   },
   "dependencies": {
     "express": "^4.19.0"

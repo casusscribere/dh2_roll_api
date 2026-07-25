@@ -233,7 +233,43 @@ exists (§8 step 4); only the dropdown plumbing lands early (step 0-capable).
 data would be published by the GitHub Pages deploy; D10 preset freshness —
 regenerate on demand vs at build time.
 
+## 6c. Schema v4 (SHIPPED 2026-07-24) — origin/influence/trainings/cybernetics/extensions + builder addendum
+
+v4 landed per the monorepo's `docs/ROLL20_CHARACTER_PIPELINE_PLAN_2026-07-23.md` Part 2 /
+Task 2.1 and `docs/CHARACTER_BUILDER_PLAN_2026-07-24.md` Part 2.2 (the builder addendum,
+folded into the same bump per decision D-G). All additive; `migrateCharacter` v3→v4 defaults
+everything and normalizes legacy shapes.
+
+- `origin { homeworld, background, role, eliteAdvances[] }` — members `{ name, ref? }` or
+  null; bare strings normalize to `{ name }` at migration. → Foundry
+  `bio.homeWorld/background/role/elite` + verbatim copy in module flags.
+- `influence` (int) → Foundry `characteristics.influence.base` (10th characteristic).
+- `weaponTrainings[]` (strings) → `Weapon Training (X)` talent Items.
+- `cybernetics[]` (string | `{ name, location?, notes?, ref?, dsl? }`) → cybernetic Items.
+- `extensions { <namespace>: any }` — opaque, preserved, never validated (house content;
+  the builder wizard parks state under `extensions.builder`).
+- `player` — privacy-guarded: `validateCharacter` warns unless `{ allowPlayer: true }` (D9).
+- **Builder addendum**: typed `xp.ledger[]` fields `kind` (enum, unknown warns) / `ref` /
+  `rank` / `matches` (0–2) — the ledger becomes a cost-audited advancement record; and
+  uniform `{ name, ref?, dsl? }` entries on talents/traits/psychicPowers. `ref` is a corpus
+  slug (`dh2:<type>:<snake_id>`) resolving mechanically to compendium UUIDs; `dsl` is
+  entry-granted rules compiled into the per-call `customRules` layer (portable custom
+  content — identical rolls in the Pages UI and Foundry).
+- Generated artifact: `docs/character.schema.v4.json` (draft-07, from CHARACTER_FIELDS via
+  `npm run schema:json`; regenerated into every `build:static`; drift-guarded by
+  `schema-v4.test.mjs`). Aptitude-source casings normalize to
+  `homeworld|background|role|elite_advance` at migration.
+- Rulebook fact (corpus `data/advancement.json`, CB-0 extraction): characteristic advances
+  have **5 ranks** (Simple→Expert; matches the schema's `advances 0–5`), skills 4; there are
+  **19 aptitudes** (10 named + 9 characteristic-based).
+
 ## 7. Open decisions (answer before implementation)
+
+> Status 2026-07-24: **resolved by v4** — #1 count ✓ (unchanged), #3 full ledger ✓ (now
+> typed), #4 cybernetics first-class ✓, #7 `pools.profitFactor` reserved ✓, #8
+> `weaponTrainings` enumerated ✓. #9/#10 (preset privacy/freshness) remain open and now
+> also govern the chargen data pack (builder plan decision D-H). Original text kept below
+> for the record.
 
 1. **Characteristic advances**: store count (sheet) with system-defined step
    (+5), or store the derived value? *Proposal: count.*
