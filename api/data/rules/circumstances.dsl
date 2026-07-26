@@ -43,3 +43,32 @@ circumstance "Haywire Field" {
   when has_circumstance("Haywire Field") and is_ranged and not has_quality("Primitive") and circumstance_severity("Haywire Field", 0) >= 4
     then add modifier "haywire field" = -60
 }
+
+# --- Firing into Melee (DH2 core p.229) --------------------------------------
+# "Ballistic Skill tests made to hit a target engaged in melee combat suffer a
+# -20 penalty. If one or more characters engaged in the melee are Stunned,
+# Helpless, or Unaware, this penalty is ignored." The exemption is GM-side:
+# simply do not flag the circumstance when it applies. Injected at priority 10
+# so the Target Selection talent (talents.dsl) can cancel it at 100.
+circumstance "Firing into Melee" {
+  meta { page 229 }
+  on MODIFIERS
+  priority 10
+  when has_circumstance("Firing into Melee") and is_ranged
+  then add modifier "firing_into_melee" = -20
+}
+
+# --- Baneful Presence (X) (DH2 core p.135) -----------------------------------
+# A TRAIT of a daemonic foe, modelled as a circumstance on the SUFFERER's tests
+# because the engine has no aura/range model: "All characters suffer a -10
+# penalty to Willpower tests taken while within X metres of the creature."
+# The GM flags the circumstance on Willpower-based tests rolled inside the
+# radius — the Willpower-based test tags in use are "Willpower", "Fear",
+# "Pinning". Cancelled outright by Iron Faith (talents.dsl, Enemies Beyond p.61).
+circumstance "Baneful Presence" {
+  meta { page 135 }
+  on test.MODIFIERS
+  priority 10
+  when has_circumstance("Baneful Presence") and (is_test("Willpower") or is_test("Fear") or is_test("Pinning"))
+  then add modifier "baneful presence" = -10
+}
