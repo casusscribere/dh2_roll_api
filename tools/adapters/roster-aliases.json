@@ -1,0 +1,8 @@
+{
+  "_comment": "Hand-maintained identity map (decision D-B): <roll20 name or character id> -> <xlsx roster id>. Used by tools/merge-characters.mjs when normalized-name matching fails. Keys starting with _ are ignored.",
+  "Jack": "jack-balvdin-first-officer",
+  "Talvdin": "baron-talvdin-hourace-horp",
+  "Reco Tamarin": "sgt-reco-tamarin-of-the-401st-trailblaizer-unit",
+  "Ui'y'eldi": "shas-ui-kai-ta-ran-y-eldi",
+  "Yuri": "uriel-yuri"
+}
