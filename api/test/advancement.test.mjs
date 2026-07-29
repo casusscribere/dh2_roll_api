@@ -181,3 +181,19 @@ test('dispatch routes: /api/chargen/advances, /advance, /origin, /validate', asy
     const bad = await dispatch('POST', '/api/chargen/advance', { doc, advance: { ...ws1, rank: 4 } });
     assert.equal(bad.status, 400);
 });
+
+test('applyAdvance accepts the compact scalar characteristic form (normalizes on write)', () => {
+    // Legal v4 shorthand: characteristics.<k> as a bare int. /api/chargen/advances
+    // lists advances for it, so /advance must be able to apply them too.
+    const doc = {
+        schemaVersion: 4, kind: 'dh2.character', name: 'Scalar',
+        characteristics: { ws: 30, bs: 35, s: 30, t: 30, ag: 30, int: 30, per: 30, wp: 30, fel: 30 },
+        aptitudes: ['General', 'Ballistic Skill', 'Finesse'],
+        xp: { total: 1000, ledger: [] }
+    };
+    const advances = listAvailableAdvances(doc, PACK);
+    const bs1 = advances.find(a => a.kind === 'characteristic' && a.ref === 'bs');
+    const { doc: next } = applyAdvance(doc, PACK, bs1);
+    assert.equal(next.characteristics.bs.base, 35);
+    assert.equal(next.characteristics.bs.advances, 1);
+});

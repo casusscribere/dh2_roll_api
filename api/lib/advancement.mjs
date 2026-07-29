@@ -254,7 +254,10 @@ export function applyAdvance(doc, pack, advance, { confirmed = false } = {}) {
     // gate so the user sees the more specific error; d is a discardable clone.
     switch (advance.kind) {
         case 'characteristic': {
-            const c = d.characteristics[advance.ref];
+            let c = d.characteristics[advance.ref];
+            if (typeof c === 'number') {                     // compact scalar form → canonical
+                c = d.characteristics[advance.ref] = { base: c, advances: 0, modifiers: [] };
+            }
             if (!c) throw new Error(`unknown characteristic "${advance.ref}"`);
             if ((c.advances ?? 0) + 1 !== advance.rank) throw new Error(`rank ${advance.rank} skips (current advances: ${c.advances ?? 0})`);
             c.advances = advance.rank;

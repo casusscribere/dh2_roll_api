@@ -283,3 +283,35 @@ test('GET unknown route returns 404', async () => {
     const res = await fetch(`${base}/api/does-not-exist`);
     assert.equal(res.status, 404);
 });
+
+// --- /api/chargen/* over HTTP (the Builder page's transport) -----------------
+test('GET /api/chargen/pack and POST /api/chargen/{advances,advance,validate,origin} are served over Express', async () => {
+    const res = await fetch(`${base}/api/chargen/pack`);
+    assert.equal(res.status, 200);
+    const pack = await res.json();
+    assert.ok(pack.talents.length > 0);
+
+    const doc = {
+        schemaVersion: 4, kind: 'dh2.character', name: 'HTTP Chargen',
+        characteristics: { ws: 30, bs: 35, s: 30, t: 30, ag: 30, int: 30, per: 30, wp: 30, fel: 30 },
+        aptitudes: ['General', 'Ballistic Skill', 'Finesse'],
+        xp: { total: 1000, ledger: [] }
+    };
+    const adv = await postJson('/api/chargen/advances', { doc });
+    assert.equal(adv.status, 200);
+    const { advances, xp } = await adv.json();
+    assert.equal(xp.remaining, 1000);
+    const bs1 = advances.find(a => a.kind === 'characteristic' && a.ref === 'bs');
+
+    const buy = await postJson('/api/chargen/advance', { doc, advance: bs1 });
+    assert.equal(buy.status, 200);
+    const bought = await buy.json();
+    assert.equal(bought.doc.characteristics.bs.advances, 1);
+
+    const val = await postJson('/api/chargen/validate', { doc: bought.doc });
+    assert.equal(val.status, 200);
+    assert.equal(typeof (await val.json()).ok, 'boolean');
+
+    const origin = await postJson('/api/chargen/origin', { doc, homeworldRef: pack.homeworlds[0].ref });
+    assert.equal(origin.status, 200);
+});

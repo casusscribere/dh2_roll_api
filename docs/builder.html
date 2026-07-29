@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="dh2-engine.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DH2 Roll Servitor — Builder</title>
+<link rel="stylesheet" href="style.css">
+<style>
+/* Builder: XP header strip → grouped advance panels → ledger. House theme. */
+.xpstrip { display:flex; gap:.6rem; flex-wrap:wrap; margin-bottom:.8rem; }
+.xptile { border:1px solid var(--border); border-radius:4px; padding:.35rem .9rem; text-align:center; background:#0e0c09; }
+.xptile .xv { font-size:1.15rem; color:var(--gold); }
+.xptile .xl { font-size:.65rem; color:var(--dim); text-transform:uppercase; letter-spacing:1px; }
+.advgroup { border:1px solid var(--border); border-radius:4px; background:var(--panel); margin-bottom:.7rem; }
+.advgroup > h3 { margin:0; padding:.4rem .7rem; color:var(--gold); font-variant:small-caps; letter-spacing:1px; font-size:.92rem; border-bottom:1px solid var(--border); cursor:pointer; }
+.advgroup > h3 .count { color:var(--dim); font-size:.75rem; margin-left:.4rem; }
+.advrows { padding:.3rem .5rem .5rem; }
+.advrow { display:flex; align-items:center; gap:.5rem; padding:.22rem .3rem; border-bottom:1px dotted #2a241c; font-size:.86rem; }
+.advrow:last-child { border-bottom:none; }
+.advrow .aname { flex:1; }
+.advrow.unaffordable .aname, .advrow.unaffordable .cost { color:var(--dim); }
+.advrow .cost { color:var(--gold); min-width:4.2rem; text-align:right; font-family:var(--mono); }
+.badge { border:1px solid var(--border); border-radius:3px; padding:0 .35rem; font-size:.68rem; color:var(--dim); white-space:nowrap; }
+.badge.match2 { color:#7ec07e; border-color:#3c5a3c; }
+.badge.warn { color:var(--red); border-color:var(--red); cursor:help; }
+.advrow button { width:auto; margin:0; padding:.15rem .7rem; font-size:.78rem; }
+.advrow button:disabled { background:#3a3226; color:#6b5f4a; cursor:not-allowed; }
+.ledger { width:100%; border-collapse:collapse; font-size:.84rem; }
+.ledger th { text-align:left; color:var(--dim); font-size:.7rem; text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid var(--border); padding:.25rem .4rem; }
+.ledger td { padding:.22rem .4rem; border-bottom:1px dotted #2a241c; }
+.ledger td.c { text-align:right; font-family:var(--mono); color:var(--gold); }
+.vreport { font-size:.82rem; margin-top:.5rem; }
+.vreport .err { color:var(--red); }
+.vreport .wrn { color:#c0a05e; }
+.hint { color:var(--dim); font-size:.8rem; font-style:italic; }
+</style>
+</head>
+<body>
+<nav>
+  <a class="brand" href="index.html">DH2 Roll Servitor</a>
+  <div class="links">
+    <a href="index.html">Home</a>
+    <a href="roll.html">Roll</a>
+    <a href="characters.html">Characters</a>
+    <a href="builder.html" class="active">Builder</a>
+    <a href="rules.html">Rules</a>
+  </div>
+</nav>
+
+<h1>Character Builder</h1>
+<div class="sub">Advancement mode — spend XP on aptitude-costed advances straight from the rulebook tables (Tables 2-2/2-4/2-6). Pick a roster character or upload a character JSON; every purchase is applied and audited by the rules engine. Guided creation (the full wizard) arrives next phase.</div>
+
+<div class="grid" style="grid-template-columns:290px 1fr; align-items:start">
+  <fieldset>
+    <legend>Character</legend>
+    <label for="preset">Roster</label>
+    <select id="preset"><option value="">— pick a character —</option></select>
+    <label for="upload" style="margin-top:.7rem">…or upload character JSON</label>
+    <input type="file" id="upload" accept="application/json,.json">
+    <div id="charStatus" class="hint" style="margin-top:.6rem">No character loaded.</div>
+    <button id="saveBtn" class="minibtn" disabled>Save edits locally</button>
+    <button id="exportBtn" class="minibtn ghost" disabled>Download JSON</button>
+    <button id="validateBtn" class="minibtn ghost" disabled>Validate build</button>
+    <div id="vreport" class="vreport"></div>
+    <div id="handoff" class="hint" style="margin-top:.6rem"></div>
+  </fieldset>
+
+  <div>
+    <div class="xpstrip" id="xpstrip" hidden>
+      <div class="xptile"><div class="xv" id="xpTotal">0</div><div class="xl">XP total</div></div>
+      <div class="xptile"><div class="xv" id="xpSpent">0</div><div class="xl">Spent</div></div>
+      <div class="xptile"><div class="xv" id="xpRemaining">0</div><div class="xl">Remaining</div></div>
+      <button id="undoBtn" class="minibtn ghost" style="margin:auto 0 auto auto" disabled>Undo last purchase</button>
+    </div>
+
+    <div id="advances"></div>
+
+    <fieldset id="traitBox" hidden>
+      <legend>Grant a trait</legend>
+      <div class="hint">Traits are never purchased in DH2 — grants come from origins, elite advances, and the GM. This writes a <code>{name, ref}</code> entry with no XP cost.</div>
+      <div style="display:flex; gap:.5rem; align-items:end">
+        <div style="flex:1"><label for="traitSel">Trait</label><select id="traitSel"></select></div>
+        <button id="traitBtn" class="minibtn" style="margin:0 0 .1rem">Grant</button>
+      </div>
+    </fieldset>
+
+    <fieldset id="ledgerBox" hidden>
+      <legend>Experience ledger</legend>
+      <table class="ledger"><thead><tr><th>Purchase</th><th>Kind</th><th style="text-align:right">Cost</th></tr></thead>
+      <tbody id="ledgerRows"></tbody></table>
+    </fieldset>
+  </div>
+</div>
+
+<script src="char-store.js"></script>
+<script type="module">
+import { BuilderSession, groupAdvances } from './builder-core.mjs';
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+async function api(method, path, body) {
+    const r = await fetch(path, method === 'GET' ? undefined
+        : { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error ?? `HTTP ${r.status}`);
+    return data;
+}
+
+let session = null;
+let currentId = null;      // roster id when picked from the roster (CharStore key)
+let ROSTER = {};
+
+// ---- character loading -----------------------------------------------------
+
+async function loadRoster() {
+    try {
+        const d = await api('GET', '/api/characters');
+        for (const c of d.characters) {
+            ROSTER[c.id] = c;
+            $('preset').add(new Option(c.name + (CharStore.edited(c.id) ? ' ✎' : ''), c.id));
+        }
+    } catch (e) {
+        $('charStatus').textContent = `Roster unavailable: ${e.message}`;
+    }
+}
+
+async function openDoc(doc, id) {
+    currentId = id ?? null;
+    session = new BuilderSession({ doc, api });
+    $('charStatus').innerHTML = 'Loading pack…';
+    await session.load();
+    $('charStatus').innerHTML = `<span class="gold">${esc(session.doc.name ?? '(unnamed)')}</span>`
+        + (id && CharStore.edited(id) ? ' <span class="dim">(with your local edits)</span>' : '')
+        + (id ? '' : ' <span class="dim">(uploaded)</span>');
+    $('handoff').innerHTML = id
+        ? `Open in <a href="characters.html">Characters</a> · <a href="roll.html">Roll</a> — both read your saved local edits for this character.`
+        : 'Uploaded characters can be downloaded after editing; roster save/hand-off needs a roster character.';
+    $('saveBtn').disabled = !id;
+    $('exportBtn').disabled = false;
+    $('validateBtn').disabled = false;
+    $('vreport').innerHTML = '';
+    render();
+}
+
+$('preset').addEventListener('change', async (e) => {
+    const id = e.target.value;
+    if (!id) return;
+    const baseline = ROSTER[id].doc;
+    await openDoc(CharStore.effective(id, baseline), id);
+});
+
+$('upload').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+        const doc = JSON.parse(await file.text());
+        await openDoc(doc, null);          // engine migrates + validates on every call
+        const report = await session.validate();
+        showReport(report);
+    } catch (err) {
+        $('charStatus').textContent = `Could not load file: ${err.message}`;
+    }
+});
+
+// ---- rendering -------------------------------------------------------------
+
+function render() {
+    $('xpstrip').hidden = false;
+    $('traitBox').hidden = false;
+    $('ledgerBox').hidden = false;
+    $('xpTotal').textContent = session.xp.total;
+    $('xpSpent').textContent = session.xp.spent;
+    $('xpRemaining').textContent = session.xp.remaining;
+    $('undoBtn').disabled = !session.canUndo;
+
+    const box = $('advances');
+    box.innerHTML = '';
+    for (const group of groupAdvances(session.advances)) {
+        const g = document.createElement('div');
+        g.className = 'advgroup';
+        const affordable = group.entries.filter((a) => a.affordable).length;
+        g.innerHTML = `<h3>${esc(group.label)} <span class="count">${group.entries.length} (${affordable} affordable)</span></h3>`;
+        const rows = document.createElement('div');
+        rows.className = 'advrows';
+        for (const a of group.entries) {
+            const row = document.createElement('div');
+            row.className = 'advrow' + (a.affordable ? '' : ' unaffordable');
+            const badges = [];
+            if (a.matches !== undefined) badges.push(`<span class="badge${a.matches === 2 ? ' match2' : ''}">${a.matches} apt</span>`);
+            if (a.rank) badges.push(`<span class="badge">rank ${a.rank}</span>`);
+            if (a.prereqProblems?.length) badges.push(`<span class="badge warn" title="${esc(a.prereqProblems.join('; '))}">prereq?</span>`);
+            row.innerHTML = `<span class="aname">${esc(a.name)}${a.speciality ? ` <span class="dim">(${esc(a.speciality)})</span>` : ''}</span>`
+                + badges.join('') + `<span class="cost">${a.cost} xp</span>`;
+            const btn = document.createElement('button');
+            btn.textContent = 'Buy';
+            btn.disabled = !a.affordable;
+            btn.addEventListener('click', () => buy(a));
+            row.appendChild(btn);
+            rows.appendChild(row);
+        }
+        g.appendChild(rows);
+        g.querySelector('h3').addEventListener('click', () => { rows.hidden = !rows.hidden; });
+        box.appendChild(g);
+    }
+
+    const traitSel = $('traitSel');
+    traitSel.innerHTML = '';
+    for (const t of session.pack?.traits ?? []) traitSel.add(new Option(t.name, t.ref));
+
+    const rows = $('ledgerRows');
+    rows.innerHTML = '';
+    for (const e of session.doc.xp?.ledger ?? []) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${esc(e.name)}</td><td class="dim">${esc(e.kind ?? '')}</td><td class="c">${e.cost}</td>`;
+        rows.appendChild(tr);
+    }
+}
+
+// ---- actions ---------------------------------------------------------------
+
+async function buy(advance) {
+    try {
+        if (advance.prereqsMet === false
+            && !window.confirm(`Prerequisites could not be verified:\n${(advance.prereqProblems ?? []).join('\n')}\n\nBuy anyway?`)) return;
+        await session.buy(advance, { confirmed: advance.prereqsMet === false });
+        persist();
+        render();
+    } catch (e) {
+        window.alert(`Purchase failed: ${e.message}`);
+    }
+}
+
+$('undoBtn').addEventListener('click', async () => { await session.undoLast(); persist(); render(); });
+
+$('traitBtn').addEventListener('click', async () => {
+    const sel = $('traitSel');
+    if (!sel.value) return;
+    await session.grantTrait({ name: sel.options[sel.selectedIndex].text, ref: sel.value });
+    persist();
+    render();
+});
+
+function persist() {
+    if (currentId) CharStore.save(currentId, session.doc);
+}
+
+$('saveBtn').addEventListener('click', () => { persist(); $('charStatus').innerHTML += ' <span class="dim">saved ✓</span>'; });
+
+$('exportBtn').addEventListener('click', () => {
+    const blob = new Blob([session.exportJson()], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${(session.doc.name ?? 'character').replace(/[^\w-]+/g, '_')}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+});
+
+function showReport(report) {
+    const bits = [];
+    if (report.ok && !(report.warnings ?? []).length) bits.push('<span class="gold">Build valid ✓</span>');
+    for (const e of report.errors ?? []) bits.push(`<div class="err">✖ ${esc(e.message ?? e)}</div>`);
+    for (const w of report.warnings ?? []) bits.push(`<div class="wrn">⚠ ${esc(w.message ?? w)}</div>`);
+    $('vreport').innerHTML = bits.join('');
+}
+
+$('validateBtn').addEventListener('click', async () => showReport(await session.validate()));
+
+loadRoster();
+</script>
+</body>
+</html>
