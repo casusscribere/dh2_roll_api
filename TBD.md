@@ -127,6 +127,16 @@ lane detail in [ROADMAP.md](ROADMAP.md). Suite baseline: 339/339.
       OFF (one-line change) or keep the "everything on" convention.
 
 ## 4. Active planning threads
+- [ ] **Sourcebook-text lane (ST-1/ST-2/ST-4; planned 2026-07-29)** — full verbatim
+      rulebook text + page citation for every talent/trait/weapon/gear/cybernetic/power,
+      shown as on-hover cards in the UI. Workspace decision D-N: this repo is PUBLIC, so
+      verbatim text arrives only as a git-ignored overlay (`api/data/chargen/prose.local.mjs`,
+      emitted by sync-chargen from the corpus) behind `GET /api/prose`; the committed pack
+      and Pages build carry `citation` fields (book+page) only, and the denylist test keeps
+      enforcing prose-free public artifacts. Citation-only hovers on Pages; full text on
+      local/private deployments. Custom content carries its own `description`/`citation`
+      in-doc (schema addendum, like `dsl`). Full plan:
+      workspace `docs/SOURCEBOOK_TEXT_PLAN_2026-07-29.md`.
 - [ ] **Character object model v2** — Foundry-compliant character datafile:
       canonical JSON in the engine, best-practices Foundry Actor equivalent in
       the module; validated against the RT campaign's custom spreadsheets
