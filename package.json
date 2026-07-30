@@ -16,7 +16,8 @@
     "schema:json": "node tools/generate-json-schema.mjs",
     "sync:chargen": "node tools/sync-chargen.mjs",
     "build:engine-lib": "node scripts/build-engine-lib.mjs",
-    "merge:characters": "node tools/merge-characters.mjs --roll20=../roll20_bridge/cache/dh2_campaign/characters/roll20_characters_2026-07-23.json --xlsx-roster --out=campaign/characters --report"
+    "merge:characters": "node tools/merge-characters.mjs --roll20=../roll20_bridge/cache/dh2_campaign/characters/roll20_characters_2026-07-23.json --xlsx-roster --out=campaign/characters --report",
+    "test:coverage": "node --test --experimental-test-coverage \"api/test/**/*.test.mjs\""
   },
   "dependencies": {
     "express": "^4.19.0"
