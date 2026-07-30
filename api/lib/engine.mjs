@@ -247,6 +247,17 @@ function strengthBonusMultiple(weapon = {}, isMelee = false) {
 }
 
 /**
+ * A characteristic bonus is the characteristic's tens digit, plus any
+ * Unnatural (X) rating (DH2 core p.24). Every damage figure in the engine
+ * flows through this, so it lives in exactly one place: it was previously
+ * written out separately at five call sites, and a mutation probe found two
+ * of them unasserted by the whole suite.
+ */
+function characteristicBonus(value, unnatural = 0) {
+    return Math.floor((Number(value) || 0) / 10) + (Number(unnatural) || 0);
+}
+
+/**
  * Run the to-hit test: build the context, accumulate modifiers, roll the d100,
  * fire POST_ROLL (jam/overheat) and, on a hit, compute the hit count, per-hit
  * locations and penetration. On a miss, compute Blast scatter. Returns the live
@@ -346,7 +357,7 @@ function runToHit(input, rng, registry) {
             // targets in the area. `detonate` is set by the DSL rule; it is not
             // reached on a jam (the Blast rule gates itself on roll ≤ jam_threshold).
             if (ctx.detonate) {
-                const sb = Math.floor((characteristics.s ?? 0) / 10) + unnaturalStrength;
+                const sb = characteristicBonus(characteristics.s, unnaturalStrength);
                 const sbTimes = strengthBonusMultiple(weapon, isMelee);
                 ctx.pen = Number(weapon.pen) || 0; ctx.penModifiers = {}; ctx.firstLocation = 'Body';
                 runCheckpoint(registry, CHECKPOINTS.PENETRATION, ctx);
@@ -371,7 +382,7 @@ function runToHit(input, rng, registry) {
     // Suppressing Fire (Full) mixes them: per-2-DoS accrual, full-RoF cap (p.224).
     const accrual = actionInfo.hitAccrual ?? actionInfo.rate;
     const fireRate = actionInfo.cap === 'wsb'
-        ? Math.max(1, Math.floor((characteristics.ws ?? 0) / 10) + (Number(unnatural.ws) || 0))
+        ? Math.max(1, characteristicBonus(characteristics.ws, unnatural.ws))
         : actionInfo.rate === 'semi' ? Math.max(1, weapon.rof?.burst ?? 1)
         : actionInfo.rate === 'full' ? Math.max(1, weapon.rof?.full ?? 1) : 1;
     if (accrual === 'semi') ctx.additionalHits = Math.floor((test.dos - 1) / 2);
@@ -385,7 +396,7 @@ function runToHit(input, rng, registry) {
     const additionalHits = ctx.additionalHits;
 
     // locations + penetration
-    const sb = Math.floor((characteristics.s ?? 0) / 10) + unnaturalStrength;
+    const sb = characteristicBonus(characteristics.s, unnaturalStrength);
     const sbTimes = strengthBonusMultiple(weapon, isMelee);
     // Spray always strikes the Body and cannot make Called Shots (p.149)
     const firstLocation = isSpray ? 'Body'
@@ -526,7 +537,7 @@ export function resolveAttack(input, rng = Math.random, registry = defaultRegist
             hit.soak = applySoak({
                 damage: dmg.total, penetration: hitMeta.totalPen,
                 armour: effArmour,
-                toughnessBonus: target.toughnessBonus ?? Math.floor((characteristics.t ?? 0) / 10),
+                toughnessBonus: target.toughnessBonus ?? characteristicBonus(characteristics.t),
                 unnaturalToughness: Number(target.unnaturalToughness) || 0,
                 felling: hitMeta.fellingReduction || 0,
             });
@@ -687,7 +698,7 @@ function resolveDodge(defender, rng, registry) {
 
 const defenderTarget = (d) => ({
     armour: Number(d.armour) || 0,
-    toughnessBonus: d.toughnessBonus ?? Math.floor((d.characteristics?.t ?? 0) / 10),
+    toughnessBonus: d.toughnessBonus ?? characteristicBonus(d.characteristics?.t),
     unnaturalToughness: Number(d.unnaturalToughness) || 0,
     toughness: d.characteristics?.t ?? 0,
     strength: d.characteristics?.s ?? 0,
