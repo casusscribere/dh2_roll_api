@@ -18,6 +18,8 @@ reference architecture for RT tool integration.
 4. `FOUNDRY_MIGRATION.md` — live-install survey (2026-07-01) + pack export/deploy/Playwright harness.
 5. `CHARACTER_MODEL.md`, `POTENTIAL_FEATURES.md`, `TBD.md`.
 
+> **OPEN DECISION (OD-1) — read before touching the Foundry deploy lane.** `dark-heresy-3rd-edition` is now a **reference system only** (user, 2026-07-29), yet this repo still names it the primary deploy target. Raise `docs/OPEN_DECISIONS.md` OD-1 with the user before any interop / deploy / RT2e-target work.
+
 ## Ground rules
 
 - **Engine stays rules-agnostic** (`api/lib/engine.mjs` header is the contract): no trait/talent/quality
