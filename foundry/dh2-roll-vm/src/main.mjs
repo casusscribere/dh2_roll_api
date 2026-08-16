@@ -28,6 +28,13 @@ import { DSL_DOCS } from '../../../api/lib/dsl/docs.mjs';
 import { compile } from '../../../api/lib/dsl/compiler.mjs';
 import { validateCharacter, migrateCharacter, characterToCombatant } from '../../../api/lib/character-schema.mjs';
 import { emptyEncounter, encounterActor, tickEncounter, harvestEngagement } from '../../../api/lib/encounter.mjs';
+// Used at :124 and re-exported at :177 but never imported until 2026-07-31.
+// Hooks.once('ready') therefore threw ReferenceError before assigning
+// game.dh2vm, so the ENTIRE module surface — /dh2attack, importCharacter,
+// the encounter mirror — was dead in Foundry. esbuild left it as a free
+// global rather than failing the build; the committed bundle showed
+// characterToFoundryActor twice unbound and camelKey zero times.
+import { characterToFoundryActor } from '../../../api/lib/foundry-actor.mjs';
 
 const MODULE_ID = 'dh2-roll-vm';
 

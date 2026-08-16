@@ -1,6 +1,12 @@
 // api/lib/dice.mjs
 var d = (sides, rng = Math.random, label = "") => Math.floor(rng(sides, label) * sides) + 1;
 function rollScript(forced = [], base = Math.random) {
+  if (forced !== null && forced !== void 0 && !Array.isArray(forced)) {
+    throw new Error(
+      `forcedRolls must be an array of die results (received ${typeof forced})`
+    );
+  }
+  forced = forced ?? [];
   const trace = [];
   const fn = (sides = 100, label = "") => {
     const index = trace.length;
@@ -26,9 +32,11 @@ var getDegree = (a, b) => Math.floor(a / 10) - Math.floor(b / 10);
 
 // api/lib/hit-locations.mjs
 function getHitLocationForRoll(roll) {
-  const reversed = parseInt(String(roll).split("").reverse().join(""));
+  const s = String(roll).padStart(2, "0");
+  let reversed = parseInt(s[1] + s[0], 10);
+  if (reversed === 0) reversed = 100;
   const table = [
-    { name: "Head", min: 0, max: 10 },
+    { name: "Head", min: 1, max: 10 },
     { name: "Right Arm", min: 11, max: 20 },
     { name: "Left Arm", min: 21, max: 30 },
     { name: "Body", min: 31, max: 70 },
@@ -1343,78 +1351,95 @@ var FACT_DEFS = [
   } }
 ];
 var FACT_ALIASES = {};
-var FUNCTION_DEFS = [
-  { name: "has_quality", signature: 'has_quality("Name")', returns: "bool", summary: 'Weapon has the named quality. Prefix match \u2014 "Proven (3)" matches has_quality("Proven"). Scopes: attacker/weapon (default) or opposing_weapon (the parried weapon).', scopes: {
+var str = (name) => ({ name, kind: "string", optional: false });
+var val = (name) => ({ name, kind: "value", optional: false });
+var opt = (p) => ({ ...p, optional: true });
+var renderParams = (params) => {
+  const req = params.filter((p) => !p.optional);
+  const show = (p) => p.kind === "string" ? `"${p.name}"` : p.name;
+  const tail = params.slice(req.length);
+  return `${req.map(show).join(", ")}${tail.length ? `[, ${tail.map(show).join(", ")}]` : ""}`;
+};
+var FUNCTION_DEFS_RAW = [
+  { name: "has_quality", params: [str("Name")], returns: "bool", summary: 'Weapon has the named quality. Prefix match \u2014 "Proven (3)" matches has_quality("Proven"). Scopes: attacker/weapon (default) or opposing_weapon (the parried weapon).', scopes: {
     attacker: (c, [n]) => hasQuality(c.qualities, String(n)),
     weapon: (c, [n]) => hasQuality(c.qualities, String(n)),
     opposing_weapon: (c, [n]) => hasQuality(c.opposingQualities, String(n))
   } },
-  { name: "quality_level", signature: 'quality_level("Name", default)', returns: "number", summary: 'Numeric level parsed from a quality like "Proven (3)" \u2192 3; returns default if absent/unnumbered.', scopes: {
+  { name: "quality_level", params: [str("Name"), val("default")], returns: "number", summary: 'Numeric level parsed from a quality like "Proven (3)" \u2192 3; returns default if absent/unnumbered.', scopes: {
     attacker: (c, [n, d2]) => qualityLevel(c.qualities, String(n), d2),
     weapon: (c, [n, d2]) => qualityLevel(c.qualities, String(n), d2),
     opposing_weapon: (c, [n, d2]) => qualityLevel(c.opposingQualities, String(n), d2)
   } },
-  { name: "has_talent", signature: 'has_talent("Name")', returns: "bool", summary: "Character has the named talent (from the attack's talents[] list). Prefix match.", scopes: {
+  { name: "has_talent", params: [str("Name")], returns: "bool", summary: "Character has the named talent (from the attack's talents[] list). Prefix match.", scopes: {
     attacker: (c, [n]) => hasNamed(c.talents ?? c.actor?.talents, n)
   } },
-  { name: "has_trait", signature: 'has_trait("Name")', returns: "bool", summary: 'Character/creature has the named DH2.0 trait (from traits[]). Prefix match \u2014 "Brutal Charge (3)" matches has_trait("Brutal Charge"). Scopes: attacker (default) or target (e.g. target.has_trait("Daemonic") \u2014 Sanctified).', scopes: {
+  { name: "has_trait", params: [str("Name")], returns: "bool", summary: 'Character/creature has the named DH2.0 trait (from traits[]). Prefix match \u2014 "Brutal Charge (3)" matches has_trait("Brutal Charge"). Scopes: attacker (default) or target (e.g. target.has_trait("Daemonic") \u2014 Sanctified).', scopes: {
     attacker: (c, [n]) => hasNamed(c.traits ?? c.actor?.traits, n),
     target: (c, [n]) => hasNamed(c.target?.traits, n)
   } },
-  { name: "trait_level", signature: 'trait_level("Name", default)', returns: "number", summary: 'Numeric level parsed from a trait like "Brutal Charge (3)" \u2192 3; returns default if absent/unnumbered. Scopes: attacker (default) or target.', scopes: {
+  { name: "trait_level", params: [str("Name"), val("default")], returns: "number", summary: 'Numeric level parsed from a trait like "Brutal Charge (3)" \u2192 3; returns default if absent/unnumbered. Scopes: attacker (default) or target.', scopes: {
     attacker: (c, [n, d2]) => qualityLevel(c.traits, String(n), d2),
     target: (c, [n, d2]) => qualityLevel(c.target?.traits, String(n), d2)
   } },
-  { name: "has_condition", signature: 'has_condition("Name")', returns: "bool", summary: 'A named Condition is active on the character (from conditions[] / statuses[]), e.g. "On Fire", "Full Aim", "Stunned".', scopes: {
+  { name: "has_condition", params: [str("Name")], returns: "bool", summary: 'A named Condition is active on the character (from conditions[] / statuses[]), e.g. "On Fire", "Full Aim", "Stunned".', scopes: {
     attacker: (c, [n]) => hasNamed(c.statuses ?? c.actor?.statuses, n)
   } },
-  { name: "has_circumstance", signature: 'has_circumstance("Name")', returns: "bool", summary: "A named environmental Circumstance is in effect (from circumstances[]).", scopes: {
+  { name: "has_circumstance", params: [str("Name")], returns: "bool", summary: "A named environmental Circumstance is in effect (from circumstances[]).", scopes: {
     attacker: (c, [n]) => hasNamed(c.circumstances ?? c.actor?.circumstances, n)
   } },
-  { name: "circumstance_severity", signature: 'circumstance_severity("Name", default)', returns: "number", summary: "Severity of a structured Circumstance in circumstances[] (e.g. the Haywire Field strength 1\u20135), or default.", scopes: {
+  { name: "circumstance_severity", params: [str("Name"), opt(val("default"))], returns: "number", summary: "Severity of a structured Circumstance in circumstances[] (e.g. the Haywire Field strength 1\u20135), or default.", scopes: {
     attacker: (c, [n, d2]) => findNamed(c.circumstances ?? c.actor?.circumstances, n)?.severity ?? num(d2)
   } },
-  { name: "configuration", signature: 'configuration("Name")', returns: "bool", summary: 'A per-character Configuration toggle is on (from configs[] / firingModes[]), e.g. configuration("Maximal").', scopes: {
+  { name: "configuration", params: [str("Name")], returns: "bool", summary: 'A per-character Configuration toggle is on (from configs[] / firingModes[]), e.g. configuration("Maximal").', scopes: {
     attacker: (c, [n]) => hasNamed(c.configs ?? c.firingModes, n)
   } },
-  { name: "is_action", signature: 'is_action("Name")', returns: "bool", summary: 'The current action is the named one (case-insensitive), e.g. is_action("Parry"). Works in every flow including reactions.', scopes: {
+  { name: "is_action", params: [str("Name")], returns: "bool", summary: 'The current action is the named one (case-insensitive), e.g. is_action("Parry"). Works in every flow including reactions.', scopes: {
     attacker: (c, [n]) => isAction(c.action, n)
   } },
-  { name: "is_test", signature: 'is_test("Name")', returns: "bool", summary: 'The generic test (test.* pipeline) is the named one, spelling-blind \u2014 is_test("Tech-Use") matches testName "tech_use"/"TechUse". THE way to write "+X to <skill>" item/talent rules: when is_test("Tech-Use") [and <condition>] then add modifier "\u2026" = X.', scopes: {
+  { name: "is_test", params: [str("Name")], returns: "bool", summary: 'The generic test (test.* pipeline) is the named one, spelling-blind \u2014 is_test("Tech-Use") matches testName "tech_use"/"TechUse". THE way to write "+X to <skill>" item/talent rules: when is_test("Tech-Use") [and <condition>] then add modifier "\u2026" = X.', scopes: {
     attacker: (c, [n]) => normName(c.testName ?? "") === normName(n)
   } },
-  { name: "is_reaction", signature: "is_reaction()", returns: "bool", summary: "The current action is a Reaction (Parry, Dodge, \u2026).", scopes: {
+  { name: "is_reaction", params: [], returns: "bool", summary: "The current action is a Reaction (Parry, Dodge, \u2026).", scopes: {
     attacker: (c) => isReaction(c.action)
   } },
-  { name: "action_subtype", signature: 'action_subtype("Name")', returns: "bool", summary: 'The current action carries the named subtype (declared via `subtype`/`attack` on the action). `is_attack` is shorthand for action_subtype("attack").', scopes: {
+  { name: "action_subtype", params: [str("Name")], returns: "bool", summary: 'The current action carries the named subtype (declared via `subtype`/`attack` on the action). `is_attack` is shorthand for action_subtype("attack").', scopes: {
     attacker: (c, [n]) => actionHasSubtype(c.action, n)
   } },
-  { name: "condition_severity", signature: 'condition_severity("Name", default)', returns: "number", summary: "Severity of a structured Condition in conditions[] (e.g. Crippled severity), or default.", scopes: {
+  { name: "condition_severity", params: [str("Name"), opt(val("default"))], returns: "number", summary: "Severity of a structured Condition in conditions[] (e.g. Crippled severity), or default.", scopes: {
     attacker: (c, [n, d2]) => findNamed(c.statuses ?? c.actor?.statuses, n)?.severity ?? num(d2)
   } },
-  { name: "condition_duration", signature: 'condition_duration("Name", default)', returns: "number", summary: "Remaining duration (rounds) of a structured Condition in conditions[], or default.", scopes: {
+  { name: "condition_duration", params: [str("Name"), opt(val("default"))], returns: "number", summary: "Remaining duration (rounds) of a structured Condition in conditions[], or default.", scopes: {
     attacker: (c, [n, d2]) => findNamed(c.statuses ?? c.actor?.statuses, n)?.duration ?? num(d2)
   } },
-  { name: "condition_location", signature: 'condition_location("Name")', returns: "string", summary: 'Hit location a structured Condition in conditions[] is bound to, or "".', scopes: {
+  { name: "condition_location", params: [str("Name")], returns: "string", summary: 'Hit location a structured Condition in conditions[] is bound to, or "".', scopes: {
     attacker: (c, [n]) => findNamed(c.statuses ?? c.actor?.statuses, n)?.location ?? ""
   } },
-  { name: "tens", signature: "tens(n)", returns: "number", summary: "The tens digit of n, i.e. floor(n / 10).", scopes: {
+  { name: "tens", params: [val("n")], returns: "number", summary: "The tens digit of n, i.e. floor(n / 10).", scopes: {
     attacker: (c, [n]) => Math.floor(num(n) / 10)
   } },
-  { name: "is_natural", signature: "is_natural(n)", returns: "bool", summary: "True if the d100 roll equals n exactly.", scopes: {
+  { name: "is_natural", params: [val("n")], returns: "bool", summary: "True if the d100 roll equals n exactly.", scopes: {
     attacker: (c, [n]) => (c.test?.roll ?? c.roll) === n
   } },
   // --- arithmetic helpers (Stage 3 — DH2 p.18: fractions round UP by default) ---
-  { name: "ceil", signature: "ceil(n)", returns: "number", summary: "Round n up to the nearest integer.", scopes: {
+  { name: "ceil", params: [val("n")], returns: "number", summary: "Round n up to the nearest integer.", scopes: {
     attacker: (c, [n]) => Math.ceil(Number(n) || 0)
   } },
-  { name: "floor", signature: "floor(n)", returns: "number", summary: "Round n down to the nearest integer.", scopes: {
+  { name: "floor", params: [val("n")], returns: "number", summary: "Round n down to the nearest integer.", scopes: {
     attacker: (c, [n]) => Math.floor(Number(n) || 0)
   } },
-  { name: "half", signature: "half(n)", returns: "number", summary: "Half of n, rounded UP \u2014 the DH2 default rounding (p.18), e.g. half(3) = 2.", scopes: {
+  { name: "half", params: [val("n")], returns: "number", summary: "Half of n, rounded UP \u2014 the DH2 default rounding (p.18), e.g. half(3) = 2.", scopes: {
     attacker: (c, [n]) => Math.ceil((Number(n) || 0) / 2)
   } }
 ];
+var FUNCTION_DEFS = FUNCTION_DEFS_RAW.map((d2) => ({
+  ...d2,
+  signature: `${d2.name}(${renderParams(d2.params)})`
+}));
+var FUNCTION_ARITY = Object.fromEntries(FUNCTION_DEFS.map((d2) => [d2.name, {
+  min: d2.params.filter((p) => !p.optional).length,
+  max: d2.params.length
+}]));
 var FUNCTION_ALIASES = {};
 var SLOT_DEFS = {
   pen: {
@@ -1797,7 +1822,7 @@ function applyAction(action, ctx, meta = {}) {
       throw new DslError(`Unknown action '${action.action}'`, 0, 0);
   }
 }
-function collectNames(node, acc = { facts: /* @__PURE__ */ new Set(), calls: /* @__PURE__ */ new Set(), scopedFacts: /* @__PURE__ */ new Set(), scopedCalls: /* @__PURE__ */ new Set() }) {
+function collectNames(node, acc = { facts: /* @__PURE__ */ new Set(), calls: /* @__PURE__ */ new Set(), scopedFacts: /* @__PURE__ */ new Set(), scopedCalls: /* @__PURE__ */ new Set(), callNodes: [] }) {
   if (!node || typeof node !== "object") return acc;
   switch (node.type) {
     case "Identifier":
@@ -1807,6 +1832,7 @@ function collectNames(node, acc = { facts: /* @__PURE__ */ new Set(), calls: /* 
     case "Call":
       if (node.scope) acc.scopedCalls.add(`${node.scope}.${node.name}`);
       else acc.calls.add(node.name);
+      (acc.callNodes ?? (acc.callNodes = [])).push(node);
       node.args.forEach((a) => collectNames(a, acc));
       break;
     case "Logical":
@@ -1825,15 +1851,38 @@ function collectNames(node, acc = { facts: /* @__PURE__ */ new Set(), calls: /* 
 // api/lib/dsl/compiler.mjs
 var KNOWN_CHECKPOINTS = new Set(Object.values(CHECKPOINTS));
 var slug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+var SIGNATURES = Object.fromEntries(FUNCTION_DEFS.map((d2) => [d2.name, d2.signature]));
+var arityPhrase = ({ min, max }) => {
+  const plural = (n) => `${n} argument${n === 1 ? "" : "s"}`;
+  return min === max ? plural(min) : `${min} or ${plural(max)}`;
+};
+var collectFromValue = (v, acc) => {
+  if (!v || typeof v !== "object") return;
+  if (Array.isArray(v)) {
+    for (const x of v) collectFromValue(x, acc);
+    return;
+  }
+  if (typeof v.type === "string") {
+    collectNames(v, acc);
+    return;
+  }
+  for (const x of Object.values(v)) collectFromValue(x, acc);
+};
+var collectFromAction = (a, acc) => {
+  for (const [k, v] of Object.entries(a)) {
+    if (k === "type" || k === "action") continue;
+    collectFromValue(v, acc);
+  }
+};
 function compileRule(rule, pkg = null) {
   const checkpoint = rule.on?.startsWith("attack.") ? rule.on.slice("attack.".length) : rule.on;
   if (!KNOWN_CHECKPOINTS.has(checkpoint)) {
     throw new DslError(`Unknown checkpoint '${rule.on}' in rule "${rule.name}"`, rule.line, rule.col);
   }
-  const names = { facts: /* @__PURE__ */ new Set(), calls: /* @__PURE__ */ new Set(), scopedFacts: /* @__PURE__ */ new Set(), scopedCalls: /* @__PURE__ */ new Set() };
+  const names = { facts: /* @__PURE__ */ new Set(), calls: /* @__PURE__ */ new Set(), scopedFacts: /* @__PURE__ */ new Set(), scopedCalls: /* @__PURE__ */ new Set(), callNodes: [] };
   for (const br of rule.branches) {
     if (br.when) collectNames(br.when, names);
-    for (const a of br.actions) if (a.value) collectNames(a.value, names);
+    for (const a of br.actions) collectFromAction(a, names);
   }
   for (const f of names.facts) {
     if (!(f in FACTS)) throw new DslError(`Unknown fact '${f}' in rule "${rule.name}"`, rule.line, rule.col);
@@ -1851,12 +1900,25 @@ function compileRule(rule, pkg = null) {
     if (!SCOPE_NAMES.includes(scope)) throw new DslError(`Unknown scope '${scope}' in rule "${rule.name}" (scopes: ${SCOPE_NAMES.join(", ")})`, rule.line, rule.col);
     if (!(c in SCOPED_FUNCTIONS[scope])) throw new DslError(`Function '${c}()' is not available in scope '${scope}' in rule "${rule.name}"`, rule.line, rule.col);
   }
+  for (const node of names.callNodes) {
+    const arity = FUNCTION_ARITY[node.name];
+    if (!arity) continue;
+    const got = node.args.length;
+    if (got < arity.min || got > arity.max) {
+      throw new DslError(
+        `Function '${node.name}()' expects ${arityPhrase(arity)}, got ${got} in rule "${rule.name}" (signature: ${SIGNATURES[node.name]})`,
+        rule.line,
+        rule.col
+      );
+    }
+  }
   for (const br of rule.branches) {
     for (const a of br.actions) {
       if (a.action === "set_slot") {
         const slot = SLOT_DEFS[a.slot];
         if (!slot) throw new DslError(`Unknown slot '${a.slot}' in rule "${rule.name}" (slots: ${Object.keys(SLOT_DEFS).join(", ")})`, rule.line, rule.col);
-        if (!slot.modes.includes(a.op ?? "=")) throw new DslError(`Slot '${a.slot}' does not support '${a.op}' in rule "${rule.name}" (modes: ${slot.modes.join(", ")})`, rule.line, rule.col);
+        const op = a.op ?? "=";
+        if (!slot.modes.includes(op)) throw new DslError(`Slot '${a.slot}' does not support '${op}' in rule "${rule.name}" (modes: ${slot.modes.join(", ")})`, rule.line, rule.col);
       } else if (a.action === "set_flag" && !FLAG_DEFS[a.flag]) {
         throw new DslError(`Unknown flag '${a.flag}' in rule "${rule.name}" (flags: ${Object.keys(FLAG_DEFS).join(", ")})`, rule.line, rule.col);
       }
@@ -2098,7 +2160,379 @@ var qualityConflictEffects = [
 ];
 
 // .build/sources.browser.mjs
-var ruleSources = { "weapon-qualities.dsl": 'dsl 3\npackage "dh2.core.weapon-qualities" {\n  system "dh2"\n  source "Dark Heresy 2e Core Rulebook"\n}\n\n# DH2 weapon qualities \u2014 authored in the trait DSL.\n#\n# This file IS the interpretation of the DH2 weapon special qualities; it is\n# data, fully separated from the roll engine. It is compiled to checkpoint\n# effects at load time (see lib/rules/index.mjs) and was previously the native\n# module lib/rules/weapon-qualities.mjs \u2014 re-authoring it here dogfoods the DSL.\n#\n# Priorities mirror the original native ordering.\n\n# --- dice pool ---------------------------------------------------------------\nquality "Tearing" {\n  meta { page 150 }\n  on DAMAGE_POOL\n  priority 10\n  when has_quality("Tearing")\n  then set extra_dice += 1; flag keep_highest          # roll one extra die, keep the original count highest\n}\n\n# --- per-die adjustment + Righteous Fury threshold ---------------------------\nquality "Vengeful" {\n  meta { page 150 }\n  on DIE_ADJUST\n  priority 0\n  when has_quality("Vengeful")\n  then set rf_threshold = quality_level("Vengeful", 9)\n}\n\nquality "Proven" {\n  meta { page 148 }\n  on DIE_ADJUST\n  priority 10\n  when has_quality("Proven")\n  then floor_die quality_level("Proven", 2)\n}\n\nquality "Primitive" {\n  meta { page 148 }\n  on DIE_ADJUST\n  priority 20\n  when has_quality("Primitive")\n  then cap_die quality_level("Primitive", 7)\n}\n\n# --- Accurate (DH2 core p.150) ----------------------------------------------\n# Requires the Aim action. Two rules share the name "Accurate" so a single\n# toggle controls both halves of the quality:\n#   1) +10 to hit while aiming (on top of the aim bonus);\n#   2) +1d10 damage per two DoS (max +2d10) on an aimed single shot.\nquality "Accurate" {\n  meta { page 145 }\n  on MODIFIERS\n  priority 50\n  when has_quality("Accurate") and (half_aim or full_aim)\n  then add modifier "accurate_aim" = 10\n}\n\nquality "Accurate" {\n  meta { page 145 }\n  on DAMAGE_MODS\n  priority 10\n  when has_quality("Accurate") and (half_aim or full_aim) and (action == "Standard Attack" or action == "Called Shot") and dos >= 3\n    then add modifier "accurate" = 1d10\n  when has_quality("Accurate") and (half_aim or full_aim) and (action == "Standard Attack" or action == "Called Shot") and dos >= 5\n    then add modifier "accurate x 2" = 1d10\n}\n\n# --- Inaccurate (DH2 core p.146) --------------------------------------------\n# The opposite of Accurate: the character gains NO benefit from the Aim action\n# with this weapon. The aim bonus is injected by the combat-action `aim-modifier`\n# effect at MODIFIERS priority 10 (and Accurate adds "accurate_aim" at 50); this\n# runs at priority 100 (canceller convention) to strip the aim bonus afterwards.\n# Accurate + Inaccurate on the same weapon is a data conflict \u2014 see the\n# mutual-exclusion check in lib/rules/quality-conflicts.mjs, which surfaces it.\nquality "Inaccurate" {\n  meta { page 147 }\n  on MODIFIERS\n  priority 100\n  when has_quality("Inaccurate")\n  then cancel modifier "aim"\n}\n\n# --- hit count ---------------------------------------------------------------\nquality "Storm" {\n  meta { page 149 }\n  on HIT_COUNT_MULT\n  priority 10\n  when has_quality("Storm")\n  then multiply_hits 2\n}\n\nquality "Twin-Linked" {\n  meta { page 150 }\n  on HIT_COUNT_BONUS\n  priority 10\n  when has_quality("Twin-Linked") and dos > 1\n  then set extra_hits += 1\n}\n\n# --- penetration -------------------------------------------------------------\n# `set pen += pen` adds the base penetration again under the rule-named slot\n# ("razor sharp" / "melta"), doubling effective penetration.\n# Razor Sharp (DH2 core p.150): at 3+ DoS, double penetration \u2014 any attack\n# (melee OR ranged), so there is no is_melee gate.\nquality "Razor Sharp" {\n  meta { page 148 }\n  on PENETRATION\n  priority 10\n  when dos > 2 and has_quality("Razor Sharp")\n  then set pen += pen\n}\n\nquality "Melta" {\n  meta { page 148 }\n  on PENETRATION\n  priority 20\n  when is_ranged and has_quality("Melta") and (range == "Short Range" or range == "Point Blank")\n  then set pen += pen\n}\n\n# Lance (DH2 core p.147): variable penetration scaling with accuracy. Increase\n# penetration by the weapon\'s BASE value once per degree of success, e.g. base\n# pen 5 at 3 DoS adds 3\xD75=15 \u2192 total 20. `pen` reads the base penetration and\n# `dos` the to-hit degrees (both live on the context at PENETRATION).\nquality "Lance" {\n  meta { page 147 }\n  on PENETRATION\n  priority 15\n  when has_quality("Lance") and dos > 0\n  then set pen += pen * dos\n}\n\n# --- malfunctions (ranged) ---------------------------------------------------\n# Overheats on 92+; Best-craftsmanship weapons never overheat (p.149). An Overheats\n# weapon OVERRIDES the baseline Jam mechanic \u2014 it overheats instead of jamming, so\n# the first branch suppresses "Jam" (priority 10, before the Jam mechanic at 50)\n# whenever the weapon has Overheats; the second branch emits the overheat on 92+.\nquality "Overheats" {\n  meta { page 148 }\n  on POST_ROLL\n  priority 10\n  when is_ranged and has_quality("Overheats")\n    then suppress "Jam"\n  when is_ranged and roll > 91 and has_quality("Overheats") and craftsmanship != "Best"\n    then emit "Overheats", "The weapon overheats forcing it to be dropped on the ground!"\n}\n\n# Flexible (DH2 core p.145): linked/non-rigid weapons (whips, flails) deny defensive\n# counters \u2014 an attack from a Flexible weapon CANNOT be Parried (the engine refuses a\n# Parry reaction against it and notes it). A Flexible weapon can still itself Parry.\nquality "Flexible" {\n  meta { page 145 }\n  on POST_ROLL\n  when has_quality("Flexible")\n  then flag no_parry\n}\n\n# Graviton (DH2 core p.146): on a hit, inflicts additional damage equal to the\n# target\'s Armour points on the struck location (effectively negating armour). The\n# vehicle interaction (facing armour + always rolling Motive Systems Critical\n# Effects) is deferred \u2014 see POTENTIAL_FEATURES.md.\nquality "Graviton" {\n  meta { page 146 }\n  on DAMAGE_MODS\n  when has_quality("Graviton")\n  then add modifier "graviton" = target.armour\n}\n\n# Jam is a base weapon MECHANIC (see mechanics.dsl), not a quality. These two\n# qualities adjust the jam threshold (default 96 \u2192 jams on 97+):\n#   Reliable \u2192 jams only on 100; Unreliable \u2192 jams on 91+.\nquality "Reliable" {\n  meta { page 148 }\n  on POST_ROLL\n  priority 10\n  when is_ranged and has_quality("Reliable")\n  then set jam_threshold = 99\n}\n\nquality "Unreliable" {\n  meta { page 150 }\n  on POST_ROLL\n  priority 10\n  when is_ranged and has_quality("Unreliable")\n  then set jam_threshold = 90\n}\n\n# --- Scatter (DH2 core p.148) \u2014 the weapon QUALITY (distinct from the scatter\n# game mechanic / Scatter Diagram used by Blast on a miss). Spreading shot: deadly\n# up close, weak at range. Point Blank: +10 to hit and +3 damage; Short Range:\n# +10 to hit; any longer range (Normal/Long/Extreme): \u22123 damage.\nquality "Scatter" {\n  meta { page 148 }\n  on MODIFIERS\n  priority 50\n  when has_quality("Scatter") and (range == "Point Blank" or range == "Short Range")\n  then add modifier "scatter (close)" = 10\n}\nquality "Scatter" {\n  meta { page 148 }\n  on DAMAGE_MODS\n  priority 50\n  when has_quality("Scatter") and range == "Point Blank"\n    then add modifier "scatter" = 3\n  when has_quality("Scatter") and (range == "Normal Range" or range == "Long Range" or range == "Extreme Range")\n    then add modifier "scatter" = -3\n}\n\n# --- Force (DH2 core p.145) \u2014 the STATIC half ---------------------------------\n# In a psyker\'s hands (psy_rating > 0) a Force weapon deals +psy-rating damage,\n# gains +psy-rating penetration, and its damage type becomes Energy. The Focus\n# Power rider (+1d10 per DoS ignoring Armour and Toughness, Opposed Willpower)\n# needs the psychic subsystem \u2014 Phase 6. Force weapons are immune to Power Field\n# (already checked by that rule).\nquality "Force" {\n  meta { page 145 }\n  on DAMAGE_POOL\n  priority 0\n  when has_quality("Force") and is_psyker\n  then set damage_type = "Energy"\n}\nquality "Force" {\n  meta { page 145 }\n  on DAMAGE_MODS\n  when has_quality("Force") and is_psyker\n  then add modifier "force (psy rating)" = psy_rating\n}\nquality "Force" {\n  meta { page 145 }\n  on PENETRATION\n  when has_quality("Force") and is_psyker\n  then set pen += psy_rating\n}\n\n# --- Indirect (X) (DH2 core p.147) --------------------------------------------\n# Fired in a high arc without line of sight: \u221210 to the attack and a Full Action\n# (surfaced as a note \u2014 the tool does not hard-block action economy). EVERY HIT\n# scatters \u2014 it strikes the ground 1d10 \u2212 BS-bonus metres (min 0) from the\n# intended target, direction from the Scatter Diagram (declare scatter_hit).\n# On a miss the shot scatters X\xD71d10 metres (approximation of Xd10 \u2014 noted).\nquality "Indirect" {\n  meta { page 147 }\n  on MODIFIERS\n  when has_quality("Indirect")\n  then add modifier "indirect" = -10\n}\nquality "Indirect" {\n  meta { page 147 }\n  on POST_ROLL\n  when has_quality("Indirect")\n  then emit "Indirect", "fired without line of sight \u2014 requires a Full Action; the GM may add penalties for poor target awareness (p.147)"\n}\nquality "Indirect" {\n  meta { page 147 }\n  on ON_HIT\n  when has_quality("Indirect")\n  then declare scatter_hit 1d10 - bs_bonus\n}\nquality "Indirect" {\n  meta { page 147 }\n  on ON_MISS\n  priority 5\n  when is_ranged and has_quality("Indirect") and not success and roll <= jam_threshold\n  then set scatter = quality_level("Indirect", 1) * 1d10; roll_on "Scatter Diagram"\n}\n\n# --- Smoke (X) (DH2 core p.149) -------------------------------------------------\n# No damage: a hit creates a smokescreen with an X-metre radius at the impact\n# point, lasting 1d10+10 rounds. Like Blast, a Smoke weapon SCATTERS on a miss \u2014\n# the screen still forms at the scatter point, but only Blast also detonates its\n# damage there (the two compose: a Smoke+Blast weapon scatters once, detonates\n# via Blast\'s rule, and smokes via this one).\nquality "Smoke" {\n  meta { page 149 }\n  on ON_HIT\n  when has_quality("Smoke")\n  then declare smoke quality_level("Smoke", 1) duration 1d10 + 10\n}\nquality "Smoke" {\n  meta { page 149 }\n  on ON_MISS\n  priority 1\n  when is_ranged and has_quality("Smoke") and not success and roll <= jam_threshold and not has_quality("Blast")\n    then set scatter = 1d5; roll_on "Scatter Diagram"; declare smoke quality_level("Smoke", 1) duration 1d10 + 10\n  when is_ranged and has_quality("Smoke") and not success and roll <= jam_threshold and has_quality("Blast")\n    then declare smoke quality_level("Smoke", 1) duration 1d10 + 10\n}\n\n# --- Spray (DH2 core p.149) ------------------------------------------------------\n# The no-attack-roll cone: the ENGINE skips the BS test entirely for a Spray\n# weapon (auto-hit, always the Body, Called Shots impossible \u2014 see runToHit) and\n# this rule gives the struck target its Challenging (+0) Agility test; a PASSED\n# test AVOIDS the hit (avoids_hit). Untrained-wielder bonuses (+20/+30) are GM\n# adjustments via the test note. A natural 9 on any damage die jams the weapon\n# (engine \u2014 surfaced as a Jam effect). Cone multi-targeting is out of scope\n# (single representative target).\nquality "Spray" {\n  meta { page 149 }\n  on ON_HIT\n  when has_quality("Spray")\n  then require_test "Agility" 0 "struck by the spray" avoids_hit\n}\n\n# (Maximal \u2014 the high-power firing mode \u2014 moved to configurations.dsl, the\n#  Configurations category.)\n\n# --- on-hit target effects (DH2 core p.150) ---------------------------------\n# Concussive (X): the target makes a Toughness test at -10*X; on a fail it is\n# Stunned (1 round per DoF). If damage dealt exceeds the target\'s SB, Prone.\nquality "Concussive" {\n  meta { page 145 }\n  on ON_HIT\n  when has_quality("Concussive")\n    then require_test "Toughness" (-10 * quality_level("Concussive", 0)) "Stunned for 1 round per degree of failure"\n  when has_quality("Concussive") and damage_dealt > target.sb\n    then apply_status "Prone", "damage dealt exceeds the target\'s Strength Bonus"\n}\n\n# Crippling (X): if the target takes at least one wound, it is Crippled for the\n# encounter. This is automatic on a wound \u2014 there is no defender test to resist\n# it (DH2 RAW). The status carries a severity value of X \u2014 the Rending damage the\n# Crippled target suffers to that location each time it takes more than a Half\n# Action (default 1 if the quality has no rating).\nquality "Crippling" {\n  meta { page 145 }\n  on ON_HIT\n  when has_quality("Crippling") and wounds > 0\n  then apply_status "Crippled" value quality_level("Crippling", 1) location location, "the hit inflicted at least one wound (automatic, no test)"\n}\n\n# Corrosive (DH2 core p.145): the caustic hit corrodes the struck location\'s\n# armour by 1d10 Armour Points (permanent until repaired, cumulative across\n# hits). Any amount beyond the current AP \u2014 or the whole amount if the target is\n# unarmoured there \u2014 is dealt to the target as wounds, ignoring Toughness. The\n# engine resolves the AP loss and overflow (see resolveCorrosion); the report\n# shows the new AP so it can be carried to the next encounter.\nquality "Corrosive" {\n  meta { page 145 }\n  on ON_HIT\n  when has_quality("Corrosive")\n  then corrode 1d10\n}\n\n# Haywire (X) (DH2 core p.146): on a hit, roll 1d10 on the Haywire Field Effects\n# table to determine the strength of the disruptive field.\nquality "Haywire" {\n  meta { page 147 }\n  on ON_HIT\n  when has_quality("Haywire")\n  then roll_on "Haywire Field Effects" area quality_level("Haywire", 1)\n}\n\n# Hallucinogenic (X) (DH2 core p.145): the target makes a Toughness test at -10*X;\n# on a failure it suffers a delusion \u2014 roll 1d10 on the Hallucinogenic Effects\n# table (some results impose conditions on the target).\nquality "Hallucinogenic" {\n  meta { page 146 }\n  on ON_HIT\n  when has_quality("Hallucinogenic")\n  then require_test "Toughness" (-10 * quality_level("Hallucinogenic", 1)) "delusion (roll on Hallucinogenic Effects)" => roll_on "Hallucinogenic Effects"\n}\n\n# Recharge (DH2 core p.146): the weapon must spend a turn recharging before it can\n# fire again. No turn loop in this single-attack tool, so it is surfaced as a note;\n# it is also added dynamically by firing on Maximal (see configurations.dsl).\nquality "Recharge" {\n  meta { page 148 }\n  on POST_ROLL\n  when has_quality("Recharge")\n  then emit "Recharge", "must spend a turn recharging before it can fire again"\n}\n\n# Felling (X) (DH2 core p.145): when calculating damage, reduce the target\'s\n# Unnatural Toughness BONUS by X \u2014 only Unnatural Toughness, never the base\n# Toughness Bonus, and only for this damage calculation. Runs at PENETRATION (the\n# defence-reduction seam) so the soak step applies the reduced Unnatural Toughness.\nquality "Felling" {\n  meta { page 145 }\n  on PENETRATION\n  when has_quality("Felling")\n  then set unnatural_toughness_reduction += quality_level("Felling", 1)\n}\n\n# Flame (DH2 core p.145): whenever a target is struck by a Flame attack (even if it\n# suffers no damage), it must make an Agility test or be set On Fire (p.243).\n# Modelled as a per-hit Agility test that applies the On Fire condition on failure.\n# (RAW Flame is an area attack that doesn\'t use BS \u2014 that targeting is out of scope;\n# the test and its effect are modelled.)\nquality "Flame" {\n  meta { page 145 }\n  on ON_HIT\n  when has_quality("Flame")\n  then require_test "Agility" 0 "set on fire (gains the On Fire condition)" => apply_status "On Fire" duration "until extinguished"\n}\n\n# Shocking (DH2 core p.148): a target that takes at least 1 wound (after Armour\n# and Toughness) must pass a Challenging (+0) Toughness test or suffer 1 level of\n# Fatigue and be Stunned for rounds equal to half its DoF (rounding up). Modelled\n# as a Toughness test gated on wounds > 0; the Stunned condition lands on a fail\n# (the Fatigue level is descriptive \u2014 no fatigue track in this single-attack tool).\nquality "Shocking" {\n  meta { page 149 }\n  on ON_HIT\n  when has_quality("Shocking") and wounds > 0\n  then require_test "Toughness" 0 "1 level of Fatigue and Stunned for rounds equal to half the degrees of failure" => apply_status "Stunned"\n}\n\n# Snare (X) (DH2 core p.148): on a hit, the target makes an Agility test at \u221210\xD7X\n# or is Immobilised (and counts as Helpless until it escapes \u2014 a Full Action\n# Challenging Strength/Agility test at \u221210\xD7X). The Immobilised condition lands on\n# a failed Agility test; escaping is descriptive (no turn loop here).\nquality "Snare" {\n  meta { page 149 }\n  on ON_HIT\n  when has_quality("Snare")\n  then require_test "Agility" (-10 * quality_level("Snare", 0)) "Immobilised (Helpless until it escapes)" => apply_status "Immobilised"\n}\n\n# Toxic (X) (DH2 core p.150): a target that suffers damage (after Armour and\n# Toughness) from a Toxic weapon is poisoned \u2014 it gains the Toxified condition,\n# which (at the end of each of its turns it took damage that round) forces a\n# Toughness test at \u221210\xD7X or 1d10 extra damage. The recurring test needs a turn\n# loop this tool lacks, so it is carried as the Toxified condition (value X) and\n# documented there (conditions.dsl); here we just inflict it on a wounding hit.\nquality "Toxic" {\n  meta { page 150 }\n  on ON_HIT\n  when has_quality("Toxic") and wounds > 0\n  then apply_status "Toxified" value quality_level("Toxic", 0), "took damage from a Toxic weapon (end-of-turn Toughness test or 1d10 additional damage)"\n}\n\n# Sanctified (DH2 core p.148): the weapon is blessed \u2014 its damage counts as Holy,\n# which has unique effects against denizens of the Warp. The concrete interaction\n# in this engine: a Daemonic creature\'s Toughness-bonus increase (its Unnatural\n# Toughness) "is negated by damage inflicted from \u2026 holy attacks" (p.135), so vs a\n# Daemonic target Sanctified strips the target\'s Unnatural Toughness for this hit\n# (reusing Felling\'s reduction). The Holy damage type is surfaced on the result.\n# (Daemonic / From Beyond traits themselves are planned \u2014 see POTENTIAL_FEATURES.md.)\nquality "Sanctified" {\n  meta { page 148 }\n  on DAMAGE_POOL\n  priority 0\n  when has_quality("Sanctified")\n  then set damage_type = "Holy"\n}\nquality "Sanctified" {\n  meta { page 148 }\n  on PENETRATION\n  priority 30\n  when has_quality("Sanctified") and target.has_trait("Daemonic")\n  then set unnatural_toughness_reduction += target.unnatural_toughness\n}\n\n# --- defensive / parry qualities (DH2 core p.150) ---------------------------\n# Balanced grants +10 to Weapon Skill tests made to Parry (only once even with\n# two Balanced weapons \u2014 it is keyed by the modifier name, so it can\'t stack).\nquality "Balanced" {\n  meta { page 145 }\n  on PARRY\n  when has_quality("Balanced")\n  then add modifier "balanced" = 10\n}\n\n# Defensive (e.g. a shield): +15 to Parry, but -10 to attacks made with it.\nquality "Defensive" {\n  meta { page 145 }\n  on PARRY\n  when has_quality("Defensive")\n  then add modifier "defensive" = 15\n}\nquality "Defensive" {\n  meta { page 145 }\n  on MODIFIERS\n  when has_quality("Defensive") and is_attack\n  then add modifier "defensive" = -10\n}\n\n# Unbalanced (DH2 core p.150): cumbersome offensively-strong weapons. \u221210 to Parry\n# tests, and they cannot be used to make Lightning Attack actions (surfaced as a\n# note \u2014 the tool does not hard-block action choice).\nquality "Unbalanced" {\n  meta { page 150 }\n  on PARRY\n  when has_quality("Unbalanced")\n  then add modifier "unbalanced" = -10\n}\nquality "Unbalanced" {\n  meta { page 150 }\n  on POST_ROLL\n  when has_quality("Unbalanced") and is_action("Lightning Attack")\n  then emit "Unbalanced", "cannot be used to make Lightning Attack actions"\n}\n\n# Unwieldy (DH2 core p.150): huge, top-heavy weapons. They CANNOT be used to Parry\n# (the parry flow refuses the reaction \u2014 see resolveParry) and cannot make\n# Lightning Attack actions.\nquality "Unwieldy" {\n  meta { page 150 }\n  on PARRY\n  when has_quality("Unwieldy")\n  then flag cannot_parry\n}\nquality "Unwieldy" {\n  meta { page 150 }\n  on POST_ROLL\n  when has_quality("Unwieldy") and is_action("Lightning Attack")\n  then emit "Unwieldy", "cannot be used to make Lightning Attack actions"\n}\n\n# Power Field (DH2 core p.148): a disruptive energy field. When this weapon\n# SUCCESSFULLY Parries an attack made with a weapon that lacks Power Field, roll\n# 1d100 on Power Field Destruction; on 26+ the attacker\'s weapon is destroyed.\n# Weapons with the Force or Warp Weapon quality, and Natural Weapons, are immune.\n# Runs at POST_PARRY (success known); `opposing_has_quality` reads the parried\n# (attacking) weapon, `opposing_present` guards the bare /api/parry test.\nquality "Power Field" {\n  meta { page 148 }\n  on POST_PARRY\n  when has_quality("Power Field") and success and opposing_weapon.present\n    and not opposing_weapon.has_quality("Power Field") and not opposing_weapon.has_quality("Force")\n    and not opposing_weapon.has_quality("Warp Weapon") and not opposing_weapon.has_quality("Natural Weapon")\n  then roll_on "Power Field Destruction"\n}\n\n# --- Blast (X) scatter on a miss (DH2 core p.150 / scatter p.230) ------------\n# A Blast weapon scatters when the firer misses. The scatter distance defaults\n# to 1d5 metres (p.230); the engine rolls the 1d10 direction on the Scatter\n# Diagram. This runs at priority 0 so the 1d5 base is established BEFORE any\n# other rules \u2014 which may increase or decrease it via `set scatter += \u2026`\n# (modifiers accumulate separately and are summed onto the base at the end).\n#\n# `detonate` makes the weapon still resolve its damage at the scatter point even\n# though the shot missed \u2014 a blast goes off wherever it lands and may catch other\n# targets in the area. The `roll <= jam_threshold` gate means a *jam* (which also\n# fails the to-hit) does NOT detonate: a jammed weapon never fired.\nquality "Blast" {\n  meta { page 145 }\n  on ON_MISS\n  priority 0\n  when is_ranged and has_quality("Blast") and not success and roll <= jam_threshold\n  then set scatter = 1d5; flag detonate; roll_on "Scatter Diagram"\n}\n', "talents.dsl": 'dsl 3\npackage "dh2.core.talents" {\n  system "dh2"\n  source "Dark Heresy 2e Core Rulebook"\n}\n\n# DH2 TALENTS (XP-bought abilities) that gate on combat state \u2014 authored in the DSL.\n# This file holds talents ONLY (kind `talent`, gated on has_talent(...)); innate\n# DH2.0 traits live separately in traits.dsl (kind `trait`, has_trait(...)). The two\n# are distinct categories in the rule taxonomy and the UI.\n#\n# Talent rules are always present in the registry but only fire when the\n# character actually HAS the talent (has_talent(...)) AND the situation is\n# right (the activation predicate). This is the activation/effect split that\n# lets e.g. Ambidextrous check "am I dual-wielding?" before touching a penalty.\n#\n# Priorities: penalty injectors at 10, cancellers/reducers at 100 (so they run\n# after the penalties they modify are in place).\n\n# (The base off-hand -20 circumstance moved to circumstances.dsl.)\n\n# --- Two-Weapon Wielder ------------------------------------------------------\n# Lets a character attack with two weapons; each attack suffers -20.\ntalent "Two-Weapon Wielder" {\n  on MODIFIERS\n  priority 10\n  when has_talent("Two-Weapon Wielder") and dual_wielding\n  then add modifier "two_weapon" = -20\n}\n\n# --- Ambidextrous (tier 1) ---------------------------------------------------\n# Two branches, each with its own activation:\n#  - firing a single off-hand weapon: negate the off-hand penalty;\n#  - combined with Two-Weapon Wielder while dual-wielding: reduce the\n#    two-weapon penalty -20 -> -10.\ntalent "Ambidextrous" tier 1 {\n  on MODIFIERS\n  priority 100\n  when has_talent("Ambidextrous") and firing_offhand and not dual_wielding\n    then cancel modifier "off_hand"\n  when has_talent("Ambidextrous") and has_talent("Two-Weapon Wielder") and dual_wielding\n    then set modifier "two_weapon" = -10\n}\n\n# --- Two-Weapon Master (tier 3, DH2 core p.132) --------------------------------\n# "When armed with two single-handed weapons \u2026 he ignores the \u201320 penalty for\n# Two-Weapon Fighting." Priority 110: after Two-Weapon Wielder injects the -20\n# (10) and after Ambidextrous halves it (100), the master removes what is left.\ntalent "Two-Weapon Master" tier 3 {\n  meta { page 132 }\n  on MODIFIERS\n  priority 110\n  when has_talent("Two-Weapon Master") and dual_wielding\n  then cancel modifier "two_weapon"\n}\n\n# --- Marksman (tier 2, DH2 core p.130) ------------------------------------------\n# "\u2026suffers no penalties for making Ballistic Skill tests at Long or Extreme\n# range." The engine injects the band penalty as the "range" modifier\n# (combat-actions.mjs RANGE_BANDS: Long -10, Extreme -30); Marksman cancels it.\n# Bonuses (Point Blank/Short) are untouched \u2014 only the PENALTY bands gate here.\ntalent "Marksman" tier 2 {\n  meta { page 130 }\n  on MODIFIERS\n  priority 100\n  when has_talent("Marksman") and is_ranged and (range == "Long Range" or range == "Extreme Range")\n  then cancel modifier "range"\n}\n\n# --- Precision Killer (tier 2, DH2 core p.130) -----------------------------------\n# "When making a Called Shot \u2026 he does not suffer the usual \u201320 penalty." The\n# Called Shot action\'s -20 IS the action modifier ("attack"), so cancelling it\n# yields the RAW net 0. Specialised entries ("Precision Killer (Ranged)"/\n# "(Melee)") gate on the matching attack type; a bare "Precision Killer" entry\n# (specialisation not recorded) applies to both.\ntalent "Precision Killer" tier 2 {\n  meta { page 130 }\n  on MODIFIERS\n  priority 100\n  when has_talent("Precision Killer (Ranged)") and is_ranged and action == "Called Shot"\n    then cancel modifier "attack"\n  when has_talent("Precision Killer (Melee)") and is_melee and action == "Called Shot"\n    then cancel modifier "attack"\n  when has_talent("Precision Killer") and not has_talent("Precision Killer (") and action == "Called Shot"\n    then cancel modifier "attack"\n}\n\n# --- Mighty Shot (tier 3, DH2 core p.130) ----------------------------------------\n# "He adds half his Ballistic Skill bonus (rounded up) to damage he inflicts\n# with ranged weapons." half() rounds up (DH2 p.18 default).\ntalent "Mighty Shot" tier 3 {\n  meta { page 130 }\n  on DAMAGE_MODS\n  when has_talent("Mighty Shot") and is_ranged\n  then add modifier "mighty shot" = half(bs_bonus)\n}\n\n# --- Crushing Blow (tier 3, DH2 core p.125) --------------------------------------\n# "He adds half his Weapon Skill bonus (rounding up) to damage he inflicts with\n# melee attacks."\ntalent "Crushing Blow" tier 3 {\n  meta { page 125 }\n  on DAMAGE_MODS\n  when has_talent("Crushing Blow") and is_melee\n  then add modifier "crushing blow" = half(ws_bonus)\n}\n\n# --- Hatred (DH2 core p.128) ------------------------------------------------------\n# "When fighting opponents of that group in close combat, the Acolyte gains a\n# +10 bonus to all Weapon Skill tests made against them", plus a Willpower test\n# to retreat/surrender. The hated group is parametric (Hatred (Mutants), \u2026) and\n# the engine cannot know who the current foe is \u2014 flag the engagement with the\n# "Hated Foe" circumstance when the target belongs to the hated group.\ntalent "Hatred" {\n  meta { page 128 }\n  on MODIFIERS\n  when has_talent("Hatred") and is_melee and has_circumstance("Hated Foe")\n    then add modifier "hatred" = 10\n  when has_talent("Hatred") and is_melee and has_circumstance("Hated Foe")\n    then emit "Hatred", "must pass a Challenging (+0) Willpower test to retreat or surrender against the hated foe"\n}\n\n# --- Iron Jaw (tier 1, DH2 core p.128) --------------------------------------------\n# "Whenever this character becomes Stunned, he may make a Challenging (+0)\n# Toughness test as a Free Action to ignore the effects." Modelled as upkeep\n# policy: at the start of his turn a Stunned character with the talent rolls\n# the test (against the encounter-stored Toughness); a pass means the GM clears\n# the condition.\ntalent "Iron Jaw" tier 1 {\n  meta { page 128 }\n  on upkeep.TURN_START\n  when has_talent("Iron Jaw") and has_condition("Stunned")\n  then require_test "Toughness" 0 "remains Stunned (Iron Jaw: a pass shakes off the condition \u2014 Free Action)"\n}\n\n# --- Die Hard (tier 1, DH2 core p.125) --------------------------------------------\n# "When this character would suffer a level of Fatigue due to the Blood Loss\n# condition, he makes a Challenging (+0) Willpower test; if he succeeds, he does\n# not suffer a level of Fatigue." Runtime override of the base Blood Loss upkeep\n# rule (conditions.dsl): suppress the automatic Fatigue note and roll the\n# Willpower test instead (priority 10, before Blood Loss at 50).\ntalent "Die Hard" tier 1 {\n  meta { page 125 }\n  on upkeep.TURN_START\n  priority 10\n  when has_talent("Die Hard") and has_condition("Blood Loss")\n    then suppress "Blood Loss"\n  when has_talent("Die Hard") and has_condition("Blood Loss")\n    then require_test "Willpower" 0 "suffers 1 level of Fatigue (Blood Loss)"\n}\n', "traits.dsl": 'dsl 3\npackage "dh2.core.traits" {\n  system "dh2"\n  source "Dark Heresy 2e Core Rulebook"\n}\n\n# DH2.0 traits \u2014 innate abilities (like talents, but NOT bought with XP).\n# Gated on has_trait("\u2026"). A character/creature\'s traits are supplied per\n# attack via traits: ["Brutal Charge (3)", \u2026].\n# Levelled traits read their value with trait_level("Name", default).\n\n# Brutal Charge (X): on a melee Charge, add X to the damage inflicted.\ntrait "Brutal Charge" {\n  on DAMAGE_MODS\n  priority 50\n  when has_trait("Brutal Charge") and is_melee and action == "Charge"\n  then add modifier "brutal charge" = trait_level("Brutal Charge", 0)\n}\n\n# --- Auto-Stabilised (DH2 core p.134) ------------------------------------------\n# "These beings always count as braced when firing heavy weapons \u2026 and not\n# suffer any penalties to hit." Cancels the Unbraced configuration penalty\n# (configurations.dsl, -30 per p.219).\ntrait "Auto-Stabilised" {\n  meta { page 134 }\n  on MODIFIERS\n  priority 100\n  when has_trait("Auto-Stabilised") and configuration("Unbraced")\n  then cancel modifier "unbraced"\n}\n\n# --- Fear (X) (DH2 core p.136, Table 4-5) ---------------------------------------\n# A character who encounters a Fear creature makes a Willpower test with a\n# penalty by rating: Disturbing (1) +0, Frightening (2) -10, Horrifying (3) -20,\n# Terrifying (4) -30. Runs in the GENERIC test pipeline: roll the Willpower test\n# via /api/test with testName "Fear" and the creature as `foe`\n# ({ foe: { traits: ["Fear (3)"] } }); on a failure the character rolls on\n# Table 8-11: Shock (p.287), +10 per degree of failure.\ntrait "Fear" {\n  meta { page 136 }\n  on test.MODIFIERS\n  when test_name == "Fear" and target.has_trait("Fear")\n  then add modifier "fear rating" = -10 * (target.trait_level("Fear", 1) - 1)\n}\n\n# --- From Beyond (DH2 core p.136) ------------------------------------------------\n# "Such a creature is immune to Fear, Pinning, Insanity points, and psychic\n# powers used to cloud, control, or delude its mind." Surfaces the immunity when\n# a Fear or Pinning test is rolled FOR the creature \u2014 no test is actually needed.\ntrait "From Beyond" {\n  meta { page 136 }\n  on test.MODIFIERS\n  priority 100\n  when (test_name == "Fear" or test_name == "Pinning") and has_trait("From Beyond")\n  then emit "From Beyond", "immune to Fear, Pinning, Insanity points, and mind-clouding psychic powers \u2014 no test is needed"\n}\n\n# --- Regeneration (X) (DH2 core p.137) --------------------------------------------\n# "Each round, at the start of its turn, the creature can make a Toughness test\n# to remove an amount of damage indicated in the parentheses." Upkeep policy:\n# the tick rolls the Toughness test against the encounter-stored stats; on a\n# pass the GM removes trait-rating damage (healing is advisory \u2014 wounds.taken\n# is not auto-reduced).\ntrait "Regeneration" {\n  meta { page 137 }\n  on upkeep.TURN_START\n  when has_trait("Regeneration")\n  then require_test "Toughness" 0 "no regeneration this round (a pass removes damage equal to the trait rating)"\n}\n\n# --- Sturdy (DH2 core p.138) --------------------------------------------------------\n# "Sturdy creatures \u2026 gain a +20 bonus to tests made to resist Grappling and\n# Knock Down actions, and uses of the Takedown talent." Generic test pipeline:\n# tag the resistance roll with the matching testName.\ntrait "Sturdy" {\n  meta { page 138 }\n  on test.MODIFIERS\n  when has_trait("Sturdy") and (test_name == "Grapple" or test_name == "Knock Down" or test_name == "Takedown")\n  then add modifier "sturdy" = 20\n}\n\n# Unnatural Characteristic (X) (DH2 core p.139) is NOT a trait rule \u2014 it is a\n# property of a characteristic, handled by the engine: +X to that characteristic\'s\n# bonus (Unnatural Strength \u2192 melee Strength Bonus; Unnatural Toughness \u2192 soak TB)\n# and \u2308X/2\u2309 bonus degrees of success on a successful test with it (WS/BS to-hit,\n# WS Parry, Ag Dodge). Supply it via the `unnatural:{ws,bs,s,ag}` object on the\n# attacker/defender (and `unnaturalToughness` for soak), exposed in the Roll UI as\n# the per-characteristic "Unnatural" inputs \u2014 see rollTest()/runToHit() in\n# lib/engine.mjs. (Previously a simplified flat-damage trait lived here; it was\n# superseded by the characteristic-based implementation.)\n', "conditions.dsl": `dsl 3
+var ruleSources = { "weapon-qualities.dsl": 'dsl 3\npackage "dh2.core.weapon-qualities" {\n  system "dh2"\n  source "Dark Heresy 2e Core Rulebook"\n}\n\n# DH2 weapon qualities \u2014 authored in the trait DSL.\n#\n# This file IS the interpretation of the DH2 weapon special qualities; it is\n# data, fully separated from the roll engine. It is compiled to checkpoint\n# effects at load time (see lib/rules/index.mjs) and was previously the native\n# module lib/rules/weapon-qualities.mjs \u2014 re-authoring it here dogfoods the DSL.\n#\n# Priorities mirror the original native ordering.\n\n# --- dice pool ---------------------------------------------------------------\nquality "Tearing" {\n  meta { page 150 }\n  on DAMAGE_POOL\n  priority 10\n  when has_quality("Tearing")\n  then set extra_dice += 1; flag keep_highest          # roll one extra die, keep the original count highest\n}\n\n# --- per-die adjustment + Righteous Fury threshold ---------------------------\nquality "Vengeful" {\n  meta { page 150 }\n  on DIE_ADJUST\n  priority 0\n  when has_quality("Vengeful")\n  then set rf_threshold = quality_level("Vengeful", 9)\n}\n\nquality "Proven" {\n  meta { page 148 }\n  on DIE_ADJUST\n  priority 10\n  when has_quality("Proven")\n  then floor_die quality_level("Proven", 2)\n}\n\nquality "Primitive" {\n  meta { page 148 }\n  on DIE_ADJUST\n  priority 20\n  when has_quality("Primitive")\n  then cap_die quality_level("Primitive", 7)\n}\n\n# --- Accurate (DH2 core p.150) ----------------------------------------------\n# Requires the Aim action. Two rules share the name "Accurate" so a single\n# toggle controls both halves of the quality:\n#   1) +10 to hit while aiming (on top of the aim bonus);\n#   2) +1d10 damage per two DoS (max +2d10) on an aimed single shot.\nquality "Accurate" {\n  meta { page 145 }\n  on MODIFIERS\n  priority 50\n  when has_quality("Accurate") and (half_aim or full_aim)\n  then add modifier "accurate_aim" = 10\n}\n\nquality "Accurate" {\n  meta { page 145 }\n  on DAMAGE_MODS\n  priority 10\n  when has_quality("Accurate") and (half_aim or full_aim) and (action == "Standard Attack" or action == "Called Shot") and dos >= 3\n    then add modifier "accurate" = 1d10\n  when has_quality("Accurate") and (half_aim or full_aim) and (action == "Standard Attack" or action == "Called Shot") and dos >= 5\n    then add modifier "accurate x 2" = 1d10\n}\n\n# --- Inaccurate (DH2 core p.146) --------------------------------------------\n# The opposite of Accurate: the character gains NO benefit from the Aim action\n# with this weapon. The aim bonus is injected by the combat-action `aim-modifier`\n# effect at MODIFIERS priority 10 (and Accurate adds "accurate_aim" at 50); this\n# runs at priority 100 (canceller convention) to strip the aim bonus afterwards.\n# Accurate + Inaccurate on the same weapon is a data conflict \u2014 see the\n# mutual-exclusion check in lib/rules/quality-conflicts.mjs, which surfaces it.\nquality "Inaccurate" {\n  meta { page 147 }\n  on MODIFIERS\n  priority 100\n  when has_quality("Inaccurate")\n  then cancel modifier "aim"\n}\n\n# --- hit count ---------------------------------------------------------------\nquality "Storm" {\n  meta { page 149 }\n  on HIT_COUNT_MULT\n  priority 10\n  when has_quality("Storm")\n  then multiply_hits 2\n}\n\nquality "Twin-Linked" {\n  meta { page 150 }\n  on HIT_COUNT_BONUS\n  priority 10\n  when has_quality("Twin-Linked") and dos > 1\n  then set extra_hits += 1\n}\n\n# --- penetration -------------------------------------------------------------\n# `set pen += pen` adds the base penetration again under the rule-named slot\n# ("razor sharp" / "melta"), doubling effective penetration.\n# Razor Sharp (DH2 core p.150): at 3+ DoS, double penetration \u2014 any attack\n# (melee OR ranged), so there is no is_melee gate.\nquality "Razor Sharp" {\n  meta { page 148 }\n  on PENETRATION\n  priority 10\n  when dos > 2 and has_quality("Razor Sharp")\n  then set pen += pen\n}\n\nquality "Melta" {\n  meta { page 148 }\n  on PENETRATION\n  priority 20\n  when is_ranged and has_quality("Melta") and (range == "Short Range" or range == "Point Blank")\n  then set pen += pen\n}\n\n# Lance (DH2 core p.147): variable penetration scaling with accuracy. Increase\n# penetration by the weapon\'s BASE value once per degree of success, e.g. base\n# pen 5 at 3 DoS adds 3\xD75=15 \u2192 total 20. `pen` reads the base penetration and\n# `dos` the to-hit degrees (both live on the context at PENETRATION).\nquality "Lance" {\n  meta { page 147 }\n  on PENETRATION\n  priority 15\n  when has_quality("Lance") and dos > 0\n  then set pen += pen * dos\n}\n\n# --- malfunctions (ranged) ---------------------------------------------------\n# Overheats on 92+; Best-craftsmanship weapons never overheat (p.149). An Overheats\n# weapon OVERRIDES the baseline Jam mechanic \u2014 it overheats instead of jamming, so\n# the first branch suppresses "Jam" (priority 10, before the Jam mechanic at 50)\n# whenever the weapon has Overheats; the second branch emits the overheat on 92+.\nquality "Overheats" {\n  meta { page 148 }\n  on POST_ROLL\n  priority 10\n  when is_ranged and has_quality("Overheats")\n    then suppress "Jam"\n  when is_ranged and roll > 91 and has_quality("Overheats") and craftsmanship != "Best"\n    then emit "Overheats", "The weapon overheats forcing it to be dropped on the ground!"\n}\n\n# Flexible (DH2 core p.145): linked/non-rigid weapons (whips, flails) deny defensive\n# counters \u2014 an attack from a Flexible weapon CANNOT be Parried (the engine refuses a\n# Parry reaction against it and notes it). A Flexible weapon can still itself Parry.\nquality "Flexible" {\n  meta { page 145 }\n  on POST_ROLL\n  when has_quality("Flexible")\n  then flag no_parry\n}\n\n# Graviton (DH2 core p.146): on a hit, inflicts additional damage equal to the\n# target\'s Armour points on the struck location (effectively negating armour). The\n# vehicle interaction (facing armour + always rolling Motive Systems Critical\n# Effects) is deferred \u2014 see POTENTIAL_FEATURES.md.\nquality "Graviton" {\n  meta { page 146 }\n  on DAMAGE_MODS\n  when has_quality("Graviton")\n  then add modifier "graviton" = target.armour\n}\n\n# Jam is a base weapon MECHANIC (see mechanics.dsl), not a quality. These two\n# qualities adjust the jam threshold (default 96 \u2192 jams on 97+):\n#   Reliable \u2192 jams only on 100; Unreliable \u2192 jams on 91+.\nquality "Reliable" {\n  meta { page 148 }\n  on POST_ROLL\n  priority 10\n  when is_ranged and has_quality("Reliable")\n  then set jam_threshold = 99\n}\n\nquality "Unreliable" {\n  meta { page 150 }\n  on POST_ROLL\n  priority 10\n  when is_ranged and has_quality("Unreliable")\n  then set jam_threshold = 90\n}\n\n# --- Scatter (DH2 core p.148) \u2014 the weapon QUALITY (distinct from the scatter\n# game mechanic / Scatter Diagram used by Blast on a miss). Spreading shot: deadly\n# up close, weak at range. Point Blank: +10 to hit and +3 damage; Short Range:\n# +10 to hit; any longer range (Normal/Long/Extreme): \u22123 damage.\nquality "Scatter" {\n  meta { page 148 }\n  on MODIFIERS\n  priority 50\n  when has_quality("Scatter") and (range == "Point Blank" or range == "Short Range")\n  then add modifier "scatter (close)" = 10\n}\nquality "Scatter" {\n  meta { page 148 }\n  on DAMAGE_MODS\n  priority 50\n  when has_quality("Scatter") and range == "Point Blank"\n    then add modifier "scatter" = 3\n  when has_quality("Scatter") and (range == "Normal Range" or range == "Long Range" or range == "Extreme Range")\n    then add modifier "scatter" = -3\n}\n\n# --- Force (DH2 core p.145) \u2014 the STATIC half ---------------------------------\n# In a psyker\'s hands (psy_rating > 0) a Force weapon deals +psy-rating damage,\n# gains +psy-rating penetration, and its damage type becomes Energy. The Focus\n# Power rider (+1d10 per DoS ignoring Armour and Toughness, Opposed Willpower)\n# needs the psychic subsystem \u2014 Phase 6. Force weapons are immune to Power Field\n# (already checked by that rule).\nquality "Force" {\n  meta { page 145 }\n  on DAMAGE_POOL\n  priority 0\n  when has_quality("Force") and is_psyker\n  then set damage_type = "Energy"\n}\nquality "Force" {\n  meta { page 145 }\n  on DAMAGE_MODS\n  when has_quality("Force") and is_psyker\n  then add modifier "force (psy rating)" = psy_rating\n}\nquality "Force" {\n  meta { page 145 }\n  on PENETRATION\n  when has_quality("Force") and is_psyker\n  then set pen += psy_rating\n}\n\n# --- Indirect (X) (DH2 core p.147) --------------------------------------------\n# Fired in a high arc without line of sight: \u221210 to the attack and a Full Action\n# (surfaced as a note \u2014 the tool does not hard-block action economy). EVERY HIT\n# scatters \u2014 it strikes the ground 1d10 \u2212 BS-bonus metres (min 0) from the\n# intended target, direction from the Scatter Diagram (declare scatter_hit).\n# On a miss the shot scatters X\xD71d10 metres (approximation of Xd10 \u2014 noted).\nquality "Indirect" {\n  meta { page 147 }\n  on MODIFIERS\n  when has_quality("Indirect")\n  then add modifier "indirect" = -10\n}\nquality "Indirect" {\n  meta { page 147 }\n  on POST_ROLL\n  when has_quality("Indirect")\n  then emit "Indirect", "fired without line of sight \u2014 requires a Full Action; the GM may add penalties for poor target awareness (p.147)"\n}\nquality "Indirect" {\n  meta { page 147 }\n  on ON_HIT\n  when has_quality("Indirect")\n  then declare scatter_hit 1d10 - bs_bonus\n}\nquality "Indirect" {\n  meta { page 147 }\n  on ON_MISS\n  priority 5\n  when is_ranged and has_quality("Indirect") and not success and roll <= jam_threshold\n  then set scatter = quality_level("Indirect", 1) * 1d10; roll_on "Scatter Diagram"\n}\n\n# --- Smoke (X) (DH2 core p.149) -------------------------------------------------\n# No damage: a hit creates a smokescreen with an X-metre radius at the impact\n# point, lasting 1d10+10 rounds. Like Blast, a Smoke weapon SCATTERS on a miss \u2014\n# the screen still forms at the scatter point, but only Blast also detonates its\n# damage there (the two compose: a Smoke+Blast weapon scatters once, detonates\n# via Blast\'s rule, and smokes via this one).\nquality "Smoke" {\n  meta { page 149 }\n  on ON_HIT\n  when has_quality("Smoke")\n  then declare smoke quality_level("Smoke", 1) duration 1d10 + 10\n}\nquality "Smoke" {\n  meta { page 149 }\n  on ON_MISS\n  priority 1\n  when is_ranged and has_quality("Smoke") and not success and roll <= jam_threshold and not has_quality("Blast")\n    then set scatter = 1d5; roll_on "Scatter Diagram"; declare smoke quality_level("Smoke", 1) duration 1d10 + 10\n  when is_ranged and has_quality("Smoke") and not success and roll <= jam_threshold and has_quality("Blast")\n    then declare smoke quality_level("Smoke", 1) duration 1d10 + 10\n}\n\n# --- Spray (DH2 core p.149) ------------------------------------------------------\n# The no-attack-roll cone: the ENGINE skips the BS test entirely for a Spray\n# weapon (auto-hit, always the Body, Called Shots impossible \u2014 see runToHit) and\n# this rule gives the struck target its Challenging (+0) Agility test; a PASSED\n# test AVOIDS the hit (avoids_hit). Untrained-wielder bonuses (+20/+30) are GM\n# adjustments via the test note. A natural 9 on any damage die jams the weapon\n# (engine \u2014 surfaced as a Jam effect). Cone multi-targeting is out of scope\n# (single representative target).\nquality "Spray" {\n  meta { page 149 }\n  on ON_HIT\n  when has_quality("Spray")\n  then require_test "Agility" 0 "struck by the spray" avoids_hit\n}\n\n# (Maximal \u2014 the high-power firing mode \u2014 moved to configurations.dsl, the\n#  Configurations category.)\n\n# --- on-hit target effects (DH2 core p.150) ---------------------------------\n# Concussive (X): the target makes a Toughness test at -10*X; on a fail it is\n# Stunned (1 round per DoF). If damage dealt exceeds the target\'s SB, Prone.\nquality "Concussive" {\n  meta { page 145 }\n  on ON_HIT\n  when has_quality("Concussive")\n    then require_test "Toughness" (-10 * quality_level("Concussive", 0)) "Stunned for 1 round per degree of failure"\n  when has_quality("Concussive") and damage_dealt > target.sb\n    then apply_status "Prone", "damage dealt exceeds the target\'s Strength Bonus"\n}\n\n# Crippling (X): if the target takes at least one wound, it is Crippled for the\n# encounter. This is automatic on a wound \u2014 there is no defender test to resist\n# it (DH2 RAW). The status carries a severity value of X \u2014 the Rending damage the\n# Crippled target suffers to that location each time it takes more than a Half\n# Action (default 1 if the quality has no rating).\nquality "Crippling" {\n  meta { page 145 }\n  on ON_HIT\n  when has_quality("Crippling") and wounds > 0\n  then apply_status "Crippled" value quality_level("Crippling", 1) location location, "the hit inflicted at least one wound (automatic, no test)"\n}\n\n# Corrosive (DH2 core p.145): the caustic hit corrodes the struck location\'s\n# armour by 1d10 Armour Points (permanent until repaired, cumulative across\n# hits). Any amount beyond the current AP \u2014 or the whole amount if the target is\n# unarmoured there \u2014 is dealt to the target as wounds, ignoring Toughness. The\n# engine resolves the AP loss and overflow (see resolveCorrosion); the report\n# shows the new AP so it can be carried to the next encounter.\nquality "Corrosive" {\n  meta { page 145 }\n  on ON_HIT\n  when has_quality("Corrosive")\n  then corrode 1d10\n}\n\n# Haywire (X) (DH2 core p.146): on a hit, roll 1d10 on the Haywire Field Effects\n# table to determine the strength of the disruptive field.\nquality "Haywire" {\n  meta { page 147 }\n  on ON_HIT\n  when has_quality("Haywire")\n  then roll_on "Haywire Field Effects" area quality_level("Haywire", 1)\n}\n\n# Hallucinogenic (X) (DH2 core p.145): the target makes a Toughness test at -10*X;\n# on a failure it suffers a delusion \u2014 roll 1d10 on the Hallucinogenic Effects\n# table (some results impose conditions on the target).\nquality "Hallucinogenic" {\n  meta { page 146 }\n  on ON_HIT\n  when has_quality("Hallucinogenic")\n  then require_test "Toughness" (-10 * quality_level("Hallucinogenic", 1)) "delusion (roll on Hallucinogenic Effects)" => roll_on "Hallucinogenic Effects"\n}\n\n# Recharge (DH2 core p.146): the weapon must spend a turn recharging before it can\n# fire again. No turn loop in this single-attack tool, so it is surfaced as a note;\n# it is also added dynamically by firing on Maximal (see configurations.dsl).\nquality "Recharge" {\n  meta { page 148 }\n  on POST_ROLL\n  when has_quality("Recharge")\n  then emit "Recharge", "must spend a turn recharging before it can fire again"\n}\n\n# Felling (X) (DH2 core p.145): when calculating damage, reduce the target\'s\n# Unnatural Toughness BONUS by X \u2014 only Unnatural Toughness, never the base\n# Toughness Bonus, and only for this damage calculation. Runs at PENETRATION (the\n# defence-reduction seam) so the soak step applies the reduced Unnatural Toughness.\nquality "Felling" {\n  meta { page 145 }\n  on PENETRATION\n  when has_quality("Felling")\n  then set unnatural_toughness_reduction += quality_level("Felling", 1)\n}\n\n# Flame (DH2 core p.145): whenever a target is struck by a Flame attack (even if it\n# suffers no damage), it must make an Agility test or be set On Fire (p.243).\n# Modelled as a per-hit Agility test that applies the On Fire condition on failure.\n# (RAW Flame is an area attack that doesn\'t use BS \u2014 that targeting is out of scope;\n# the test and its effect are modelled.)\nquality "Flame" {\n  meta { page 145 }\n  on ON_HIT\n  when has_quality("Flame")\n  then require_test "Agility" 0 "set on fire (gains the On Fire condition)" => apply_status "On Fire" duration "until extinguished"\n}\n\n# Shocking (DH2 core p.148): a target that takes at least 1 wound (after Armour\n# and Toughness) must pass a Challenging (+0) Toughness test or suffer 1 level of\n# Fatigue and be Stunned for rounds equal to half its DoF (rounding up). Modelled\n# as a Toughness test gated on wounds > 0; the Stunned condition lands on a fail\n# (the Fatigue level is descriptive \u2014 no fatigue track in this single-attack tool).\nquality "Shocking" {\n  meta { page 149 }\n  on ON_HIT\n  when has_quality("Shocking") and wounds > 0\n  then require_test "Toughness" 0 "1 level of Fatigue and Stunned for rounds equal to half the degrees of failure" => apply_status "Stunned"\n}\n\n# Snare (X) (DH2 core p.148): on a hit, the target makes an Agility test at \u221210\xD7X\n# or is Immobilised (and counts as Helpless until it escapes \u2014 a Full Action\n# Challenging Strength/Agility test at \u221210\xD7X). The Immobilised condition lands on\n# a failed Agility test; escaping is descriptive (no turn loop here).\nquality "Snare" {\n  meta { page 149 }\n  on ON_HIT\n  when has_quality("Snare")\n  then require_test "Agility" (-10 * quality_level("Snare", 0)) "Immobilised (Helpless until it escapes)" => apply_status "Immobilised"\n}\n\n# Toxic (X) (DH2 core p.150): a target that suffers damage (after Armour and\n# Toughness) from a Toxic weapon is poisoned \u2014 it gains the Toxified condition,\n# which (at the end of each of its turns it took damage that round) forces a\n# Toughness test at \u221210\xD7X or 1d10 extra damage. The recurring test needs a turn\n# loop this tool lacks, so it is carried as the Toxified condition (value X) and\n# documented there (conditions.dsl); here we just inflict it on a wounding hit.\nquality "Toxic" {\n  meta { page 150 }\n  on ON_HIT\n  when has_quality("Toxic") and wounds > 0\n  then apply_status "Toxified" value quality_level("Toxic", 0), "took damage from a Toxic weapon (end-of-turn Toughness test or 1d10 additional damage)"\n}\n\n# Sanctified (DH2 core p.148): the weapon is blessed \u2014 its damage counts as Holy,\n# which has unique effects against denizens of the Warp. The concrete interaction\n# in this engine: a Daemonic creature\'s Toughness-bonus increase (its Unnatural\n# Toughness) "is negated by damage inflicted from \u2026 holy attacks" (p.135), so vs a\n# Daemonic target Sanctified strips the target\'s Unnatural Toughness for this hit\n# (reusing Felling\'s reduction). The Holy damage type is surfaced on the result.\n# (Daemonic / From Beyond traits themselves are planned \u2014 see POTENTIAL_FEATURES.md.)\nquality "Sanctified" {\n  meta { page 148 }\n  on DAMAGE_POOL\n  priority 0\n  when has_quality("Sanctified")\n  then set damage_type = "Holy"\n}\nquality "Sanctified" {\n  meta { page 148 }\n  on PENETRATION\n  priority 30\n  when has_quality("Sanctified") and target.has_trait("Daemonic")\n  then set unnatural_toughness_reduction += target.unnatural_toughness\n}\n\n# --- defensive / parry qualities (DH2 core p.150) ---------------------------\n# Balanced grants +10 to Weapon Skill tests made to Parry (only once even with\n# two Balanced weapons \u2014 it is keyed by the modifier name, so it can\'t stack).\nquality "Balanced" {\n  meta { page 145 }\n  on PARRY\n  when has_quality("Balanced")\n  then add modifier "balanced" = 10\n}\n\n# Defensive (e.g. a shield): +15 to Parry, but -10 to attacks made with it.\nquality "Defensive" {\n  meta { page 145 }\n  on PARRY\n  when has_quality("Defensive")\n  then add modifier "defensive" = 15\n}\nquality "Defensive" {\n  meta { page 145 }\n  on MODIFIERS\n  when has_quality("Defensive") and is_attack\n  then add modifier "defensive" = -10\n}\n\n# Unbalanced (DH2 core p.150): cumbersome offensively-strong weapons. \u221210 to Parry\n# tests, and they cannot be used to make Lightning Attack actions (surfaced as a\n# note \u2014 the tool does not hard-block action choice).\nquality "Unbalanced" {\n  meta { page 150 }\n  on PARRY\n  when has_quality("Unbalanced")\n  then add modifier "unbalanced" = -10\n}\nquality "Unbalanced" {\n  meta { page 150 }\n  on POST_ROLL\n  when has_quality("Unbalanced") and is_action("Lightning Attack")\n  then emit "Unbalanced", "cannot be used to make Lightning Attack actions"\n}\n\n# Unwieldy (DH2 core p.150): huge, top-heavy weapons. They CANNOT be used to Parry\n# (the parry flow refuses the reaction \u2014 see resolveParry) and cannot make\n# Lightning Attack actions.\nquality "Unwieldy" {\n  meta { page 150 }\n  on PARRY\n  when has_quality("Unwieldy")\n  then flag cannot_parry\n}\nquality "Unwieldy" {\n  meta { page 150 }\n  on POST_ROLL\n  when has_quality("Unwieldy") and is_action("Lightning Attack")\n  then emit "Unwieldy", "cannot be used to make Lightning Attack actions"\n}\n\n# Power Field (DH2 core p.148): a disruptive energy field. When this weapon\n# SUCCESSFULLY Parries an attack made with a weapon that lacks Power Field, roll\n# 1d100 on Power Field Destruction; on 26+ the attacker\'s weapon is destroyed.\n# Weapons with the Force or Warp Weapon quality, and Natural Weapons, are immune.\n# Runs at POST_PARRY (success known); `opposing_has_quality` reads the parried\n# (attacking) weapon, `opposing_present` guards the bare /api/parry test.\nquality "Power Field" {\n  meta { page 148 }\n  on POST_PARRY\n  when has_quality("Power Field") and success and opposing_weapon.present\n    and not opposing_weapon.has_quality("Power Field") and not opposing_weapon.has_quality("Force")\n    and not opposing_weapon.has_quality("Warp Weapon") and not opposing_weapon.has_quality("Natural Weapon")\n  then roll_on "Power Field Destruction"\n}\n\n# --- Blast (X) scatter on a miss (DH2 core p.150 / scatter p.230) ------------\n# A Blast weapon scatters when the firer misses. The scatter distance defaults\n# to 1d5 metres (p.230); the engine rolls the 1d10 direction on the Scatter\n# Diagram. This runs at priority 0 so the 1d5 base is established BEFORE any\n# other rules \u2014 which may increase or decrease it via `set scatter += \u2026`\n# (modifiers accumulate separately and are summed onto the base at the end).\n#\n# `detonate` makes the weapon still resolve its damage at the scatter point even\n# though the shot missed \u2014 a blast goes off wherever it lands and may catch other\n# targets in the area. The `roll <= jam_threshold` gate means a *jam* (which also\n# fails the to-hit) does NOT detonate: a jammed weapon never fired.\nquality "Blast" {\n  meta { page 145 }\n  on ON_MISS\n  priority 0\n  when is_ranged and has_quality("Blast") and not success and roll <= jam_threshold\n  then set scatter = 1d5; flag detonate; roll_on "Scatter Diagram"\n}\n', "talents.dsl": `dsl 3
+package "dh2.core.talents" {
+  system "dh2"
+  source "Dark Heresy 2e Core Rulebook"
+}
+
+# DH2 TALENTS (XP-bought abilities) that gate on combat state \u2014 authored in the DSL.
+# This file holds talents ONLY (kind \`talent\`, gated on has_talent(...)); innate
+# DH2.0 traits live separately in traits.dsl (kind \`trait\`, has_trait(...)). The two
+# are distinct categories in the rule taxonomy and the UI.
+#
+# Talent rules are always present in the registry but only fire when the
+# character actually HAS the talent (has_talent(...)) AND the situation is
+# right (the activation predicate). This is the activation/effect split that
+# lets e.g. Ambidextrous check "am I dual-wielding?" before touching a penalty.
+#
+# Priorities: penalty injectors at 10, cancellers/reducers at 100 (so they run
+# after the penalties they modify are in place).
+
+# (The base off-hand -20 circumstance moved to circumstances.dsl.)
+
+# --- Two-Weapon Wielder ------------------------------------------------------
+# Lets a character attack with two weapons; each attack suffers -20.
+talent "Two-Weapon Wielder" {
+  on MODIFIERS
+  priority 10
+  when has_talent("Two-Weapon Wielder") and dual_wielding
+  then add modifier "two_weapon" = -20
+}
+
+# --- Ambidextrous (tier 1) ---------------------------------------------------
+# Two branches, each with its own activation:
+#  - firing a single off-hand weapon: negate the off-hand penalty;
+#  - combined with Two-Weapon Wielder while dual-wielding: reduce the
+#    two-weapon penalty -20 -> -10.
+talent "Ambidextrous" tier 1 {
+  on MODIFIERS
+  priority 100
+  when has_talent("Ambidextrous") and firing_offhand and not dual_wielding
+    then cancel modifier "off_hand"
+  when has_talent("Ambidextrous") and has_talent("Two-Weapon Wielder") and dual_wielding
+    then set modifier "two_weapon" = -10
+}
+
+# --- Two-Weapon Master (tier 3, DH2 core p.132) --------------------------------
+# "When armed with two single-handed weapons \u2026 he ignores the \u201320 penalty for
+# Two-Weapon Fighting." Priority 110: after Two-Weapon Wielder injects the -20
+# (10) and after Ambidextrous halves it (100), the master removes what is left.
+talent "Two-Weapon Master" tier 3 {
+  meta { page 132 }
+  on MODIFIERS
+  priority 110
+  when has_talent("Two-Weapon Master") and dual_wielding
+  then cancel modifier "two_weapon"
+}
+
+# --- Marksman (tier 2, DH2 core p.130) ------------------------------------------
+# "\u2026suffers no penalties for making Ballistic Skill tests at Long or Extreme
+# range." The engine injects the band penalty as the "range" modifier
+# (combat-actions.mjs RANGE_BANDS: Long -10, Extreme -30); Marksman cancels it.
+# Bonuses (Point Blank/Short) are untouched \u2014 only the PENALTY bands gate here.
+talent "Marksman" tier 2 {
+  meta { page 130 }
+  on MODIFIERS
+  priority 100
+  when has_talent("Marksman") and is_ranged and (range == "Long Range" or range == "Extreme Range")
+  then cancel modifier "range"
+}
+
+# --- Precision Killer (tier 2, DH2 core p.130) -----------------------------------
+# "When making a Called Shot \u2026 he does not suffer the usual \u201320 penalty." The
+# Called Shot action's -20 IS the action modifier ("attack"), so cancelling it
+# yields the RAW net 0. Specialised entries ("Precision Killer (Ranged)"/
+# "(Melee)") gate on the matching attack type; a bare "Precision Killer" entry
+# (specialisation not recorded) applies to both.
+talent "Precision Killer" tier 2 {
+  meta { page 130 }
+  on MODIFIERS
+  priority 100
+  when has_talent("Precision Killer (Ranged)") and is_ranged and action == "Called Shot"
+    then cancel modifier "attack"
+  when has_talent("Precision Killer (Melee)") and is_melee and action == "Called Shot"
+    then cancel modifier "attack"
+  when has_talent("Precision Killer") and not has_talent("Precision Killer (") and action == "Called Shot"
+    then cancel modifier "attack"
+}
+
+# --- Mighty Shot (tier 3, DH2 core p.130) ----------------------------------------
+# "He adds half his Ballistic Skill bonus (rounded up) to damage he inflicts
+# with ranged weapons." half() rounds up (DH2 p.18 default).
+talent "Mighty Shot" tier 3 {
+  meta { page 130 }
+  on DAMAGE_MODS
+  when has_talent("Mighty Shot") and is_ranged
+  then add modifier "mighty shot" = half(bs_bonus)
+}
+
+# --- Crushing Blow (tier 3, DH2 core p.125) --------------------------------------
+# "He adds half his Weapon Skill bonus (rounding up) to damage he inflicts with
+# melee attacks."
+talent "Crushing Blow" tier 3 {
+  meta { page 125 }
+  on DAMAGE_MODS
+  when has_talent("Crushing Blow") and is_melee
+  then add modifier "crushing blow" = half(ws_bonus)
+}
+
+# --- Hatred (DH2 core p.128) ------------------------------------------------------
+# "When fighting opponents of that group in close combat, the Acolyte gains a
+# +10 bonus to all Weapon Skill tests made against them", plus a Willpower test
+# to retreat/surrender. The hated group is parametric (Hatred (Mutants), \u2026) and
+# the engine cannot know who the current foe is \u2014 flag the engagement with the
+# "Hated Foe" circumstance when the target belongs to the hated group.
+talent "Hatred" {
+  meta { page 128 }
+  on MODIFIERS
+  when has_talent("Hatred") and is_melee and has_circumstance("Hated Foe")
+    then add modifier "hatred" = 10
+  when has_talent("Hatred") and is_melee and has_circumstance("Hated Foe")
+    then emit "Hatred", "must pass a Challenging (+0) Willpower test to retreat or surrender against the hated foe"
+}
+
+# --- Iron Jaw (tier 1, DH2 core p.128) --------------------------------------------
+# "Whenever this character becomes Stunned, he may make a Challenging (+0)
+# Toughness test as a Free Action to ignore the effects." Modelled as upkeep
+# policy: at the start of his turn a Stunned character with the talent rolls
+# the test (against the encounter-stored Toughness); a pass means the GM clears
+# the condition.
+talent "Iron Jaw" tier 1 {
+  meta { page 128 }
+  on upkeep.TURN_START
+  when has_talent("Iron Jaw") and has_condition("Stunned")
+  then require_test "Toughness" 0 "remains Stunned (Iron Jaw: a pass shakes off the condition \u2014 Free Action)"
+}
+
+# --- Die Hard (tier 1, DH2 core p.125) --------------------------------------------
+# "When this character would suffer a level of Fatigue due to the Blood Loss
+# condition, he makes a Challenging (+0) Willpower test; if he succeeds, he does
+# not suffer a level of Fatigue." Runtime override of the base Blood Loss upkeep
+# rule (conditions.dsl): suppress the automatic Fatigue note and roll the
+# Willpower test instead (priority 10, before Blood Loss at 50).
+talent "Die Hard" tier 1 {
+  meta { page 125 }
+  on upkeep.TURN_START
+  priority 10
+  when has_talent("Die Hard") and has_condition("Blood Loss")
+    then suppress "Blood Loss"
+  when has_talent("Die Hard") and has_condition("Blood Loss")
+    then require_test "Willpower" 0 "suffers 1 level of Fatigue (Blood Loss)"
+}
+
+# ============================ wavelet 1 (2026-07) ==============================
+# The first DSL-content sweep from the talent triage: roster-held, DSL-now
+# talents, verified against the core/supplement PDF text. GM-flagged
+# circumstances ("Hated Foe" pattern) gate the situational ones.
+
+# --- Resistance (X) (tier 1, DH2 core p.131) -----------------------------------
+# "Each time he selects this talent, choose one area of resistance. He gains a
+# +10 bonus when making tests to resist effects of this type." One branch per
+# RAW specialisation (Cold, Fear, Heat, Poisons, Psychic Powers, Radiation,
+# Vacuum); the resist test's tag is the specialisation name (is_test is
+# spelling-blind). "Other" specialisations are GM territory.
+talent "Resistance" tier 1 {
+  meta { page 131 }
+  on test.MODIFIERS
+  when has_talent("Resistance (Cold)")           and is_test("Cold")           then add modifier "resistance" = 10
+  when has_talent("Resistance (Fear)")           and is_test("Fear")           then add modifier "resistance" = 10
+  when has_talent("Resistance (Heat)")           and is_test("Heat")           then add modifier "resistance" = 10
+  when has_talent("Resistance (Poisons)")        and is_test("Poisons")        then add modifier "resistance" = 10
+  when has_talent("Resistance (Psychic Powers)") and is_test("Psychic Powers") then add modifier "resistance" = 10
+  when has_talent("Resistance (Radiation)")      and is_test("Radiation")      then add modifier "resistance" = 10
+  when has_talent("Resistance (Vacuum)")         and is_test("Vacuum")         then add modifier "resistance" = 10
+}
+
+# --- Jaded (tier 1, DH2 core p.128) ---------------------------------------------
+# "Mundane events, from death's horrific visage to xenos abominations, do not
+# force him to gain Insanity points or make Fear tests. Daemons, Warp
+# manifestations, and other unnatural effects still affect him normally."
+# The GM flags the "Supernatural" circumstance when the Fear source is
+# unnatural \u2014 unflagged Fear tests are mundane and Jaded voids them (advisory).
+talent "Jaded" tier 1 {
+  meta { page 128 }
+  on test.MODIFIERS
+  priority 100
+  when has_talent("Jaded") and is_test("Fear") and not has_circumstance("Supernatural")
+  then emit "Jaded", "mundane horrors force no Fear test and no Insanity gain \u2014 daemons, Warp manifestations, and other unnatural threats still apply (flag the Supernatural circumstance)"
+}
+
+# --- Target Selection (tier 3, DH2 core p.132) ----------------------------------
+# "He can shoot into melee with no penalty. If he also makes an Aim action
+# beforehand, he prevents any chance of hitting friendly targets as well."
+# Cancels the -20 injected by the "Firing into Melee" circumstance
+# (circumstances.dsl, p.229) at priority 100.
+talent "Target Selection" tier 3 {
+  meta { page 132 }
+  on MODIFIERS
+  priority 100
+  when has_talent("Target Selection") and is_ranged and has_circumstance("Firing into Melee")
+    then cancel modifier "firing_into_melee"
+  when has_talent("Target Selection") and is_ranged and has_circumstance("Firing into Melee") and (half_aim or full_aim)
+    then emit "Target Selection", "aimed beforehand \u2014 no chance of hitting friendly targets in the melee"
+}
+
+# --- Peer (X) (tier 1, DH2 core p.130) ------------------------------------------
+# "He gains a +10 bonus to all Fellowship and Influence tests when interacting
+# with this chosen group." The group is parametric (Peer (Government), \u2026) and
+# the engine cannot know who the interaction is with \u2014 the GM flags the
+# "Peer Group" circumstance (Hatred's "Hated Foe" pattern). Fellowship-based
+# skill tags per the core skill table: Charm, Command, Deceive, Inquiry; plus
+# bare Fellowship and Influence tests. Stacked awards (Peer (X) \u2192 +10\xD7X,
+# p.130) are a GM-side adjustment.
+talent "Peer" tier 1 {
+  meta { page 130 }
+  on test.MODIFIERS
+  when has_talent("Peer") and has_circumstance("Peer Group")
+    and (is_test("Charm") or is_test("Command") or is_test("Deceive") or is_test("Inquiry") or is_test("Fellowship") or is_test("Influence"))
+  then add modifier "peer" = 10
+}
+
+# --- Double Tap (tier 2, DH2 core p.125) ----------------------------------------
+# "When making a second ranged attack action in the same turn against the same
+# target, he gains a +20 bonus to the attack test if his first attack scored
+# one or more successful hits." The engine has no attack history \u2014 the GM
+# flags the "Follow-Up Shot" circumstance when the RAW conditions hold.
+talent "Double Tap" tier 2 {
+  meta { page 125 }
+  on MODIFIERS
+  when has_talent("Double Tap") and is_ranged and has_circumstance("Follow-Up Shot")
+  then add modifier "double tap" = 20
+}
+
+# --- Counter Attack (tier 2, DH2 core p.125) ------------------------------------
+# "Once per turn, after successfully Parrying an opponent's attack, this
+# character may immediately make a Standard Attack action as a Free Action
+# against that opponent using the weapon with which he Parried. The character
+# suffers a -20 penalty on the Weapon Skill test for this attack." Advisory at
+# POST_PARRY (success known); the follow-up attack is rolled by the player.
+talent "Counter Attack" tier 2 {
+  meta { page 125 }
+  on POST_PARRY
+  when has_talent("Counter Attack") and success
+  then emit "Counter Attack", "may immediately make one Standard Attack as a Free Action against the parried opponent with this weapon, at -20 Weapon Skill (once per turn)"
+}
+
+# --- Mounted Warrior (tier 1, Enemies Within p.58) ------------------------------
+# "He then reduces any penalty for making corresponding attacks (Melee or
+# Ranged) from a moving vehicle or mount by 10 for each time the talent has
+# been purchased in that specialisation." The GM applies the situational
+# vehicle/mount penalty and flags the "Mounted" circumstance; this rule offsets
+# 10 of it (one purchase \u2014 stacked purchases and the cap at the actual penalty
+# are GM-side). Specialised entries gate on attack type; a bare entry
+# (specialisation not recorded) applies to both \u2014 Precision Killer pattern.
+talent "Mounted Warrior" tier 1 {
+  meta { page 58 source "Dark Heresy 2e Enemies Within" }
+  on MODIFIERS
+  priority 100
+  when has_talent("Mounted Warrior (Ranged)") and is_ranged and has_circumstance("Mounted")
+    then add modifier "mounted warrior" = 10
+  when has_talent("Mounted Warrior (Melee)") and is_melee and has_circumstance("Mounted")
+    then add modifier "mounted warrior" = 10
+  when has_talent("Mounted Warrior") and not has_talent("Mounted Warrior (") and has_circumstance("Mounted")
+    then add modifier "mounted warrior" = 10
+}
+
+# --- Eye of Vengeance (tier 3, DH2 core p.127) ----------------------------------
+# "Before making a ranged Standard Attack action, he can spend a Fate point.
+# If he does so, he adds the number of degrees of success scored on the attack
+# test to both his damage and penetration for the hit." The Fate spend is the
+# "Eye of Vengeance" configuration toggle (honor system until Fate tracking
+# lands); three blocks \u2014 advisory at POST_ROLL, +DoS at DAMAGE_MODS, +DoS at
+# PENETRATION.
+talent "Eye of Vengeance" tier 3 {
+  meta { page 127 }
+  on POST_ROLL
+  when has_talent("Eye of Vengeance") and configuration("Eye of Vengeance") and is_ranged and action == "Standard Attack" and success
+  then emit "Eye of Vengeance", "Fate point spent \u2014 the attack's degrees of success are added to damage and penetration for the hit"
+}
+talent "Eye of Vengeance" tier 3 {
+  meta { page 127 }
+  on DAMAGE_MODS
+  when has_talent("Eye of Vengeance") and configuration("Eye of Vengeance") and is_ranged and action == "Standard Attack"
+  then add modifier "eye of vengeance" = dos
+}
+talent "Eye of Vengeance" tier 3 {
+  meta { page 127 }
+  on PENETRATION
+  when has_talent("Eye of Vengeance") and configuration("Eye of Vengeance") and is_ranged and action == "Standard Attack" and success
+  then set pen += dos
+}
+
+# --- Grenadier (tier 1, Enemies Without p.62) -----------------------------------
+# "When the character misses with a thrown weapon or weapon with the Blast
+# quality, he may reduce the distance it scatters by a number of metres up to
+# half his BS bonus." Runs after Blast establishes the 1d5 base (priority 0);
+# the full reduction is applied ("up to" \u2014 reducing less is never better; the
+# engine floors the final distance at 0). Thrown weapons without Blast have no
+# scatter model yet, so this rides the Blast scatter only.
+talent "Grenadier" tier 1 {
+  meta { page 62 source "Dark Heresy 2e Enemies Without" }
+  on ON_MISS
+  priority 10
+  when has_talent("Grenadier") and is_ranged and has_quality("Blast") and not success and roll <= jam_threshold
+  then set scatter += 0 - half(bs_bonus)
+}
+
+# --- Push the Limit (tier 3, Enemies Without p.63) -------------------------------
+# "Once per round, the character may add +20 to an Operate test (or Survival
+# test in the case of living steeds); however, if he fails the test by 4 or
+# more degrees of failure, immediately roll 1d5 on Table 7-32: Motive Systems
+# Critical Hit Effects \u2026 If he is riding a living mount, roll 1d5 on Table
+# 7-18: Impact Critical Effects - Leg". Activation is the "Push the Limit"
+# condition (a per-roll player declaration, like Half/Full Aim \u2014 the test
+# pipeline has no configuration channel); once-per-round is honor-system.
+talent "Push the Limit" tier 3 {
+  meta { page 63 source "Dark Heresy 2e Enemies Without" }
+  on test.MODIFIERS
+  when has_talent("Push the Limit") and has_condition("Push the Limit") and (is_test("Operate") or is_test("Survival"))
+  then add modifier "push the limit" = 20
+}
+talent "Push the Limit" tier 3 {
+  meta { page 63 source "Dark Heresy 2e Enemies Without" }
+  on test.POST_ROLL
+  when has_talent("Push the Limit") and has_condition("Push the Limit") and (is_test("Operate") or is_test("Survival")) and dof >= 4
+  then emit "Push the Limit", "failed by 4+ degrees \u2014 roll 1d5 on Motive Systems Critical Hit Effects (vehicle) or Impact Critical Effects - Leg (living mount)"
+}
+
+# --- Superior Chirurgeon (tier 3, DH2 core p.131) -------------------------------
+# "He gains a +20 bonus on all Medicae skill tests. When providing first aid,
+# he ignores the penalties for Heavily Damaged patients and only suffers a -10
+# penalty for those suffering Critical damage." The first-aid penalty relief is
+# advisory (those penalties are GM-applied inputs).
+talent "Superior Chirurgeon" tier 3 {
+  meta { page 131 }
+  on test.MODIFIERS
+  when has_talent("Superior Chirurgeon") and is_test("Medicae")
+  then add modifier "superior chirurgeon" = 20; emit "Superior Chirurgeon", "first aid: ignore the Heavily Damaged penalty; Critical-damage patients are only -10"
+}
+
+# --- Coordinated Interrogation (tier 2, DH2 core p.124) --------------------------
+# "He gains a +10 bonus to all Interrogation tests, and gains an additional +5
+# for each other character participating in the interrogation who also has
+# Coordinated Interrogation." The co-interrogator count is off-sheet \u2014 the +5s
+# are surfaced as an advisory.
+talent "Coordinated Interrogation" tier 2 {
+  meta { page 124 }
+  on test.MODIFIERS
+  when has_talent("Coordinated Interrogation") and is_test("Interrogation")
+  then add modifier "coordinated interrogation" = 10; emit "Coordinated Interrogation", "+5 more for each other participant who also has Coordinated Interrogation (counts as test assistance)"
+}
+
+# --- Divine Protection (tier 3, Enemies Within p.57) -----------------------------
+# "When the Acolyte attacks using a weapon with the Spray quality, it only
+# strikes enemies within the area of effect; the attack does not harm allies."
+# Advisory \u2014 the engine models one representative Spray target.
+talent "Divine Protection" tier 3 {
+  meta { page 57 source "Dark Heresy 2e Enemies Within" }
+  on POST_ROLL
+  when has_talent("Divine Protection") and has_quality("Spray")
+  then emit "Divine Protection", "the spray strikes only enemies in the area of effect \u2014 allies are unharmed"
+}
+
+# --- Iron Faith (tier 3, Enemies Beyond p.61) ------------------------------------
+# "The character is immune to the effects of the Baneful Presence trait."
+# Cancels the -10 injected by the Baneful Presence circumstance
+# (circumstances.dsl, core p.135) at priority 100.
+talent "Iron Faith" tier 3 {
+  meta { page 61 source "Dark Heresy 2e Enemies Beyond" }
+  on test.MODIFIERS
+  priority 100
+  when has_talent("Iron Faith") and has_circumstance("Baneful Presence")
+  then cancel modifier "baneful presence"
+}
+`, "traits.dsl": 'dsl 3\npackage "dh2.core.traits" {\n  system "dh2"\n  source "Dark Heresy 2e Core Rulebook"\n}\n\n# DH2.0 traits \u2014 innate abilities (like talents, but NOT bought with XP).\n# Gated on has_trait("\u2026"). A character/creature\'s traits are supplied per\n# attack via traits: ["Brutal Charge (3)", \u2026].\n# Levelled traits read their value with trait_level("Name", default).\n\n# Brutal Charge (X): on a melee Charge, add X to the damage inflicted.\ntrait "Brutal Charge" {\n  on DAMAGE_MODS\n  priority 50\n  when has_trait("Brutal Charge") and is_melee and action == "Charge"\n  then add modifier "brutal charge" = trait_level("Brutal Charge", 0)\n}\n\n# --- Auto-Stabilised (DH2 core p.134) ------------------------------------------\n# "These beings always count as braced when firing heavy weapons \u2026 and not\n# suffer any penalties to hit." Cancels the Unbraced configuration penalty\n# (configurations.dsl, -30 per p.219).\ntrait "Auto-Stabilised" {\n  meta { page 134 }\n  on MODIFIERS\n  priority 100\n  when has_trait("Auto-Stabilised") and configuration("Unbraced")\n  then cancel modifier "unbraced"\n}\n\n# --- Fear (X) (DH2 core p.136, Table 4-5) ---------------------------------------\n# A character who encounters a Fear creature makes a Willpower test with a\n# penalty by rating: Disturbing (1) +0, Frightening (2) -10, Horrifying (3) -20,\n# Terrifying (4) -30. Runs in the GENERIC test pipeline: roll the Willpower test\n# via /api/test with testName "Fear" and the creature as `foe`\n# ({ foe: { traits: ["Fear (3)"] } }); on a failure the character rolls on\n# Table 8-11: Shock (p.287), +10 per degree of failure.\ntrait "Fear" {\n  meta { page 136 }\n  on test.MODIFIERS\n  when test_name == "Fear" and target.has_trait("Fear")\n  then add modifier "fear rating" = -10 * (target.trait_level("Fear", 1) - 1)\n}\n\n# --- From Beyond (DH2 core p.136) ------------------------------------------------\n# "Such a creature is immune to Fear, Pinning, Insanity points, and psychic\n# powers used to cloud, control, or delude its mind." Surfaces the immunity when\n# a Fear or Pinning test is rolled FOR the creature \u2014 no test is actually needed.\ntrait "From Beyond" {\n  meta { page 136 }\n  on test.MODIFIERS\n  priority 100\n  when (test_name == "Fear" or test_name == "Pinning") and has_trait("From Beyond")\n  then emit "From Beyond", "immune to Fear, Pinning, Insanity points, and mind-clouding psychic powers \u2014 no test is needed"\n}\n\n# --- Regeneration (X) (DH2 core p.137) --------------------------------------------\n# "Each round, at the start of its turn, the creature can make a Toughness test\n# to remove an amount of damage indicated in the parentheses." Upkeep policy:\n# the tick rolls the Toughness test against the encounter-stored stats; on a\n# pass the GM removes trait-rating damage (healing is advisory \u2014 wounds.taken\n# is not auto-reduced).\ntrait "Regeneration" {\n  meta { page 137 }\n  on upkeep.TURN_START\n  when has_trait("Regeneration")\n  then require_test "Toughness" 0 "no regeneration this round (a pass removes damage equal to the trait rating)"\n}\n\n# --- Sturdy (DH2 core p.138) --------------------------------------------------------\n# "Sturdy creatures \u2026 gain a +20 bonus to tests made to resist Grappling and\n# Knock Down actions, and uses of the Takedown talent." Generic test pipeline:\n# tag the resistance roll with the matching testName.\ntrait "Sturdy" {\n  meta { page 138 }\n  on test.MODIFIERS\n  when has_trait("Sturdy") and (test_name == "Grapple" or test_name == "Knock Down" or test_name == "Takedown")\n  then add modifier "sturdy" = 20\n}\n\n# Unnatural Characteristic (X) (DH2 core p.139) is NOT a trait rule \u2014 it is a\n# property of a characteristic, handled by the engine: +X to that characteristic\'s\n# bonus (Unnatural Strength \u2192 melee Strength Bonus; Unnatural Toughness \u2192 soak TB)\n# and \u2308X/2\u2309 bonus degrees of success on a successful test with it (WS/BS to-hit,\n# WS Parry, Ag Dodge). Supply it via the `unnatural:{ws,bs,s,ag}` object on the\n# attacker/defender (and `unnaturalToughness` for soak), exposed in the Roll UI as\n# the per-characteristic "Unnatural" inputs \u2014 see rollTest()/runToHit() in\n# lib/engine.mjs. (Previously a simplified flat-damage trait lived here; it was\n# superseded by the characteristic-based implementation.)\n', "conditions.dsl": `dsl 3
 package "dh2.core.conditions" {
   system "dh2"
   source "Dark Heresy 2e Core Rulebook"
@@ -2178,7 +2612,81 @@ condition "Blood Loss" {
   when has_condition("Blood Loss")
   then emit "Blood Loss", "suffers 1 level of Fatigue; a Difficult (-10) Medicae test (Free Action, once per round) removes the condition"
 }
-`, "circumstances.dsl": 'dsl 3\npackage "dh2.core.circumstances" {\n  system "dh2"\n  source "Dark Heresy 2e Core Rulebook"\n}\n\n# Circumstances \u2014 situational modifiers derived from the environment or the\n# framing of an action (not purchasable talents, not active conditions, not\n# per-character configurations). Gated on has_circumstance("\u2026") (or a fact);\n# eventually hook into a map/scene-aware system (see FOUNDRY_MIGRATION.md).\n# Supplied per attack via circumstances: ["\u2026"] (entries may be structured objects\n# { name, severity } for circumstances that carry a strength, e.g. Haywire Field).\n\n# --- Darkness (DH2 core p.229) ----------------------------------------------\n# Fighting in darkness: Weapon Skill tests suffer -20, Ballistic Skill tests -30.\ncircumstance "Darkness" {\n  meta { page 229 }\n  on MODIFIERS\n  when has_circumstance("Darkness") and is_melee  then add modifier "darkness" = -20\n  when has_circumstance("Darkness") and is_ranged then add modifier "darkness" = -30\n}\n\n# --- Haywire Field (DH2 core p.146, Table 5-4) ------------------------------\n# An ENVIRONMENTAL field left by a Haywire weapon (see weapon-qualities.dsl). It is\n# ONE circumstance carrying a severity (1-5 = Insignificant / Minor Disruption /\n# Major Disruption / Dead Zone / Prolonged Dead Zone) rather than five separate\n# conditions \u2014 RAW the field "lessens one step in severity each round", so a single\n# severity that degrades models it cleanly. The Haywire roll establishes the field\n# strength; set it via circumstances: [{ name: "Haywire Field", severity: N }].\n# Powered ranged attacks (non-Primitive) suffer the field penalty, worsening by\n# severity threshold: 2 Minor = -10, 3 Major = -20, 4-5 Dead Zone = -60 (technology\n# ceases \u2014 powered weapons effectively cannot fire). Primitive weapons are exempt.\n# (Unbraced moved to configurations.dsl \u2014 it is a per-shot stance the PLAYER\n#  chooses, not an environmental circumstance.)\n\ncircumstance "Haywire Field" {\n  meta { page 147 }\n  on MODIFIERS\n  when has_circumstance("Haywire Field") and is_ranged and not has_quality("Primitive") and circumstance_severity("Haywire Field", 0) == 2\n    then add modifier "haywire field" = -10\n  when has_circumstance("Haywire Field") and is_ranged and not has_quality("Primitive") and circumstance_severity("Haywire Field", 0) == 3\n    then add modifier "haywire field" = -20\n  when has_circumstance("Haywire Field") and is_ranged and not has_quality("Primitive") and circumstance_severity("Haywire Field", 0) >= 4\n    then add modifier "haywire field" = -60\n}\n', "configurations.dsl": `dsl 3
+`, "circumstances.dsl": `dsl 3
+package "dh2.core.circumstances" {
+  system "dh2"
+  source "Dark Heresy 2e Core Rulebook"
+}
+
+# Circumstances \u2014 situational modifiers derived from the environment or the
+# framing of an action (not purchasable talents, not active conditions, not
+# per-character configurations). Gated on has_circumstance("\u2026") (or a fact);
+# eventually hook into a map/scene-aware system (see FOUNDRY_MIGRATION.md).
+# Supplied per attack via circumstances: ["\u2026"] (entries may be structured objects
+# { name, severity } for circumstances that carry a strength, e.g. Haywire Field).
+
+# --- Darkness (DH2 core p.229) ----------------------------------------------
+# Fighting in darkness: Weapon Skill tests suffer -20, Ballistic Skill tests -30.
+circumstance "Darkness" {
+  meta { page 229 }
+  on MODIFIERS
+  when has_circumstance("Darkness") and is_melee  then add modifier "darkness" = -20
+  when has_circumstance("Darkness") and is_ranged then add modifier "darkness" = -30
+}
+
+# --- Haywire Field (DH2 core p.146, Table 5-4) ------------------------------
+# An ENVIRONMENTAL field left by a Haywire weapon (see weapon-qualities.dsl). It is
+# ONE circumstance carrying a severity (1-5 = Insignificant / Minor Disruption /
+# Major Disruption / Dead Zone / Prolonged Dead Zone) rather than five separate
+# conditions \u2014 RAW the field "lessens one step in severity each round", so a single
+# severity that degrades models it cleanly. The Haywire roll establishes the field
+# strength; set it via circumstances: [{ name: "Haywire Field", severity: N }].
+# Powered ranged attacks (non-Primitive) suffer the field penalty, worsening by
+# severity threshold: 2 Minor = -10, 3 Major = -20, 4-5 Dead Zone = -60 (technology
+# ceases \u2014 powered weapons effectively cannot fire). Primitive weapons are exempt.
+# (Unbraced moved to configurations.dsl \u2014 it is a per-shot stance the PLAYER
+#  chooses, not an environmental circumstance.)
+
+circumstance "Haywire Field" {
+  meta { page 147 }
+  on MODIFIERS
+  when has_circumstance("Haywire Field") and is_ranged and not has_quality("Primitive") and circumstance_severity("Haywire Field", 0) == 2
+    then add modifier "haywire field" = -10
+  when has_circumstance("Haywire Field") and is_ranged and not has_quality("Primitive") and circumstance_severity("Haywire Field", 0) == 3
+    then add modifier "haywire field" = -20
+  when has_circumstance("Haywire Field") and is_ranged and not has_quality("Primitive") and circumstance_severity("Haywire Field", 0) >= 4
+    then add modifier "haywire field" = -60
+}
+
+# --- Firing into Melee (DH2 core p.229) --------------------------------------
+# "Ballistic Skill tests made to hit a target engaged in melee combat suffer a
+# -20 penalty. If one or more characters engaged in the melee are Stunned,
+# Helpless, or Unaware, this penalty is ignored." The exemption is GM-side:
+# simply do not flag the circumstance when it applies. Injected at priority 10
+# so the Target Selection talent (talents.dsl) can cancel it at 100.
+circumstance "Firing into Melee" {
+  meta { page 229 }
+  on MODIFIERS
+  priority 10
+  when has_circumstance("Firing into Melee") and is_ranged
+  then add modifier "firing_into_melee" = -20
+}
+
+# --- Baneful Presence (X) (DH2 core p.135) -----------------------------------
+# A TRAIT of a daemonic foe, modelled as a circumstance on the SUFFERER's tests
+# because the engine has no aura/range model: "All characters suffer a -10
+# penalty to Willpower tests taken while within X metres of the creature."
+# The GM flags the circumstance on Willpower-based tests rolled inside the
+# radius \u2014 the Willpower-based test tags in use are "Willpower", "Fear",
+# "Pinning". Cancelled outright by Iron Faith (talents.dsl, Enemies Beyond p.61).
+circumstance "Baneful Presence" {
+  meta { page 135 }
+  on test.MODIFIERS
+  priority 10
+  when has_circumstance("Baneful Presence") and (is_test("Willpower") or is_test("Fear") or is_test("Pinning"))
+  then add modifier "baneful presence" = -10
+}
+`, "configurations.dsl": `dsl 3
 package "dh2.core.configurations" {
   system "dh2"
   source "Dark Heresy 2e Core Rulebook"
@@ -2611,6 +3119,9 @@ function applySoak({ damage, penetration = 0, armour = 0, toughnessBonus = 0, un
 function strengthBonusMultiple(weapon = {}, isMelee = false) {
   return isMelee || weapon.thrown === true ? weapon.sbMultiplier || 1 : 0;
 }
+function characteristicBonus(value, unnatural = 0) {
+  return Math.floor((Number(value) || 0) / 10) + (Number(unnatural) || 0);
+}
 function runToHit(input, rng, registry) {
   const { characteristics = {}, weapon = {}, target } = input;
   const action = canonicalAction(input.action) ?? input.action ?? "Standard Attack";
@@ -2716,7 +3227,7 @@ function runToHit(input, rng, registry) {
       };
       if (directionText) scatter.directionText = directionText;
       if (ctx.detonate) {
-        const sb2 = Math.floor((characteristics.s ?? 0) / 10) + unnaturalStrength;
+        const sb2 = characteristicBonus(characteristics.s, unnaturalStrength);
         const sbTimes2 = strengthBonusMultiple(weapon, isMelee);
         ctx.pen = Number(weapon.pen) || 0;
         ctx.penModifiers = {};
@@ -2738,7 +3249,7 @@ function runToHit(input, rng, registry) {
     return { ctx, base, success: false, scatter, hitMeta: null };
   }
   const accrual = actionInfo.hitAccrual ?? actionInfo.rate;
-  const fireRate = actionInfo.cap === "wsb" ? Math.max(1, Math.floor((characteristics.ws ?? 0) / 10) + (Number(unnatural.ws) || 0)) : actionInfo.rate === "semi" ? Math.max(1, weapon.rof?.burst ?? 1) : actionInfo.rate === "full" ? Math.max(1, weapon.rof?.full ?? 1) : 1;
+  const fireRate = actionInfo.cap === "wsb" ? Math.max(1, characteristicBonus(characteristics.ws, unnatural.ws)) : actionInfo.rate === "semi" ? Math.max(1, weapon.rof?.burst ?? 1) : actionInfo.rate === "full" ? Math.max(1, weapon.rof?.full ?? 1) : 1;
   if (accrual === "semi") ctx.additionalHits = Math.floor((test.dos - 1) / 2);
   else if (accrual === "full") ctx.additionalHits = test.dos - 1;
   else ctx.additionalHits = 0;
@@ -2748,7 +3259,7 @@ function runToHit(input, rng, registry) {
   if (ctx.additionalHits < 0) ctx.additionalHits = 0;
   runCheckpoint(registry, CHECKPOINTS.HIT_COUNT_BONUS, ctx);
   const additionalHits = ctx.additionalHits;
-  const sb = Math.floor((characteristics.s ?? 0) / 10) + unnaturalStrength;
+  const sb = characteristicBonus(characteristics.s, unnaturalStrength);
   const sbTimes = strengthBonusMultiple(weapon, isMelee);
   const firstLocation = isSpray ? "Body" : action === "Called Shot" && input.calledShotLocation ? input.calledShotLocation : getHitLocationForRoll(test.roll);
   const pen = Number(weapon.pen) || 0;
@@ -2896,7 +3407,7 @@ function resolveAttack(input, rng = Math.random, registry = defaultRegistry) {
         damage: dmg.total,
         penetration: hitMeta.totalPen,
         armour: effArmour,
-        toughnessBonus: target.toughnessBonus ?? Math.floor((characteristics.t ?? 0) / 10),
+        toughnessBonus: target.toughnessBonus ?? characteristicBonus(characteristics.t),
         unnaturalToughness: Number(target.unnaturalToughness) || 0,
         felling: hitMeta.fellingReduction || 0
       });
@@ -3044,7 +3555,7 @@ function resolveDodge(defender, rng, registry) {
 }
 var defenderTarget = (d2) => ({
   armour: Number(d2.armour) || 0,
-  toughnessBonus: d2.toughnessBonus ?? Math.floor((d2.characteristics?.t ?? 0) / 10),
+  toughnessBonus: d2.toughnessBonus ?? characteristicBonus(d2.characteristics?.t),
   unnaturalToughness: Number(d2.unnaturalToughness) || 0,
   toughness: d2.characteristics?.t ?? 0,
   strength: d2.characteristics?.s ?? 0,
@@ -3264,7 +3775,15 @@ var DOCUMENTED_FACTS = DSL_DOCS.facts.map((f) => f.name);
 var DOCUMENTED_FUNCTIONS = DSL_DOCS.functions.map((f) => f.signature.split("(")[0]);
 
 // api/lib/character-schema.mjs
-var CHARACTER_SCHEMA_VERSION = 3;
+var CHARACTER_SCHEMA_VERSION = 4;
+var LEDGER_KINDS = ["characteristic", "skill", "talent", "psychic_power", "psy_rating", "elite_advance", "other"];
+function normalizeAptitudeSource(a) {
+  if (!a || typeof a !== "object" || typeof a.source !== "string") return a;
+  const s = a.source.trim();
+  const canon = /^home\s*world$/i.test(s) ? "homeworld" : /^(bg|background)$/i.test(s) ? "background" : /^role$/i.test(s) ? "role" : /^elite([\s_-]?advance)?s?$/i.test(s) ? "elite_advance" : null;
+  return canon ? { ...a, source: canon } : a;
+}
+var REF_PATTERN = /^[a-z0-9_]+:[a-z0-9_]+:[a-z0-9_]+$/;
 var CHARACTERISTIC_KEYS = ["ws", "bs", "s", "t", "ag", "int", "per", "wp", "fel"];
 var UNNATURAL_KEYS = ["ws", "bs", "s", "t", "ag"];
 var ARMOUR_KEYS = ["head", "body", "leftArm", "rightArm", "leftLeg", "rightLeg"];
@@ -3321,9 +3840,23 @@ var CHARACTER_FIELDS = [
   { path: "skills.<Name>", type: "{ advances 0\u20134, characteristic?, modifiers[], specialities? }", required: false, summary: `A DH2 skill (canonical names: ${Object.keys(SKILL_DEFS).join(", ")}). Target derived RAW: untrained = \xBD characteristic; advances 1\u20134 \u2192 +0/+10/+20/+30 (use skillTarget).` },
   { path: "skills.<Name>.specialities.<X>", type: "{ advances 0\u20134, modifiers[] }", required: false, summary: "Specialist-skill entries \u2014 Scholastic Lore (Occult), Operate (Surface), \u2026 Only valid on specialist skills." },
   { path: "skills.<Name>.modifiers[]", type: "{ value, source?, note? }", required: false, summary: 'Skill modifiers BY SOURCE \u2014 e.g. { value: 20, source: "Good Bionic Eyes" } on Tech-Use.' },
-  { path: "xp", type: "{ total, spent?, ledger[] }", required: false, summary: "Experience: earned total, spent (defaults to the ledger sum), and the per-purchase ledger." },
-  { path: "xp.ledger[]", type: "{ name, cost, source?, date? }", required: false, summary: 'One purchase \u2014 "Mighty Shot", 600, "Core RB".' },
-  { path: "aptitudes[]", type: "string | { name, source? }", required: false, summary: "Aptitudes with their origin (Homeworld / Background / Role / \u2026)." },
+  { path: "xp", type: "{ total, spent?, ledger[] }", required: false, summary: "Experience: earned total (starting grant included), spent (defaults to the ledger sum), and the per-purchase ledger." },
+  { path: "xp.ledger[]", type: "{ name, cost, kind?, ref?, rank?, matches?, source?, date? }", required: false, summary: 'One purchase \u2014 "Mighty Shot", 600. Typed fields (builder addendum) make it a cost-audited advancement record; untyped legacy entries stay valid.' },
+  { path: "xp.ledger[].kind", type: LEDGER_KINDS.join(" | "), required: false, summary: "What kind of advance was bought (unknown kinds warn, for forward compatibility)." },
+  { path: "xp.ledger[].ref", type: "string", required: false, summary: "What was bought: a corpus ref (dh2:<type>:<snake_id>), a characteristic key (ws\u2026fel), or a skill name (+speciality)." },
+  { path: "xp.ledger[].rank", type: "int \u2265 1", required: false, summary: "Advance rank purchased (characteristic 1\u20135 Simple\u2192Expert, skill 1\u20134; psy rating = the new rating)." },
+  { path: "xp.ledger[].matches", type: "int 0\u20132", required: false, summary: "Aptitude matches at purchase time \u2014 the cost audit trail." },
+  { path: "aptitudes[]", type: "string | { name, source? }", required: false, summary: "Aptitudes with their origin (source \u2208 homeworld|background|role|elite_advance|extra; legacy casings normalize at migration)." },
+  { path: "origin", type: "{ homeworld?, background?, role?, eliteAdvances[] }", required: false, summary: "Character-creation origin. Members are { name, ref? } or null; bare strings normalize to { name } at migration. \u21C4 Foundry bio.homeWorld/background/role/elite." },
+  { path: "origin.eliteAdvances[]", type: "{ name, ref?, cost? }", required: false, summary: "Elite advances taken (Psyker, Untouchable, \u2026) with their XP cost." },
+  { path: "influence", type: "int \u2265 0", required: false, summary: "Influence (the DH2 social resource-characteristic). \u21C4 Foundry characteristics.influence.base." },
+  { path: "weaponTrainings[]", type: "string[]", required: false, summary: 'Weapon Training groups held ("Bolt", "Las", \u2026) \u2014 mapped to Weapon Training (X) talent Items in Foundry.' },
+  { path: "cybernetics[]", type: "string | { name, location?, notes?, ref?, dsl? }", required: false, summary: "Installed cybernetics (\u21C4 Foundry cybernetic Items)." },
+  { path: "extensions", type: "{ <namespace>: any }", required: false, summary: "Opaque campaign extensions (Dramatic Moments, builder wizard state under extensions.builder, \u2026). Preserved verbatim, never validated." },
+  { path: "player", type: "string", required: false, summary: "Player attribution \u2014 PRIVACY-GUARDED: validation warns unless { allowPlayer: true }; omitted by default (pipeline decision D9)." },
+  { path: "pools.profitFactor", type: "(reserved)", required: false, summary: "Reserved for Rogue Trader \u2014 not populated by any current adapter." },
+  { path: "<talents|traits|psychicPowers>[].ref", type: 'string "dh2:<type>:<snake_id>"', required: false, summary: "Corpus ref \u2014 resolves mechanically to compendium UUIDs (deterministic slug ids; no name-matching)." },
+  { path: "<talents|traits|psychicPowers>[].dsl", type: "string (DSL source)", required: false, summary: "Entry-granted rules in the DSL (custom talents/traits/powers) \u2014 compiled into the customRules layer at roll time; portable between the Pages UI and Foundry." },
   { path: "tarot", type: "{ card?, text?, effect? }", required: false, summary: "The Emperor's Tarot / divination drawn at creation (\u21C4 Foundry bio.divination)." },
   { path: "weapons[].weight", type: "number \u2265 0 (kg)", required: false, summary: "Weapon weight \u2014 counts toward encumbrance while equipped." },
   { path: "weapons[].equipped", type: "bool (default true)", required: false, summary: "On the character (counts weight; available in combat). false = stored." },
@@ -3345,8 +3878,8 @@ var CHARACTER_FIELDS = [
   { path: "armour.<head|body|leftArm|rightArm|leftLeg|rightLeg>", type: "int \u2265 0", required: false, summary: "Armour points by hit location." },
   { path: "wounds", type: "{ max, current }", required: false, summary: "Wound track (carried, not yet consumed by the attack loop)." },
   { path: "fate", type: "{ max, current }", required: false, summary: "Fate points (carried, not yet consumed)." },
-  { path: "talents", type: "(string | {name, level})[]", required: false, summary: 'Talent list. "Name (X)" strings or {name, level} objects.' },
-  { path: "traits", type: "(string | {name, level})[]", required: false, summary: "Trait list (innate DH2.0 traits, e.g. Brutal Charge (3), Daemonic (4))." },
+  { path: "talents", type: "(string | {name, level?, ref?, dsl?})[]", required: false, summary: 'Talent list. "Name (X)" strings or {name, \u2026} objects (ref/dsl per the builder addendum).' },
+  { path: "traits", type: "(string | {name, level?, ref?, dsl?})[]", required: false, summary: "Trait list (innate DH2.0 traits, e.g. Brutal Charge (3), Daemonic (4)). Traits are granted, never XP-purchased." },
   { path: "conditions", type: "(string | {name, severity, duration, location})[]", required: false, summary: "Active Conditions (Stunned, On Fire, \u2026)." },
   { path: "circumstances", type: "(string | {name, severity})[]", required: false, summary: "Environmental Circumstances (Darkness, Haywire Field, \u2026)." },
   { path: "weapons[]", type: "weapon", required: false, summary: "Weapon profiles (see weapon fields)." },
@@ -3362,6 +3895,7 @@ var CHARACTER_FIELDS = [
   { path: "field", type: "{ rating, overloadMax }", required: false, summary: "Force field (absorbs on roll \u2264 rating; overloads on roll \u2264 overloadMax)." },
   { path: "source", type: "{ adapter, ... }", required: false, summary: "Import provenance (adapter name, source identifiers, timestamp)." }
 ];
+var characteristicBonus2 = (doc, key) => Math.floor(characteristicTotal(doc, key) / 10) + (doc.unnatural?.[key] ?? 0);
 function armourByLocation(doc) {
   const worn = (doc.armourItems ?? []).filter((a) => a.equipped !== false);
   if (!worn.length) return { ...Object.fromEntries(ARMOUR_KEYS.map((k) => [k, 0])), ...doc.armour ?? {} };
@@ -3372,6 +3906,7 @@ function armourByLocation(doc) {
   }
   return out;
 }
+var fatigueThreshold = (doc) => characteristicBonus2(doc, "t") + characteristicBonus2(doc, "wp");
 function characteristicTotal(doc, key) {
   const c = doc.characteristics?.[key];
   if (typeof c === "number") return c;
@@ -3381,10 +3916,18 @@ function characteristicTotal(doc, key) {
 var isInt = (v) => Number.isInteger(v);
 var isNonNegInt = (v) => Number.isInteger(v) && v >= 0;
 var isNamedEntry = (v) => typeof v === "string" || v && typeof v === "object" && typeof v.name === "string";
-function validateCharacter(doc) {
+function validateCharacter(doc, opts = {}) {
   const errors = [], warnings = [];
   const err = (path, message) => errors.push({ path, message });
   const warn = (path, message) => warnings.push({ path, message });
+  const checkRefDsl = (entry, path) => {
+    if (!entry || typeof entry !== "object") return;
+    if (entry.ref !== void 0) {
+      if (typeof entry.ref !== "string") err(`${path}.ref`, "String ref required (dh2:<type>:<snake_id>)");
+      else if (!REF_PATTERN.test(entry.ref)) warn(`${path}.ref`, `Ref "${entry.ref}" does not match <system>:<type>:<snake_id>`);
+    }
+    if (entry.dsl !== void 0 && typeof entry.dsl !== "string") err(`${path}.dsl`, "String (DSL source) required");
+  };
   if (!doc || typeof doc !== "object") return { ok: false, errors: [{ path: "", message: "Not an object" }], warnings };
   if (!isInt(doc.schemaVersion)) err("schemaVersion", "Required integer");
   else if (doc.schemaVersion > CHARACTER_SCHEMA_VERSION) warn("schemaVersion", `Document is v${doc.schemaVersion}; this build knows v${CHARACTER_SCHEMA_VERSION} \u2014 fields may be ignored`);
@@ -3462,7 +4005,17 @@ function validateCharacter(doc) {
       if (doc.xp.ledger !== void 0) {
         if (!Array.isArray(doc.xp.ledger)) err("xp.ledger", "Must be an array");
         else doc.xp.ledger.forEach((e, i) => {
-          if (!e || typeof e !== "object" || typeof e.name !== "string" || !isNonNegInt(e.cost)) err(`xp.ledger[${i}]`, "{ name: string, cost: int \u2265 0, source?, date? } required");
+          if (!e || typeof e !== "object" || typeof e.name !== "string" || !isNonNegInt(e.cost)) {
+            err(`xp.ledger[${i}]`, "{ name: string, cost: int \u2265 0, kind?, ref?, rank?, matches?, source?, date? } required");
+            return;
+          }
+          if (e.kind !== void 0) {
+            if (typeof e.kind !== "string") err(`xp.ledger[${i}].kind`, "String required");
+            else if (!LEDGER_KINDS.includes(e.kind)) warn(`xp.ledger[${i}].kind`, `Unknown kind "${e.kind}" (known: ${LEDGER_KINDS.join(", ")})`);
+          }
+          if (e.ref !== void 0 && typeof e.ref !== "string") err(`xp.ledger[${i}].ref`, "String required");
+          if (e.rank !== void 0 && (!isInt(e.rank) || e.rank < 1)) err(`xp.ledger[${i}].rank`, "Integer \u2265 1 required");
+          if (e.matches !== void 0 && (!isInt(e.matches) || e.matches < 0 || e.matches > 2)) err(`xp.ledger[${i}].matches`, "Integer 0\u20132 required");
         });
       }
     }
@@ -3533,6 +4086,7 @@ function validateCharacter(doc) {
         return;
       }
       if (p && typeof p === "object") {
+        checkRefDsl(p, `psychicPowers[${i}]`);
         if (p.equipped !== void 0 && typeof p.equipped !== "boolean") err(`psychicPowers[${i}].equipped`, "Boolean required");
         if (p.cost !== void 0 && !isNonNegInt(p.cost)) err(`psychicPowers[${i}].cost`, "Non-negative integer required");
         for (const f of ["discipline", "notes"]) if (p[f] !== void 0 && typeof p[f] !== "string") err(`psychicPowers[${i}].${f}`, "String required");
@@ -3614,7 +4168,11 @@ function validateCharacter(doc) {
       continue;
     }
     list.forEach((entry, i) => {
-      if (!isNamedEntry(entry)) err(`${listName}[${i}]`, "Must be a string or { name, \u2026 } object");
+      if (!isNamedEntry(entry)) {
+        err(`${listName}[${i}]`, "Must be a string or { name, \u2026 } object");
+        return;
+      }
+      if (listName === "talents" || listName === "traits") checkRefDsl(entry, `${listName}[${i}]`);
     });
   }
   if (doc.weapons !== void 0) {
@@ -3651,6 +4209,59 @@ function validateCharacter(doc) {
     if (typeof doc.field !== "object") err("field", "Must be { rating, overloadMax }");
     else for (const p of ["rating", "overloadMax"]) if (doc.field[p] !== void 0 && !isNonNegInt(doc.field[p])) err(`field.${p}`, "Non-negative integer required");
   }
+  if (doc.origin !== void 0) {
+    if (!doc.origin || typeof doc.origin !== "object" || Array.isArray(doc.origin)) err("origin", "Must be { homeworld?, background?, role?, eliteAdvances[] }");
+    else {
+      for (const k of ["homeworld", "background", "role"]) {
+        const v = doc.origin[k];
+        if (v === void 0 || v === null) continue;
+        if (!isNamedEntry(v)) {
+          err(`origin.${k}`, "Must be null, a string, or { name, ref? }");
+          continue;
+        }
+        checkRefDsl(v, `origin.${k}`);
+      }
+      if (doc.origin.eliteAdvances !== void 0) {
+        if (!Array.isArray(doc.origin.eliteAdvances)) err("origin.eliteAdvances", "Must be an array");
+        else doc.origin.eliteAdvances.forEach((e, i) => {
+          if (!isNamedEntry(e)) {
+            err(`origin.eliteAdvances[${i}]`, "Must be a string or { name, ref?, cost? }");
+            return;
+          }
+          checkRefDsl(e, `origin.eliteAdvances[${i}]`);
+          if (e && typeof e === "object" && e.cost !== void 0 && !isNonNegInt(e.cost)) err(`origin.eliteAdvances[${i}].cost`, "Non-negative integer required");
+        });
+      }
+    }
+  }
+  if (doc.influence !== void 0 && !isNonNegInt(doc.influence)) err("influence", "Non-negative integer required");
+  if (doc.weaponTrainings !== void 0) {
+    if (!Array.isArray(doc.weaponTrainings)) err("weaponTrainings", "Must be an array of strings");
+    else doc.weaponTrainings.forEach((w, i) => {
+      if (typeof w !== "string" || !w.trim()) err(`weaponTrainings[${i}]`, "Non-empty string required");
+    });
+  }
+  if (doc.cybernetics !== void 0) {
+    if (!Array.isArray(doc.cybernetics)) err("cybernetics", "Must be an array");
+    else doc.cybernetics.forEach((c, i) => {
+      if (!isNamedEntry(c)) {
+        err(`cybernetics[${i}]`, "Must be a string or { name, location?, notes?, ref?, dsl? }");
+        return;
+      }
+      if (c && typeof c === "object") {
+        checkRefDsl(c, `cybernetics[${i}]`);
+        for (const f of ["location", "notes"]) if (c[f] !== void 0 && typeof c[f] !== "string") err(`cybernetics[${i}].${f}`, "String required");
+      }
+    });
+  }
+  if (doc.extensions !== void 0 && (!doc.extensions || typeof doc.extensions !== "object" || Array.isArray(doc.extensions))) {
+    err("extensions", "Must be an object of { <namespace>: any }");
+  }
+  if (doc.player !== void 0) {
+    if (typeof doc.player !== "string") err("player", "String required");
+    else if (!opts.allowPlayer) warn("player", "Player attribution present \u2014 omitted by default for privacy (pass { allowPlayer: true } to accept)");
+  }
+  if (doc.pools !== void 0 && (!doc.pools || typeof doc.pools !== "object" || Array.isArray(doc.pools))) err("pools", "Must be an object (reserved)");
   return { ok: errors.length === 0, errors, warnings };
 }
 function migrateCharacter(doc) {
@@ -3684,7 +4295,23 @@ function migrateCharacter(doc) {
       if (d2.wounds && typeof d2.wounds === "object") d2.wounds = { critical: 0, ...d2.wounds };
       d2.schemaVersion = 3;
     // fallthrough:
-    case 3:
+    case 3: {
+      const normMember = (v) => v == null ? null : typeof v === "string" ? { name: v } : { ...v };
+      const o = d2.origin && typeof d2.origin === "object" && !Array.isArray(d2.origin) ? d2.origin : {};
+      d2.origin = {
+        homeworld: normMember(o.homeworld ?? null),
+        background: normMember(o.background ?? null),
+        role: normMember(o.role ?? null),
+        eliteAdvances: Array.isArray(o.eliteAdvances) ? o.eliteAdvances.map((e) => typeof e === "string" ? { name: e } : e) : []
+      };
+      d2.influence ?? (d2.influence = 0);
+      d2.weaponTrainings ?? (d2.weaponTrainings = []);
+      d2.cybernetics ?? (d2.cybernetics = []);
+      d2.extensions ?? (d2.extensions = {});
+      if (Array.isArray(d2.aptitudes)) d2.aptitudes = d2.aptitudes.map(normalizeAptitudeSource);
+      d2.schemaVersion = 4;
+    }
+    case 4:
       break;
     default:
       break;
@@ -3730,6 +4357,7 @@ function emptyEncounter() {
   return { schemaVersion: ENCOUNTER_SCHEMA_VERSION, kind: "dh2.encounter", round: 1, actors: {} };
 }
 function encounterActor(encounter, key, name = key) {
+  if (!encounter.actors) encounter.actors = {};
   if (!encounter.actors[key]) {
     encounter.actors[key] = {
       name,
@@ -3752,6 +4380,7 @@ function tickEncounter(encounter, phase, registry = defaultRegistry, rng = Math.
   const checkpoint = PHASE_TO_CHECKPOINT[phase];
   if (!checkpoint) throw new Error(`Unknown upkeep phase '${phase}' (TURN_START | TURN_END | ROUND_END)`);
   const out = clone(encounter);
+  if (!out.actors) out.actors = {};
   const events = [];
   const keys = actorKey ? [actorKey] : Object.keys(out.actors);
   for (const key of keys) {
@@ -3851,6 +4480,231 @@ function harvestEngagement(encounter, attackerKey, defenderKey, result, { attack
     def.wounds.taken += (hit.soak?.woundsInflicted ?? 0) + (hit.corrosiveWounds ?? 0);
   }
   return out;
+}
+
+// api/lib/foundry-actor.mjs
+var CHAR_KEY_MAP = {
+  ws: "weaponSkill",
+  bs: "ballisticSkill",
+  s: "strength",
+  t: "toughness",
+  ag: "agility",
+  int: "intelligence",
+  per: "perception",
+  wp: "willpower",
+  fel: "fellowship"
+};
+var camelKey = (name) => String(name ?? "").split(/[^A-Za-z0-9]+/).filter(Boolean).map((w, i) => i === 0 ? w.toLowerCase() : w[0].toUpperCase() + w.slice(1).toLowerCase()).join("");
+var asEntry = (x) => x && typeof x === "object" ? x : { name: String(x ?? "") };
+var entryFlags = (e) => e.ref !== void 0 || e.dsl !== void 0 ? { flags: { "dh2-roll-vm": { ...e.ref !== void 0 && { ref: e.ref }, ...e.dsl !== void 0 && { dsl: e.dsl } } } } : {};
+var SET_VALUED_ITEM_TYPES = /* @__PURE__ */ new Set(["talent"]);
+var itemKey = (i) => JSON.stringify([i.type, String(i.name).toLowerCase().replace(/\s+/g, " ").trim()]);
+function dedupeItems(items) {
+  const out = [];
+  const byKey = /* @__PURE__ */ new Map();
+  for (const item of items) {
+    if (!SET_VALUED_ITEM_TYPES.has(item.type)) {
+      out.push(item);
+      continue;
+    }
+    const kept = byKey.get(itemKey(item));
+    if (!kept) {
+      byKey.set(itemKey(item), item);
+      out.push(item);
+      continue;
+    }
+    for (const [k, v] of Object.entries(item.system)) {
+      if (!kept.system[k] && v) kept.system[k] = v;
+    }
+    const lost = item.flags?.["dh2-roll-vm"];
+    if (lost) {
+      if (!kept.flags) kept.flags = { "dh2-roll-vm": {} };
+      const ns = kept.flags["dh2-roll-vm"];
+      for (const [k, v] of Object.entries(lost)) if (ns[k] === void 0) ns[k] = v;
+    }
+  }
+  return out;
+}
+function characterToFoundryActor(doc) {
+  const characteristics = {};
+  const modifierSources = { characteristics: {}, skills: {} };
+  for (const [k, foundryKey] of Object.entries(CHAR_KEY_MAP)) {
+    const c = doc.characteristics?.[k];
+    const obj = c && typeof c === "object" ? c : { base: Number(c) || 0, advances: 0, modifiers: [] };
+    characteristics[foundryKey] = {
+      base: obj.base ?? 0,
+      advance: obj.advances ?? 0,
+      modifier: modifierTotal(obj.modifiers),
+      unnatural: doc.unnatural?.[k] ?? 0
+    };
+    if ((obj.modifiers ?? []).length) modifierSources.characteristics[k] = obj.modifiers;
+  }
+  const skills = {};
+  for (const [rawName, s] of Object.entries(doc.skills ?? {})) {
+    const canonical = canonicalSkillName(rawName);
+    if (!canonical) continue;
+    const key = camelKey(canonical);
+    const def = SKILL_DEFS[canonical];
+    const entry = { advance: s.advances ?? 0, isSpecialist: !!def.specialist };
+    if (def.specialist && s.specialities) {
+      entry.specialities = {};
+      for (const [spec, sv] of Object.entries(s.specialities)) {
+        entry.specialities[camelKey(spec)] = {
+          label: spec,
+          advance: sv.advances ?? 0,
+          cost: 0,
+          taken: (sv.advances ?? 0) > 0
+        };
+      }
+    }
+    skills[key] = entry;
+    if ((s.modifiers ?? []).length) modifierSources.skills[canonical] = s.modifiers;
+  }
+  const spent = doc.xp?.spent ?? (doc.xp?.ledger ?? []).reduce((a, e) => a + (e.cost || 0), 0);
+  const tarotBits = [doc.tarot?.card, doc.tarot?.text, doc.tarot?.effect].filter(Boolean);
+  const originName = (m) => m == null ? "" : typeof m === "string" ? m : m.name ?? "";
+  characteristics.influence = { base: doc.influence ?? 0, advance: 0, modifier: 0, unnatural: 0 };
+  const system = {
+    characteristics,
+    skills,
+    wounds: {
+      max: doc.wounds?.max ?? 10,
+      value: doc.wounds?.current ?? doc.wounds?.max ?? 10,
+      critical: doc.wounds?.critical ?? 0
+    },
+    fate: { max: doc.fate?.max ?? 0, value: doc.fate?.current ?? doc.fate?.max ?? 0 },
+    fatigue: { value: doc.fatigue?.current ?? 0, max: fatigueThreshold(doc) },
+    psy: {
+      rating: doc.psy?.rating ?? 0,
+      sustained: doc.psy?.sustained ?? 0,
+      class: doc.psy?.class && doc.psy.class !== "none" ? doc.psy.class : "bound",
+      hasFocus: false
+    },
+    insanity: doc.insanity?.points ?? 0,
+    corruption: doc.corruption?.points ?? 0,
+    experience: { total: doc.xp?.total ?? 0, used: spent },
+    bio: {
+      divination: tarotBits.join(" \u2014 "),
+      homeWorld: originName(doc.origin?.homeworld),
+      background: originName(doc.origin?.background),
+      role: originName(doc.origin?.role),
+      elite: (doc.origin?.eliteAdvances ?? []).map((e) => originName(e)).filter(Boolean).join(", ")
+    }
+  };
+  const items = [];
+  for (const w of doc.weapons ?? []) {
+    items.push({
+      name: w.name,
+      type: "weapon",
+      system: {
+        class: w.class ?? "basic",
+        damage: w.damage,
+        penetration: w.pen ?? 0,
+        damageType: w.damageType ?? "Impact",
+        craftsmanship: (w.craftsmanship ?? "Common").toLowerCase(),
+        equipped: w.equipped !== false,
+        weight: w.weight ?? 0,
+        clip: { max: w.clip?.max ?? 0, value: w.clip?.value ?? w.clip?.max ?? 0 },
+        rateOfFire: { single: w.rof?.single === false ? 0 : 1, burst: w.rof?.burst ?? 0, full: w.rof?.full ?? 0 },
+        description: (w.qualities ?? []).length ? `Qualities: ${w.qualities.map(entryName).join(", ")}` : ""
+      },
+      flags: { "dh2-roll-vm": { qualities: (w.qualities ?? []).map(entryName) } }
+    });
+  }
+  for (const a of doc.armourItems ?? []) {
+    items.push({
+      name: a.name,
+      type: "armour",
+      system: {
+        equipped: a.equipped !== false,
+        weight: a.weight ?? 0,
+        maxAgility: a.maxAgility ?? 0,
+        description: `AP ${a.ap} (${(a.locations ?? ["all"]).join(", ")})`
+      },
+      flags: { "dh2-roll-vm": { ap: a.ap, locations: a.locations ?? ["all"] } }
+    });
+  }
+  for (const g of doc.gear ?? []) {
+    items.push({
+      name: g.name,
+      type: "gear",
+      system: {
+        equipped: g.equipped !== false,
+        weight: g.weight ?? 0,
+        description: g.notes ?? ""
+      },
+      flags: { "dh2-roll-vm": { quantity: g.quantity ?? 1 } }
+    });
+  }
+  for (const a of doc.aptitudes ?? []) {
+    const e = asEntry(a);
+    items.push({ name: e.name, type: "aptitude", system: { description: e.source ? `Source: ${e.source}` : "" } });
+  }
+  for (const t of doc.talents ?? []) {
+    const e = asEntry(t);
+    items.push({ name: e.name, type: "talent", system: { tier: e.tier ?? 0, benefit: e.notes ?? "", description: e.source ? `Source: ${e.source}` : "" }, ...entryFlags(e) });
+  }
+  for (const w of doc.weaponTrainings ?? []) {
+    items.push({ name: `Weapon Training (${w})`, type: "talent", system: { tier: 1, benefit: "", description: "" } });
+  }
+  for (const t of doc.traits ?? []) {
+    const e = asEntry(t);
+    items.push({ name: e.name, type: "trait", system: e.level != null ? { level: e.level } : {}, ...entryFlags(e) });
+  }
+  for (const c of doc.cybernetics ?? []) {
+    const e = asEntry(c);
+    items.push({
+      name: e.name,
+      type: "cybernetic",
+      system: { description: [e.location && `Location: ${e.location}`, e.notes].filter(Boolean).join(" \u2014 ") },
+      ...entryFlags(e)
+    });
+  }
+  for (const p of doc.psychicPowers ?? []) {
+    const e = asEntry(p);
+    const extra = entryFlags(e).flags?.["dh2-roll-vm"] ?? {};
+    items.push({
+      name: e.name,
+      type: "psychicPower",
+      system: { discipline: e.discipline ?? "", cost: e.cost ?? 0, sustained: "No", description: e.notes ?? "" },
+      flags: { "dh2-roll-vm": { equipped: e.equipped !== false, ...extra } }
+      // loadout state (no DH3 field)
+    });
+  }
+  for (const d2 of doc.insanity?.disorders ?? []) {
+    items.push({ name: entryName(d2), type: "mentalDisorder", system: {} });
+  }
+  for (const m of doc.corruption?.malignancies ?? []) {
+    items.push({ name: entryName(m), type: "malignancy", system: {} });
+  }
+  for (const m of doc.corruption?.mutations ?? []) {
+    items.push({ name: entryName(m), type: "mutation", system: {} });
+  }
+  for (const c of doc.criticalInjuries ?? []) {
+    const e = c && typeof c === "object" ? c : { effect: String(c) };
+    items.push({
+      name: e.effect.slice(0, 60),
+      type: "criticalInjury",
+      system: { part: e.location ?? "body", type: "impact", description: e.effect + (e.source ? ` (${e.source})` : "") }
+    });
+  }
+  if ((doc.field?.rating ?? 0) > 0) {
+    items.push({ name: "Force Field", type: "forceField", system: { protectionRating: doc.field.rating, activated: true, overloaded: false } });
+  }
+  const flags = {
+    "dh2-roll-vm": {
+      schemaVersion: doc.schemaVersion,
+      modifierSources,
+      amputations: doc.amputations ?? [],
+      xpLedger: doc.xp?.ledger ?? [],
+      // typed fields (kind/ref/rank/matches) ride verbatim
+      source: doc.source ?? null,
+      origin: doc.origin ?? null,
+      // verbatim (refs incl.) for lossless round-trip
+      extensions: doc.extensions ?? {}
+    }
+  };
+  return { name: doc.name, type: "acolyte", system, flags, items: dedupeItems(items) };
 }
 
 // foundry/dh2-roll-vm/src/main.mjs

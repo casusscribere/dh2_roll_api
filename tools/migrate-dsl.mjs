@@ -49,6 +49,9 @@ const REPLACEMENTS = [
     ['fail', 'flag attack_failed'],
 ].sort((a, b) => b[0].length - a[0].length);
 
+/** The version this tool migrates TO. */
+const CURRENT_DSL = 3;
+
 const KIND_MAP = { status: 'condition', generic: 'miscellaneous', rule: 'miscellaneous' };
 const isWord = (ch) => ch !== undefined && /[A-Za-z0-9_.]/.test(ch);
 
@@ -87,8 +90,18 @@ export function migrateDsl(src) {
             // pragma version bump
             if (word === 'dsl' && /^\s*\d+/.test(s.slice(j))) {
                 const m = /^(\s*)(\d+)/.exec(s.slice(j));
-                if (+m[2] < 3) changes++;
-                out += `dsl${m[1]}3`;
+                const from = +m[2];
+                // A version ABOVE the target is not something this tool can
+                // migrate. It used to rewrite `dsl 4` down to `dsl 3` and report
+                // changes: 0, so --write silently downgraded a newer file while
+                // claiming it had done nothing.
+                if (from > CURRENT_DSL) {
+                    throw new Error(
+                        `cannot migrate dsl ${from} down to ${CURRENT_DSL} — this file was `
+                        + `written for a newer DSL than this tool understands`);
+                }
+                if (from < CURRENT_DSL) changes++;
+                out += `dsl${m[1]}${CURRENT_DSL}`;
                 i = j + m[0].length;
                 sawPragma = true;
                 continue;
@@ -102,7 +115,18 @@ export function migrateDsl(src) {
                 continue;
             }
             const hit = REPLACEMENTS.find(([from]) => from === word && !isWord(s[j]));
-            if (hit) {
+            // Idempotence: several rewrites expand a bare verb into `flag <verb>`
+            // (detonate, cannot_parry, keep_highest), and the table still matched
+            // the bare word INSIDE its own output — so a second pass produced
+            // `flag flag detonate`. api/data/rules/weapon-qualities.dsl already
+            // ships all three expanded forms, which meant
+            // `node tools/migrate-dsl.mjs --all --write` corrupted the repo's own
+            // rule files on the first run. Skip a replacement whose output is
+            // `flag <word>` when `flag ` is already immediately to the left.
+            const alreadyFlagged = hit
+                && hit[1] === `flag ${word}`
+                && /(^|[\s;{])flag\s+$/.test(out);
+            if (hit && !alreadyFlagged) {
                 out += hit[1];
                 i = j;
                 changes++;
@@ -136,7 +160,18 @@ if (isMain) {
         process.exit(2);
     }
     for (const f of files) {
-        const { text, changes } = migrateDsl(readFileSync(f, 'utf8'));
+        let migrated;
+        try {
+            migrated = migrateDsl(readFileSync(f, 'utf8'));
+        } catch (err) {
+            // A refusal (e.g. a file written for a newer DSL) is a user-facing
+            // condition, not a crash. Report it and stop rather than dumping a
+            // stack — and stop BEFORE writing, so --all cannot half-migrate a
+            // directory and leave the rest in an unknown state.
+            console.error(`✗ ${f}: ${err.message}`);
+            process.exit(1);
+        }
+        const { text, changes } = migrated;
         if (write) {
             writeFileSync(f, text);
             console.log(`✓ ${f} — ${changes} change(s)`);
