@@ -498,10 +498,39 @@ function skillAddress(doc, pack, e) {
  * "Weapon Training (Flame or Las, Chain)". Origin members are matched by ref
  * first, then by name (v3→v4 migrated documents carry names only).
  */
+/**
+ * Expand a grant's alternatives into one name each.
+ *
+ * DH2 writes a choice inside the parenthetical — "Weapon Training (Flame or
+ * Las, Chain)" means Weapon Training in ONE of Flame, Las or Chain — so the
+ * alternation belongs to the specialisation, not to the talent name. Splitting
+ * the whole string on " or " produced ["weapon training (flame", "las, chain)"],
+ * neither of which is a talent; only the parenthetical-stripping fallback made
+ * grant matching work at all.
+ *
+ * Input is already normalised (lowercased) by the caller.
+ */
+function expandAlternatives(name) {
+    const m = name.match(/^(.*?)\s*\((.*)\)\s*$/);
+    if (!m) {
+        // No parenthetical: a bare "Hardy or Resistance" is a genuine choice
+        // between two whole talents.
+        return name.split(' or ').map((s) => s.trim()).filter(Boolean);
+    }
+    const [, base, inner] = m;
+    const options = inner
+        .split(/\s+or\s+|,/)          // "Flame or Las, Chain" -> Flame | Las | Chain
+        .map((s) => s.trim())
+        .filter(Boolean);
+    if (!options.length) return [name];
+    return options.map((o) => `${base} (${o})`);
+}
+
+
 function originGrantedTalents(doc, pack) {
     const granted = new Set();
     const add = (n) => {
-        for (const a of norm(n).split(' or ')) {           // norm() lowercases, so a plain split
+        for (const a of expandAlternatives(norm(n))) {
             if (!a) continue;
             granted.add(a);
             granted.add(a.replace(/\s*\(.*$/, ''));       // base name, parenthetical dropped
@@ -584,3 +613,9 @@ export function validateBuild(doc, pack) {
 
     return { ok: errors.length === 0, errors, warnings };
 }
+
+
+/** Test seam for originGrantedTalents — see api/test/minor-findings.test.mjs.
+ *  Exported rather than made public because the grant-expansion rules are
+ *  fiddly enough to deserve direct tests, not only end-to-end ones. */
+export const originGrantedTalentsForTest = originGrantedTalents;

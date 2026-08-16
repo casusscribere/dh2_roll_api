@@ -16,6 +16,15 @@ export const d = (sides, rng = Math.random, label = '') => Math.floor(rng(sides,
  * `d(sides)` yield the chosen face, so it composes with the existing engine.
  */
 export function rollScript(forced = [], base = Math.random) {
+    // A non-array here used to be indexed by character: rollScript("5,10")
+    // read forced[0] === '5', forcing die 1 to 5 and randomising the rest.
+    // Half-applied determinism is worse than none, because the caller sees a
+    // plausible result and no signal, so this is a hard error.
+    if (forced !== null && forced !== undefined && !Array.isArray(forced)) {
+        throw new Error(
+            `forcedRolls must be an array of die results (received ${typeof forced})`);
+    }
+    forced = forced ?? [];
     const trace = [];
     const fn = (sides = 100, label = '') => {
         const index = trace.length;
