@@ -73,10 +73,13 @@ const GET = {
     // talent/skill/trait catalogs with refs. Regenerate: npm run sync:chargen.
     '/api/chargen/pack': () => CHARGEN_PACK,
     // Sourcebook prose overlay (ST-1, decision D-N): the full verbatim-text map
-    // when the GIT-IGNORED overlay api/data/chargen/prose.local.mjs is present
-    // (local builds), else { available:false } — the public Pages deployment and
-    // fresh clones show citations only. Async: this is the ONE route whose
-    // handler returns a promise (dispatch resolves it — see below).
+    // when the git-ignored overlay module is present (local builds), else
+    // { available:false } — the public Pages deployment and fresh clones show
+    // citations only. See api/lib/prose.mjs for where the overlay lives; this
+    // comment deliberately does not name the file, because esbuild carries it
+    // into docs/ and the D-N guard scans the built site for that name.
+    // Async: this is the ONE route whose handler returns a promise (dispatch
+    // resolves it — see below).
     '/api/prose': () => loadProseOverlay(),
     // Character schema v1 (Phase 2): the field reference + an empty template.
     '/api/character/schema': () => ({

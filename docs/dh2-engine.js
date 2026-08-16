@@ -2,6 +2,12 @@
   // api/lib/dice.mjs
   var d = (sides, rng = Math.random, label = "") => Math.floor(rng(sides, label) * sides) + 1;
   function rollScript(forced = [], base = Math.random) {
+    if (forced !== null && forced !== void 0 && !Array.isArray(forced)) {
+      throw new Error(
+        `forcedRolls must be an array of die results (received ${typeof forced})`
+      );
+    }
+    forced = forced ?? [];
     const trace = [];
     const fn = (sides = 100, label = "") => {
       const index = trace.length;
@@ -10494,10 +10500,10 @@ roll_table "Power Field Destruction" {
   // api/data/chargen/pack.mjs
   var CHARGEN_PACK = {
     "packVersion": 1,
-    "generatedAt": "2026-07-25T20:00:21.534Z",
+    "generatedAt": "2026-08-16T14:29:19.853Z",
     "corpus": {
       "system": "dark_heresy_2e",
-      "commit": "e126fa219c71f0a576578620034e26b15a52e862"
+      "commit": "733d2ab7d3aba97129d61f75a8a0609e1239eee6"
     },
     "startingXp": 1e3,
     "aptitudes": [
@@ -10736,7 +10742,12 @@ roll_table "Power Field Destruction" {
           "Outcast"
         ],
         "_source": "src_dh2_core_p33",
-        "_book_page": 32
+        "_book_page": 32,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 32,
+          "source": "src_dh2_core_p33"
+        }
       },
       {
         "id": "forge_world",
@@ -10759,7 +10770,12 @@ roll_table "Power Field Destruction" {
           "Imperial Guard"
         ],
         "_source": "src_dh2_core_p35",
-        "_book_page": 34
+        "_book_page": 34,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 34,
+          "source": "src_dh2_core_p35"
+        }
       },
       {
         "id": "highborn",
@@ -10782,7 +10798,12 @@ roll_table "Power Field Destruction" {
           "Adeptus Ministorum"
         ],
         "_source": "src_dh2_core_p37",
-        "_book_page": 36
+        "_book_page": 36,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 36,
+          "source": "src_dh2_core_p37"
+        }
       },
       {
         "id": "hive_world",
@@ -10805,7 +10826,12 @@ roll_table "Power Field Destruction" {
           "Outcast"
         ],
         "_source": "src_dh2_core_p39",
-        "_book_page": 38
+        "_book_page": 38,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 38,
+          "source": "src_dh2_core_p39"
+        }
       },
       {
         "id": "shrine_world",
@@ -10828,7 +10854,12 @@ roll_table "Power Field Destruction" {
           "Imperial Guard"
         ],
         "_source": "src_dh2_core_p41",
-        "_book_page": 40
+        "_book_page": 40,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 40,
+          "source": "src_dh2_core_p41"
+        }
       },
       {
         "id": "voidborn",
@@ -10851,7 +10882,12 @@ roll_table "Power Field Destruction" {
           "Outcast"
         ],
         "_source": "src_dh2_core_p43",
-        "_book_page": 42
+        "_book_page": 42,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 42,
+          "source": "src_dh2_core_p43"
+        }
       },
       {
         "id": "agri_world",
@@ -10874,7 +10910,12 @@ roll_table "Power Field Destruction" {
           "Mutant"
         ],
         "_source": "src_dh2_within_p25",
-        "_book_page": 24
+        "_book_page": 24,
+        "citation": {
+          "book": "Enemies Within",
+          "page": 24,
+          "source": "src_dh2_within_p25"
+        }
       },
       {
         "id": "feudal_world",
@@ -10897,7 +10938,12 @@ roll_table "Power Field Destruction" {
           "Imperial Guard"
         ],
         "_source": "src_dh2_within_p27",
-        "_book_page": 26
+        "_book_page": 26,
+        "citation": {
+          "book": "Enemies Within",
+          "page": 26,
+          "source": "src_dh2_within_p27"
+        }
       },
       {
         "id": "frontier_world",
@@ -10920,7 +10966,12 @@ roll_table "Power Field Destruction" {
           "Outcast"
         ],
         "_source": "src_dh2_within_p29",
-        "_book_page": 28
+        "_book_page": 28,
+        "citation": {
+          "book": "Enemies Within",
+          "page": 28,
+          "source": "src_dh2_within_p29"
+        }
       },
       {
         "id": "death_world",
@@ -10943,7 +10994,12 @@ roll_table "Power Field Destruction" {
           "Imperial Guard"
         ],
         "_source": "src_dh2_without_p27",
-        "_book_page": 26
+        "_book_page": 26,
+        "citation": {
+          "book": "Enemies Without",
+          "page": 26,
+          "source": "src_dh2_without_p27"
+        }
       },
       {
         "id": "garden_world",
@@ -10966,7 +11022,12 @@ roll_table "Power Field Destruction" {
           "Rogue Trader Fleet"
         ],
         "_source": "src_dh2_without_p29",
-        "_book_page": 28
+        "_book_page": 28,
+        "citation": {
+          "book": "Enemies Without",
+          "page": 28,
+          "source": "src_dh2_without_p29"
+        }
       },
       {
         "id": "research_station",
@@ -10989,7 +11050,12 @@ roll_table "Power Field Destruction" {
           "Mutant"
         ],
         "_source": "src_dh2_without_p31",
-        "_book_page": 30
+        "_book_page": 30,
+        "citation": {
+          "book": "Enemies Without",
+          "page": 30,
+          "source": "src_dh2_without_p31"
+        }
       },
       {
         "id": "daemon_world",
@@ -11012,7 +11078,12 @@ roll_table "Power Field Destruction" {
           "Outcast"
         ],
         "_source": "src_dh2_beyond_p27",
-        "_book_page": 26
+        "_book_page": 26,
+        "citation": {
+          "book": "Enemies Beyond",
+          "page": 26,
+          "source": "src_dh2_beyond_p27"
+        }
       },
       {
         "id": "penal_colony",
@@ -11035,7 +11106,12 @@ roll_table "Power Field Destruction" {
           "Outcast"
         ],
         "_source": "src_dh2_beyond_p29",
-        "_book_page": 28
+        "_book_page": 28,
+        "citation": {
+          "book": "Enemies Beyond",
+          "page": 28,
+          "source": "src_dh2_beyond_p29"
+        }
       },
       {
         "id": "quarantine_world",
@@ -11058,7 +11134,12 @@ roll_table "Power Field Destruction" {
           "Outcast"
         ],
         "_source": "src_dh2_beyond_p31",
-        "_book_page": 30
+        "_book_page": 30,
+        "citation": {
+          "book": "Enemies Beyond",
+          "page": 30,
+          "source": "src_dh2_beyond_p31"
+        }
       }
     ],
     "backgrounds": [
@@ -11077,7 +11158,12 @@ roll_table "Power Field Destruction" {
         ],
         "startingAptitude": "Knowledge",
         "startingEquipmentClass": "Adeptus Administratum",
-        "_source": "src_dh2_core_p45"
+        "_source": "src_dh2_core_p45",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": null,
+          "source": "src_dh2_core_p45"
+        }
       },
       {
         "id": "adeptus_arbites",
@@ -11095,7 +11181,12 @@ roll_table "Power Field Destruction" {
         ],
         "startingAptitude": "Defence",
         "startingEquipmentClass": "Adeptus Arbites",
-        "_source": "src_dh2_core_p45"
+        "_source": "src_dh2_core_p45",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": null,
+          "source": "src_dh2_core_p45"
+        }
       },
       {
         "id": "adeptus_astra_telepathica",
@@ -11113,7 +11204,12 @@ roll_table "Power Field Destruction" {
         ],
         "startingAptitude": "Psyker",
         "startingEquipmentClass": "Adeptus Astra Telepathica",
-        "_source": "src_dh2_core_p45"
+        "_source": "src_dh2_core_p45",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": null,
+          "source": "src_dh2_core_p45"
+        }
       },
       {
         "id": "adeptus_mechanicus",
@@ -11131,7 +11227,12 @@ roll_table "Power Field Destruction" {
         ],
         "startingAptitude": "Tech",
         "startingEquipmentClass": "Adeptus Mechanicus",
-        "_source": "src_dh2_core_p45"
+        "_source": "src_dh2_core_p45",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": null,
+          "source": "src_dh2_core_p45"
+        }
       },
       {
         "id": "adeptus_ministorum",
@@ -11149,7 +11250,12 @@ roll_table "Power Field Destruction" {
         ],
         "startingAptitude": "Social",
         "startingEquipmentClass": "Adeptus Ministorum",
-        "_source": "src_dh2_core_p45"
+        "_source": "src_dh2_core_p45",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": null,
+          "source": "src_dh2_core_p45"
+        }
       },
       {
         "id": "imperial_guard",
@@ -11168,7 +11274,12 @@ roll_table "Power Field Destruction" {
         ],
         "startingAptitude": "Defence",
         "startingEquipmentClass": "Imperial Guard",
-        "_source": "src_dh2_core_p45"
+        "_source": "src_dh2_core_p45",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": null,
+          "source": "src_dh2_core_p45"
+        }
       },
       {
         "id": "outcast",
@@ -11185,7 +11296,12 @@ roll_table "Power Field Destruction" {
         ],
         "startingAptitude": "Knowledge",
         "startingEquipmentClass": "Outcast",
-        "_source": "src_dh2_core_p45"
+        "_source": "src_dh2_core_p45",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": null,
+          "source": "src_dh2_core_p45"
+        }
       },
       {
         "id": "scintillan_nobilite",
@@ -11202,7 +11318,12 @@ roll_table "Power Field Destruction" {
         ],
         "startingAptitude": "Social",
         "startingEquipmentClass": "Scintillan Nobilite",
-        "_source": "src_dh2_core_p45"
+        "_source": "src_dh2_core_p45",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": null,
+          "source": "src_dh2_core_p45"
+        }
       },
       {
         "id": "adepta_sororitas",
@@ -11221,7 +11342,12 @@ roll_table "Power Field Destruction" {
         "startingAptitude": "Offence or Social",
         "startingEquipmentClass": "",
         "_source": "src_dh2_within_p31",
-        "_book_page": 30
+        "_book_page": 30,
+        "citation": {
+          "book": "Enemies Within",
+          "page": 30,
+          "source": "src_dh2_within_p31"
+        }
       },
       {
         "id": "mutant",
@@ -11240,7 +11366,12 @@ roll_table "Power Field Destruction" {
         "startingAptitude": "Fieldcraft or Offence",
         "startingEquipmentClass": "",
         "_source": "src_dh2_within_p33",
-        "_book_page": 32
+        "_book_page": 32,
+        "citation": {
+          "book": "Enemies Within",
+          "page": 32,
+          "source": "src_dh2_within_p33"
+        }
       },
       {
         "id": "heretek",
@@ -11259,7 +11390,12 @@ roll_table "Power Field Destruction" {
         "startingAptitude": "Finesse or Tech",
         "startingEquipmentClass": "",
         "_source": "src_dh2_without_p33",
-        "_book_page": 32
+        "_book_page": 32,
+        "citation": {
+          "book": "Enemies Without",
+          "page": 32,
+          "source": "src_dh2_without_p33"
+        }
       },
       {
         "id": "imperial_navy",
@@ -11278,7 +11414,12 @@ roll_table "Power Field Destruction" {
         "startingAptitude": "Offence or Tech",
         "startingEquipmentClass": "",
         "_source": "src_dh2_without_p35",
-        "_book_page": 34
+        "_book_page": 34,
+        "citation": {
+          "book": "Enemies Without",
+          "page": 34,
+          "source": "src_dh2_without_p35"
+        }
       },
       {
         "id": "rogue_trader_fleet",
@@ -11297,7 +11438,12 @@ roll_table "Power Field Destruction" {
         "startingAptitude": "Finesse or Social",
         "startingEquipmentClass": "",
         "_source": "src_dh2_without_p37",
-        "_book_page": 36
+        "_book_page": 36,
+        "citation": {
+          "book": "Enemies Without",
+          "page": 36,
+          "source": "src_dh2_without_p37"
+        }
       }
     ],
     "roles": [
@@ -11318,7 +11464,12 @@ roll_table "Power Field Destruction" {
         ],
         "roleBonusName": "Sure Kill",
         "_source": "src_dh2_core_p63",
-        "_book_page": 62
+        "_book_page": 62,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 62,
+          "source": "src_dh2_core_p63"
+        }
       },
       {
         "id": "chirurgeon",
@@ -11337,7 +11488,12 @@ roll_table "Power Field Destruction" {
         ],
         "roleBonusName": "Dedicated Healer",
         "_source": "src_dh2_core_p65",
-        "_book_page": 64
+        "_book_page": 64,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 64,
+          "source": "src_dh2_core_p65"
+        }
       },
       {
         "id": "desperado",
@@ -11356,7 +11512,12 @@ roll_table "Power Field Destruction" {
         ],
         "roleBonusName": "Move and Shoot",
         "_source": "src_dh2_core_p66",
-        "_book_page": 65
+        "_book_page": 65,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 65,
+          "source": "src_dh2_core_p66"
+        }
       },
       {
         "id": "hierophant",
@@ -11375,7 +11536,12 @@ roll_table "Power Field Destruction" {
         ],
         "roleBonusName": "Sway the Masses",
         "_source": "src_dh2_core_p67",
-        "_book_page": 66
+        "_book_page": 66,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 66,
+          "source": "src_dh2_core_p67"
+        }
       },
       {
         "id": "mystic",
@@ -11394,7 +11560,12 @@ roll_table "Power Field Destruction" {
         ],
         "roleBonusName": "Stare into the Warp",
         "_source": "src_dh2_core_p68",
-        "_book_page": 67
+        "_book_page": 67,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 67,
+          "source": "src_dh2_core_p68"
+        }
       },
       {
         "id": "sage",
@@ -11413,7 +11584,12 @@ roll_table "Power Field Destruction" {
         ],
         "roleBonusName": "Quest for Knowledge",
         "_source": "src_dh2_core_p70",
-        "_book_page": 69
+        "_book_page": 69,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 69,
+          "source": "src_dh2_core_p70"
+        }
       },
       {
         "id": "seeker",
@@ -11432,7 +11608,12 @@ roll_table "Power Field Destruction" {
         ],
         "roleBonusName": "Nothing Escapes My Sight",
         "_source": "src_dh2_core_p72",
-        "_book_page": 71
+        "_book_page": 71,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 71,
+          "source": "src_dh2_core_p72"
+        }
       },
       {
         "id": "warrior",
@@ -11451,7 +11632,12 @@ roll_table "Power Field Destruction" {
         ],
         "roleBonusName": "Expert at Violence",
         "_source": "src_dh2_core_p74",
-        "_book_page": 73
+        "_book_page": 73,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 73,
+          "source": "src_dh2_core_p74"
+        }
       },
       {
         "id": "fanatic",
@@ -11470,7 +11656,12 @@ roll_table "Power Field Destruction" {
         ],
         "roleBonusName": "Death to All Who Oppose Me!",
         "_source": "src_dh2_within_p35",
-        "_book_page": 34
+        "_book_page": 34,
+        "citation": {
+          "book": "Enemies Within",
+          "page": 34,
+          "source": "src_dh2_within_p35"
+        }
       },
       {
         "id": "penitent",
@@ -11489,7 +11680,12 @@ roll_table "Power Field Destruction" {
         ],
         "roleBonusName": "Cleansing Pain",
         "_source": "src_dh2_within_p37",
-        "_book_page": 36
+        "_book_page": 36,
+        "citation": {
+          "book": "Enemies Within",
+          "page": 36,
+          "source": "src_dh2_within_p37"
+        }
       },
       {
         "id": "ace",
@@ -11507,7 +11703,12 @@ roll_table "Power Field Destruction" {
           "Hotshot Pilot"
         ],
         "roleBonusName": "Right Stuff",
-        "_source": "src_dh2_without"
+        "_source": "src_dh2_without",
+        "citation": {
+          "book": "Enemies Without",
+          "page": null,
+          "source": "src_dh2_without"
+        }
       }
     ],
     "talents": [
@@ -11524,7 +11725,12 @@ roll_table "Power Field Destruction" {
           "Ag 30"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p120"
+        "_source": "src_dh2_core_p120",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 123,
+          "source": "src_dh2_core_p124"
+        }
       },
       {
         "id": "blind_fighting",
@@ -11539,7 +11745,12 @@ roll_table "Power Field Destruction" {
           "Per 30"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p120"
+        "_source": "src_dh2_core_p120",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 123,
+          "source": "src_dh2_core_p124"
+        }
       },
       {
         "id": "catfall",
@@ -11554,7 +11765,12 @@ roll_table "Power Field Destruction" {
           "Ag 30"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p120"
+        "_source": "src_dh2_core_p120",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 124,
+          "source": "src_dh2_core_p125"
+        }
       },
       {
         "id": "clues_from_the_crowds",
@@ -11569,7 +11785,12 @@ roll_table "Power Field Destruction" {
           "Fel 30"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p120"
+        "_source": "src_dh2_core_p120",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 124,
+          "source": "src_dh2_core_p125"
+        }
       },
       {
         "id": "die_hard",
@@ -11584,7 +11805,12 @@ roll_table "Power Field Destruction" {
           "WP 40"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p120"
+        "_source": "src_dh2_core_p120",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 125,
+          "source": "src_dh2_core_p126"
+        }
       },
       {
         "id": "disarm",
@@ -11599,7 +11825,12 @@ roll_table "Power Field Destruction" {
           "Ag 30"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p120"
+        "_source": "src_dh2_core_p120",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 125,
+          "source": "src_dh2_core_p126"
+        }
       },
       {
         "id": "double_team",
@@ -11612,7 +11843,12 @@ roll_table "Power Field Destruction" {
         ],
         "prerequisites": [],
         "specialist": false,
-        "_source": "src_dh2_core_p120"
+        "_source": "src_dh2_core_p120",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 126,
+          "source": "src_dh2_core_p127"
+        }
       },
       {
         "id": "enemy",
@@ -11625,7 +11861,12 @@ roll_table "Power Field Destruction" {
         ],
         "prerequisites": [],
         "specialist": true,
-        "_source": "src_dh2_core_p120"
+        "_source": "src_dh2_core_p120",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 126,
+          "source": "src_dh2_core_p127"
+        }
       },
       {
         "id": "ferric_summons",
@@ -11641,7 +11882,12 @@ roll_table "Power Field Destruction" {
           "Mechanicus Implants"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p120"
+        "_source": "src_dh2_core_p120",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 127,
+          "source": "src_dh2_core_p128"
+        }
       },
       {
         "id": "frenzy",
@@ -11654,7 +11900,12 @@ roll_table "Power Field Destruction" {
         ],
         "prerequisites": [],
         "specialist": false,
-        "_source": "src_dh2_core_p120"
+        "_source": "src_dh2_core_p120",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 127,
+          "source": "src_dh2_core_p128"
+        }
       },
       {
         "id": "iron_jaw",
@@ -11669,7 +11920,12 @@ roll_table "Power Field Destruction" {
           "T 40"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p120"
+        "_source": "src_dh2_core_p120",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 128,
+          "source": "src_dh2_core_p129"
+        }
       },
       {
         "id": "jaded",
@@ -11684,7 +11940,12 @@ roll_table "Power Field Destruction" {
           "WP 40"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p120"
+        "_source": "src_dh2_core_p120",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 128,
+          "source": "src_dh2_core_p129"
+        }
       },
       {
         "id": "keen_intuition",
@@ -11699,7 +11960,12 @@ roll_table "Power Field Destruction" {
           "Int 35"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p120"
+        "_source": "src_dh2_core_p120",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 129,
+          "source": "src_dh2_core_p130"
+        }
       },
       {
         "id": "leap_up",
@@ -11714,7 +11980,12 @@ roll_table "Power Field Destruction" {
           "Ag 30"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p120"
+        "_source": "src_dh2_core_p120",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 129,
+          "source": "src_dh2_core_p130"
+        }
       },
       {
         "id": "nowhere_to_hide",
@@ -11729,7 +12000,12 @@ roll_table "Power Field Destruction" {
           "Per 30"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p120"
+        "_source": "src_dh2_core_p120",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 130,
+          "source": "src_dh2_core_p131"
+        }
       },
       {
         "id": "peer",
@@ -11744,7 +12020,12 @@ roll_table "Power Field Destruction" {
           "Fel 30"
         ],
         "specialist": true,
-        "_source": "src_dh2_core_p120"
+        "_source": "src_dh2_core_p120",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 130,
+          "source": "src_dh2_core_p131"
+        }
       },
       {
         "id": "quick_draw",
@@ -11757,7 +12038,12 @@ roll_table "Power Field Destruction" {
         ],
         "prerequisites": [],
         "specialist": false,
-        "_source": "src_dh2_core_p120"
+        "_source": "src_dh2_core_p120",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 131,
+          "source": "src_dh2_core_p132"
+        }
       },
       {
         "id": "rapid_reload",
@@ -11770,7 +12056,12 @@ roll_table "Power Field Destruction" {
         ],
         "prerequisites": [],
         "specialist": false,
-        "_source": "src_dh2_core_p120"
+        "_source": "src_dh2_core_p120",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 131,
+          "source": "src_dh2_core_p132"
+        }
       },
       {
         "id": "resistance",
@@ -11783,7 +12074,12 @@ roll_table "Power Field Destruction" {
         ],
         "prerequisites": [],
         "specialist": true,
-        "_source": "src_dh2_core_p120"
+        "_source": "src_dh2_core_p120",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 131,
+          "source": "src_dh2_core_p132"
+        }
       },
       {
         "id": "sound_constitution",
@@ -11796,7 +12092,12 @@ roll_table "Power Field Destruction" {
         ],
         "prerequisites": [],
         "specialist": false,
-        "_source": "src_dh2_core_p120"
+        "_source": "src_dh2_core_p120",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 131,
+          "source": "src_dh2_core_p132"
+        }
       },
       {
         "id": "takedown",
@@ -11809,7 +12110,12 @@ roll_table "Power Field Destruction" {
         ],
         "prerequisites": [],
         "specialist": false,
-        "_source": "src_dh2_core_p120"
+        "_source": "src_dh2_core_p120",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 132,
+          "source": "src_dh2_core_p133"
+        }
       },
       {
         "id": "technical_knock",
@@ -11824,7 +12130,12 @@ roll_table "Power Field Destruction" {
           "Int 30"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p120"
+        "_source": "src_dh2_core_p120",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 132,
+          "source": "src_dh2_core_p133"
+        }
       },
       {
         "id": "warp_sense",
@@ -11841,7 +12152,12 @@ roll_table "Power Field Destruction" {
           "Per 30"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p120"
+        "_source": "src_dh2_core_p120",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 133,
+          "source": "src_dh2_core_p134"
+        }
       },
       {
         "id": "weapon_tech",
@@ -11857,7 +12173,12 @@ roll_table "Power Field Destruction" {
           "Int 40"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p120"
+        "_source": "src_dh2_core_p120",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 133,
+          "source": "src_dh2_core_p134"
+        }
       },
       {
         "id": "weapon_training",
@@ -11870,7 +12191,12 @@ roll_table "Power Field Destruction" {
         ],
         "prerequisites": [],
         "specialist": true,
-        "_source": "src_dh2_core_p120"
+        "_source": "src_dh2_core_p120",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 133,
+          "source": "src_dh2_core_p134"
+        }
       },
       {
         "id": "armour_monger",
@@ -11887,7 +12213,12 @@ roll_table "Power Field Destruction" {
           "Trade (Armourer)"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 123,
+          "source": "src_dh2_core_p124"
+        }
       },
       {
         "id": "battle_rage",
@@ -11902,7 +12233,12 @@ roll_table "Power Field Destruction" {
           "Frenzy"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 123,
+          "source": "src_dh2_core_p124"
+        }
       },
       {
         "id": "bulging_biceps",
@@ -11917,7 +12253,12 @@ roll_table "Power Field Destruction" {
           "S 45"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 123,
+          "source": "src_dh2_core_p124"
+        }
       },
       {
         "id": "combat_master",
@@ -11932,7 +12273,12 @@ roll_table "Power Field Destruction" {
           "WS 30"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 124,
+          "source": "src_dh2_core_p125"
+        }
       },
       {
         "id": "constant_vigilance",
@@ -11948,7 +12294,12 @@ roll_table "Power Field Destruction" {
           "Awareness +10"
         ],
         "specialist": true,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 124,
+          "source": "src_dh2_core_p125"
+        }
       },
       {
         "id": "contact_network",
@@ -11964,7 +12315,12 @@ roll_table "Power Field Destruction" {
           "Int 35"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 124,
+          "source": "src_dh2_core_p125"
+        }
       },
       {
         "id": "coordinated_interrogation",
@@ -11980,7 +12336,12 @@ roll_table "Power Field Destruction" {
           "Clues from the Crowds"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 124,
+          "source": "src_dh2_core_p125"
+        }
       },
       {
         "id": "counter_attack",
@@ -11995,7 +12356,12 @@ roll_table "Power Field Destruction" {
           "WS 40"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 125,
+          "source": "src_dh2_core_p126"
+        }
       },
       {
         "id": "cover_up",
@@ -12010,7 +12376,12 @@ roll_table "Power Field Destruction" {
           "Int 35"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 125,
+          "source": "src_dh2_core_p126"
+        }
       },
       {
         "id": "deny_the_witch",
@@ -12025,7 +12396,12 @@ roll_table "Power Field Destruction" {
           "WP 35"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 125,
+          "source": "src_dh2_core_p126"
+        }
       },
       {
         "id": "devastating_assault",
@@ -12040,7 +12416,12 @@ roll_table "Power Field Destruction" {
           "WS 35"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 125,
+          "source": "src_dh2_core_p126"
+        }
       },
       {
         "id": "double_tap",
@@ -12055,7 +12436,12 @@ roll_table "Power Field Destruction" {
           "Two-Weapon Wielder"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 125,
+          "source": "src_dh2_core_p126"
+        }
       },
       {
         "id": "exotic_weapon_training",
@@ -12068,7 +12454,12 @@ roll_table "Power Field Destruction" {
         ],
         "prerequisites": [],
         "specialist": true,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 127,
+          "source": "src_dh2_core_p128"
+        }
       },
       {
         "id": "face_in_a_crowd",
@@ -12084,7 +12475,12 @@ roll_table "Power Field Destruction" {
           "Clues from the Crowds"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 127,
+          "source": "src_dh2_core_p128"
+        }
       },
       {
         "id": "hard_target",
@@ -12099,7 +12495,12 @@ roll_table "Power Field Destruction" {
           "Ag 40"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 128,
+          "source": "src_dh2_core_p129"
+        }
       },
       {
         "id": "hardy",
@@ -12114,7 +12515,12 @@ roll_table "Power Field Destruction" {
           "T 40"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 128,
+          "source": "src_dh2_core_p129"
+        }
       },
       {
         "id": "hatred",
@@ -12127,7 +12533,12 @@ roll_table "Power Field Destruction" {
         ],
         "prerequisites": [],
         "specialist": true,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 128,
+          "source": "src_dh2_core_p129"
+        }
       },
       {
         "id": "hip_shooting",
@@ -12143,7 +12554,12 @@ roll_table "Power Field Destruction" {
           "Ag 40"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 128,
+          "source": "src_dh2_core_p129"
+        }
       },
       {
         "id": "independent_targeting",
@@ -12158,7 +12574,12 @@ roll_table "Power Field Destruction" {
           "BS 40"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 128,
+          "source": "src_dh2_core_p129"
+        }
       },
       {
         "id": "inescapable_attack",
@@ -12174,7 +12595,12 @@ roll_table "Power Field Destruction" {
           "Per 35"
         ],
         "specialist": true,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 128,
+          "source": "src_dh2_core_p129"
+        }
       },
       {
         "id": "killing_strike",
@@ -12189,7 +12615,12 @@ roll_table "Power Field Destruction" {
           "WS 50"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 129,
+          "source": "src_dh2_core_p130"
+        }
       },
       {
         "id": "luminen_shock",
@@ -12205,7 +12636,12 @@ roll_table "Power Field Destruction" {
           "Mechanicus Implants"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 129,
+          "source": "src_dh2_core_p130"
+        }
       },
       {
         "id": "maglev_transcendence",
@@ -12221,7 +12657,12 @@ roll_table "Power Field Destruction" {
           "Mechanicus Implants"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 129,
+          "source": "src_dh2_core_p130"
+        }
       },
       {
         "id": "marksman",
@@ -12236,7 +12677,12 @@ roll_table "Power Field Destruction" {
           "BS 35"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 130,
+          "source": "src_dh2_core_p131"
+        }
       },
       {
         "id": "mechadendrite_use",
@@ -12251,7 +12697,12 @@ roll_table "Power Field Destruction" {
           "Mechanicus Implants"
         ],
         "specialist": true,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 130,
+          "source": "src_dh2_core_p131"
+        }
       },
       {
         "id": "precision_killer",
@@ -12266,7 +12717,12 @@ roll_table "Power Field Destruction" {
           "BS 40 or WS 40"
         ],
         "specialist": true,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 130,
+          "source": "src_dh2_core_p131"
+        }
       },
       {
         "id": "prosanguine",
@@ -12282,7 +12738,12 @@ roll_table "Power Field Destruction" {
           "Mechanicus Implants"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 131,
+          "source": "src_dh2_core_p132"
+        }
       },
       {
         "id": "strong_minded",
@@ -12298,7 +12759,12 @@ roll_table "Power Field Destruction" {
           "Resistance (Psychic Powers)"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 131,
+          "source": "src_dh2_core_p132"
+        }
       },
       {
         "id": "swift_attack",
@@ -12313,7 +12779,12 @@ roll_table "Power Field Destruction" {
           "WS 30"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 131,
+          "source": "src_dh2_core_p132"
+        }
       },
       {
         "id": "two_weapon_wielder",
@@ -12326,7 +12797,12 @@ roll_table "Power Field Destruction" {
         ],
         "prerequisites": [],
         "specialist": true,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 132,
+          "source": "src_dh2_core_p133"
+        }
       },
       {
         "id": "unarmed_specialist",
@@ -12343,7 +12819,12 @@ roll_table "Power Field Destruction" {
           "WS 35"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 132,
+          "source": "src_dh2_core_p133"
+        }
       },
       {
         "id": "warp_conduit",
@@ -12360,7 +12841,12 @@ roll_table "Power Field Destruction" {
           "WP 50"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 132,
+          "source": "src_dh2_core_p133"
+        }
       },
       {
         "id": "whirlwind_of_death",
@@ -12375,7 +12861,12 @@ roll_table "Power Field Destruction" {
           "WS 40"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p121"
+        "_source": "src_dh2_core_p121",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 133,
+          "source": "src_dh2_core_p134"
+        }
       },
       {
         "id": "adamantium_faith",
@@ -12392,7 +12883,12 @@ roll_table "Power Field Destruction" {
           "WP 45"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p122"
+        "_source": "src_dh2_core_p122",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 123,
+          "source": "src_dh2_core_p124"
+        }
       },
       {
         "id": "assassin_strike",
@@ -12408,7 +12904,12 @@ roll_table "Power Field Destruction" {
           "Acrobatics"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p122"
+        "_source": "src_dh2_core_p122",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 123,
+          "source": "src_dh2_core_p124"
+        }
       },
       {
         "id": "bastion_of_iron_will",
@@ -12425,7 +12926,12 @@ roll_table "Power Field Destruction" {
           "WP 40"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p122"
+        "_source": "src_dh2_core_p122",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 123,
+          "source": "src_dh2_core_p124"
+        }
       },
       {
         "id": "blademaster",
@@ -12441,7 +12947,12 @@ roll_table "Power Field Destruction" {
           "Weapon Training (any Melee)"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p122"
+        "_source": "src_dh2_core_p122",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 123,
+          "source": "src_dh2_core_p124"
+        }
       },
       {
         "id": "crushing_blow",
@@ -12456,7 +12967,12 @@ roll_table "Power Field Destruction" {
           "WS 40"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p122"
+        "_source": "src_dh2_core_p122",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 125,
+          "source": "src_dh2_core_p126"
+        }
       },
       {
         "id": "deathdealer",
@@ -12471,7 +12987,12 @@ roll_table "Power Field Destruction" {
           "BS 45 or WS 45"
         ],
         "specialist": true,
-        "_source": "src_dh2_core_p122"
+        "_source": "src_dh2_core_p122",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 125,
+          "source": "src_dh2_core_p126"
+        }
       },
       {
         "id": "delicate_interrogation",
@@ -12487,7 +13008,12 @@ roll_table "Power Field Destruction" {
           "Coordinated Interrogation"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p122"
+        "_source": "src_dh2_core_p122",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 125,
+          "source": "src_dh2_core_p126"
+        }
       },
       {
         "id": "eye_of_vengeance",
@@ -12502,7 +13028,12 @@ roll_table "Power Field Destruction" {
           "BS 50"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p122"
+        "_source": "src_dh2_core_p122",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 127,
+          "source": "src_dh2_core_p128"
+        }
       },
       {
         "id": "favoured_by_the_warp",
@@ -12517,7 +13048,12 @@ roll_table "Power Field Destruction" {
           "WP 35"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p122"
+        "_source": "src_dh2_core_p122",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 127,
+          "source": "src_dh2_core_p128"
+        }
       },
       {
         "id": "flash_of_insight",
@@ -12534,7 +13070,12 @@ roll_table "Power Field Destruction" {
           "Coordinated Interrogation"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p122"
+        "_source": "src_dh2_core_p122",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 127,
+          "source": "src_dh2_core_p128"
+        }
       },
       {
         "id": "halo_of_command",
@@ -12550,7 +13091,12 @@ roll_table "Power Field Destruction" {
           "WP 40"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p122"
+        "_source": "src_dh2_core_p122",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 127,
+          "source": "src_dh2_core_p128"
+        }
       },
       {
         "id": "hammer_blow",
@@ -12565,7 +13111,12 @@ roll_table "Power Field Destruction" {
           "Crushing Blow"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p122"
+        "_source": "src_dh2_core_p122",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 128,
+          "source": "src_dh2_core_p129"
+        }
       },
       {
         "id": "infused_knowledge",
@@ -12581,7 +13132,12 @@ roll_table "Power Field Destruction" {
           "Lore (any one)"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p122"
+        "_source": "src_dh2_core_p122",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 128,
+          "source": "src_dh2_core_p129"
+        }
       },
       {
         "id": "lightning_attack",
@@ -12596,7 +13152,12 @@ roll_table "Power Field Destruction" {
           "Swift Attack"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p122"
+        "_source": "src_dh2_core_p122",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 129,
+          "source": "src_dh2_core_p130"
+        }
       },
       {
         "id": "luminen_blast",
@@ -12613,7 +13174,12 @@ roll_table "Power Field Destruction" {
           "Mechanicus Implants"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p122"
+        "_source": "src_dh2_core_p122",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 129,
+          "source": "src_dh2_core_p130"
+        }
       },
       {
         "id": "mastery",
@@ -12628,7 +13194,12 @@ roll_table "Power Field Destruction" {
           "Rank 4 in selected skill"
         ],
         "specialist": true,
-        "_source": "src_dh2_core_p122"
+        "_source": "src_dh2_core_p122",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 130,
+          "source": "src_dh2_core_p131"
+        }
       },
       {
         "id": "mighty_shot",
@@ -12643,7 +13214,12 @@ roll_table "Power Field Destruction" {
           "BS 40"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p122"
+        "_source": "src_dh2_core_p122",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 130,
+          "source": "src_dh2_core_p131"
+        }
       },
       {
         "id": "never_die",
@@ -12659,7 +13235,12 @@ roll_table "Power Field Destruction" {
           "T 50"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p122"
+        "_source": "src_dh2_core_p122",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 130,
+          "source": "src_dh2_core_p131"
+        }
       },
       {
         "id": "preternatural_speed",
@@ -12675,7 +13256,12 @@ roll_table "Power Field Destruction" {
           "Ag 50"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p122"
+        "_source": "src_dh2_core_p122",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 130,
+          "source": "src_dh2_core_p131"
+        }
       },
       {
         "id": "sprint",
@@ -12688,7 +13274,12 @@ roll_table "Power Field Destruction" {
         ],
         "prerequisites": [],
         "specialist": false,
-        "_source": "src_dh2_core_p122"
+        "_source": "src_dh2_core_p122",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 131,
+          "source": "src_dh2_core_p132"
+        }
       },
       {
         "id": "step_aside",
@@ -12704,7 +13295,12 @@ roll_table "Power Field Destruction" {
           "Dodge or Parry"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p122"
+        "_source": "src_dh2_core_p122",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 131,
+          "source": "src_dh2_core_p132"
+        }
       },
       {
         "id": "superior_chirurgeon",
@@ -12719,7 +13315,12 @@ roll_table "Power Field Destruction" {
           "Rank 2 in Medicae skill"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p122"
+        "_source": "src_dh2_core_p122",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 131,
+          "source": "src_dh2_core_p132"
+        }
       },
       {
         "id": "target_selection",
@@ -12734,7 +13335,12 @@ roll_table "Power Field Destruction" {
           "BS 50"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p122"
+        "_source": "src_dh2_core_p122",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 132,
+          "source": "src_dh2_core_p133"
+        }
       },
       {
         "id": "thunder_charge",
@@ -12749,7 +13355,12 @@ roll_table "Power Field Destruction" {
           "S 50"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p122"
+        "_source": "src_dh2_core_p122",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 132,
+          "source": "src_dh2_core_p133"
+        }
       },
       {
         "id": "true_grit",
@@ -12764,7 +13375,12 @@ roll_table "Power Field Destruction" {
           "T 40"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p122"
+        "_source": "src_dh2_core_p122",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 132,
+          "source": "src_dh2_core_p133"
+        }
       },
       {
         "id": "two_weapon_master",
@@ -12782,7 +13398,12 @@ roll_table "Power Field Destruction" {
           "Two-Weapon Wielder (Melee, Ranged)"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p122"
+        "_source": "src_dh2_core_p122",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 132,
+          "source": "src_dh2_core_p133"
+        }
       },
       {
         "id": "warp_lock",
@@ -12799,7 +13420,12 @@ roll_table "Power Field Destruction" {
           "WP 50"
         ],
         "specialist": false,
-        "_source": "src_dh2_core_p122"
+        "_source": "src_dh2_core_p122",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 133,
+          "source": "src_dh2_core_p134"
+        }
       }
     ],
     "traits": [
@@ -12808,287 +13434,492 @@ roll_table "Power Field Destruction" {
         "ref": "dh2:trait:amorphous",
         "name": "Amorphous",
         "rated": false,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 134,
+          "source": "src_dh2_core_p135"
+        }
       },
       {
         "id": "amphibious",
         "ref": "dh2:trait:amphibious",
         "name": "Amphibious",
         "rated": false,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 134,
+          "source": "src_dh2_core_p135"
+        }
       },
       {
         "id": "auto_stabilised",
         "ref": "dh2:trait:auto_stabilised",
         "name": "Auto-stabilised",
         "rated": false,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 134,
+          "source": "src_dh2_core_p135"
+        }
       },
       {
         "id": "baneful_presence",
         "ref": "dh2:trait:baneful_presence",
         "name": "Baneful Presence (X)",
         "rated": true,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 134,
+          "source": "src_dh2_core_p135"
+        }
       },
       {
         "id": "bestial",
         "ref": "dh2:trait:bestial",
         "name": "Bestial",
         "rated": false,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 134,
+          "source": "src_dh2_core_p135"
+        }
       },
       {
         "id": "blind",
         "ref": "dh2:trait:blind",
         "name": "Blind",
         "rated": false,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 134,
+          "source": "src_dh2_core_p135"
+        }
       },
       {
         "id": "brutal_charge",
         "ref": "dh2:trait:brutal_charge",
         "name": "Brutal Charge",
         "rated": false,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 134,
+          "source": "src_dh2_core_p135"
+        }
       },
       {
         "id": "burrower",
         "ref": "dh2:trait:burrower",
         "name": "Burrower (X)",
         "rated": true,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 134,
+          "source": "src_dh2_core_p135"
+        }
       },
       {
         "id": "crawler",
         "ref": "dh2:trait:crawler",
         "name": "Crawler",
         "rated": false,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 134,
+          "source": "src_dh2_core_p135"
+        }
       },
       {
         "id": "daemonic",
         "ref": "dh2:trait:daemonic",
         "name": "Daemonic (X)",
         "rated": true,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 135,
+          "source": "src_dh2_core_p136"
+        }
       },
       {
         "id": "dark_sight",
         "ref": "dh2:trait:dark_sight",
         "name": "Dark-sight",
         "rated": false,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 135,
+          "source": "src_dh2_core_p136"
+        }
       },
       {
         "id": "deadly_natural_weapons",
         "ref": "dh2:trait:deadly_natural_weapons",
         "name": "Deadly Natural Weapons",
         "rated": false,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 135,
+          "source": "src_dh2_core_p136"
+        }
       },
       {
         "id": "fear",
         "ref": "dh2:trait:fear",
         "name": "Fear (X)",
         "rated": true,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 136,
+          "source": "src_dh2_core_p137"
+        }
       },
       {
         "id": "flyer",
         "ref": "dh2:trait:flyer",
         "name": "Flyer (X)",
         "rated": true,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 136,
+          "source": "src_dh2_core_p137"
+        }
       },
       {
         "id": "from_beyond",
         "ref": "dh2:trait:from_beyond",
         "name": "From Beyond",
         "rated": false,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 136,
+          "source": "src_dh2_core_p137"
+        }
       },
       {
         "id": "hoverer",
         "ref": "dh2:trait:hoverer",
         "name": "Hoverer (X)",
         "rated": true,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 136,
+          "source": "src_dh2_core_p137"
+        }
       },
       {
         "id": "incorporeal",
         "ref": "dh2:trait:incorporeal",
         "name": "Incorporeal",
         "rated": false,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 136,
+          "source": "src_dh2_core_p137"
+        }
       },
       {
         "id": "machine",
         "ref": "dh2:trait:machine",
         "name": "Machine (X)",
         "rated": true,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 136,
+          "source": "src_dh2_core_p137"
+        }
       },
       {
         "id": "mechanicus_implants",
         "ref": "dh2:trait:mechanicus_implants",
         "name": "Mechanicus Implants",
         "rated": false,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 137,
+          "source": "src_dh2_core_p138"
+        }
       },
       {
         "id": "mind_lock",
         "ref": "dh2:trait:mind_lock",
         "name": "Mind Lock",
         "rated": false,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 137,
+          "source": "src_dh2_core_p138"
+        }
       },
       {
         "id": "multiple_arms",
         "ref": "dh2:trait:multiple_arms",
         "name": "Multiple Arms (X)",
         "rated": true,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 137,
+          "source": "src_dh2_core_p138"
+        }
       },
       {
         "id": "natural_armour",
         "ref": "dh2:trait:natural_armour",
         "name": "Natural Armour (X)",
         "rated": true,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 137,
+          "source": "src_dh2_core_p138"
+        }
       },
       {
         "id": "natural_weapons",
         "ref": "dh2:trait:natural_weapons",
         "name": "Natural Weapons",
         "rated": false,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 137,
+          "source": "src_dh2_core_p138"
+        }
       },
       {
         "id": "phase",
         "ref": "dh2:trait:phase",
         "name": "Phase",
         "rated": false,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 137,
+          "source": "src_dh2_core_p138"
+        }
       },
       {
         "id": "psyker",
         "ref": "dh2:trait:psyker",
         "name": "Psyker (X)",
         "rated": true,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 137,
+          "source": "src_dh2_core_p138"
+        }
       },
       {
         "id": "quadruped",
         "ref": "dh2:trait:quadruped",
         "name": "Quadruped",
         "rated": false,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 137,
+          "source": "src_dh2_core_p138"
+        }
       },
       {
         "id": "regeneration",
         "ref": "dh2:trait:regeneration",
         "name": "Regeneration (X)",
         "rated": true,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 138,
+          "source": "src_dh2_core_p139"
+        }
       },
       {
         "id": "sanctioned",
         "ref": "dh2:trait:sanctioned",
         "name": "Sanctioned",
         "rated": false,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 138,
+          "source": "src_dh2_core_p139"
+        }
       },
       {
         "id": "size",
         "ref": "dh2:trait:size",
         "name": "Size (X)",
         "rated": true,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 138,
+          "source": "src_dh2_core_p139"
+        }
       },
       {
         "id": "sonar_sense",
         "ref": "dh2:trait:sonar_sense",
         "name": "Sonar Sense",
         "rated": false,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 138,
+          "source": "src_dh2_core_p139"
+        }
       },
       {
         "id": "soul_bound",
         "ref": "dh2:trait:soul_bound",
         "name": "Soul Bound",
         "rated": false,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 138,
+          "source": "src_dh2_core_p139"
+        }
       },
       {
         "id": "stampede",
         "ref": "dh2:trait:stampede",
         "name": "Stampede",
         "rated": false,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 138,
+          "source": "src_dh2_core_p139"
+        }
       },
       {
         "id": "stuff_of_nightmares",
         "ref": "dh2:trait:stuff_of_nightmares",
         "name": "Stuff of Nightmares",
         "rated": false,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 138,
+          "source": "src_dh2_core_p139"
+        }
       },
       {
         "id": "sturdy",
         "ref": "dh2:trait:sturdy",
         "name": "Sturdy",
         "rated": false,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 139,
+          "source": "src_dh2_core_p140"
+        }
       },
       {
         "id": "touched_by_the_fates",
         "ref": "dh2:trait:touched_by_the_fates",
         "name": "Touched by the Fates (X)",
         "rated": true,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 139,
+          "source": "src_dh2_core_p140"
+        }
       },
       {
         "id": "toxic",
         "ref": "dh2:trait:toxic",
         "name": "Toxic (X)",
         "rated": true,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 139,
+          "source": "src_dh2_core_p140"
+        }
       },
       {
         "id": "undying",
         "ref": "dh2:trait:undying",
         "name": "Undying",
         "rated": false,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 139,
+          "source": "src_dh2_core_p140"
+        }
       },
       {
         "id": "unnatural_characteristic",
         "ref": "dh2:trait:unnatural_characteristic",
         "name": "Unnatural [Characteristic] (X)",
         "rated": true,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 139,
+          "source": "src_dh2_core_p140"
+        }
       },
       {
         "id": "unnatural_senses",
         "ref": "dh2:trait:unnatural_senses",
         "name": "Unnatural Senses (X)",
         "rated": true,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 139,
+          "source": "src_dh2_core_p140"
+        }
       },
       {
         "id": "warp_instability",
         "ref": "dh2:trait:warp_instability",
         "name": "Warp Instability",
         "rated": false,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 139,
+          "source": "src_dh2_core_p140"
+        }
       },
       {
         "id": "warp_weapons",
         "ref": "dh2:trait:warp_weapons",
         "name": "Warp Weapons",
         "rated": false,
-        "_source": "src_dh2_core_p135"
+        "_source": "src_dh2_core_p135",
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 139,
+          "source": "src_dh2_core_p140"
+        }
       }
     ],
     "skills": [
@@ -13106,7 +13937,12 @@ roll_table "Power Field Destruction" {
           "Strength"
         ],
         "_source": "src_dh2_core_p99",
-        "_book_page": 98
+        "_book_page": 98,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 98,
+          "source": "src_dh2_core_p99"
+        }
       },
       {
         "id": "athletics",
@@ -13122,7 +13958,12 @@ roll_table "Power Field Destruction" {
           "Toughness"
         ],
         "_source": "src_dh2_core_p100",
-        "_book_page": 99
+        "_book_page": 99,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 99,
+          "source": "src_dh2_core_p100"
+        }
       },
       {
         "id": "awareness",
@@ -13139,7 +13980,12 @@ roll_table "Power Field Destruction" {
           "Intelligence"
         ],
         "_source": "src_dh2_core_p101",
-        "_book_page": 100
+        "_book_page": 100,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 100,
+          "source": "src_dh2_core_p101"
+        }
       },
       {
         "id": "charm",
@@ -13155,7 +14001,12 @@ roll_table "Power Field Destruction" {
           "Influence"
         ],
         "_source": "src_dh2_core_p101",
-        "_book_page": 100
+        "_book_page": 100,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 100,
+          "source": "src_dh2_core_p101"
+        }
       },
       {
         "id": "command",
@@ -13173,7 +14024,12 @@ roll_table "Power Field Destruction" {
           "Willpower"
         ],
         "_source": "src_dh2_core_p102",
-        "_book_page": 101
+        "_book_page": 101,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 101,
+          "source": "src_dh2_core_p102"
+        }
       },
       {
         "id": "commerce",
@@ -13189,7 +14045,12 @@ roll_table "Power Field Destruction" {
           "Fellowship"
         ],
         "_source": "src_dh2_core_p103",
-        "_book_page": 102
+        "_book_page": 102,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 102,
+          "source": "src_dh2_core_p103"
+        }
       },
       {
         "id": "common_lore",
@@ -13205,7 +14066,12 @@ roll_table "Power Field Destruction" {
           "Fellowship"
         ],
         "_source": "src_dh2_core_p104",
-        "_book_page": 103
+        "_book_page": 103,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 102,
+          "source": "src_dh2_core_p103"
+        }
       },
       {
         "id": "deceive",
@@ -13222,7 +14088,12 @@ roll_table "Power Field Destruction" {
           "Tech-Use"
         ],
         "_source": "src_dh2_core_p105",
-        "_book_page": 104
+        "_book_page": 104,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 103,
+          "source": "src_dh2_core_p104"
+        }
       },
       {
         "id": "dodge",
@@ -13235,7 +14106,12 @@ roll_table "Power Field Destruction" {
         ],
         "specialist": false,
         "_source": "src_dh2_core_p106",
-        "_book_page": 105
+        "_book_page": 105,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 104,
+          "source": "src_dh2_core_p105"
+        }
       },
       {
         "id": "forbidden_lore",
@@ -13251,7 +14127,12 @@ roll_table "Power Field Destruction" {
           "Fellowship"
         ],
         "_source": "src_dh2_core_p107",
-        "_book_page": 106
+        "_book_page": 106,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 104,
+          "source": "src_dh2_core_p105"
+        }
       },
       {
         "id": "inquiry",
@@ -13268,7 +14149,12 @@ roll_table "Power Field Destruction" {
           "Perception"
         ],
         "_source": "src_dh2_core_p109",
-        "_book_page": 108
+        "_book_page": 108,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 105,
+          "source": "src_dh2_core_p106"
+        }
       },
       {
         "id": "interrogation",
@@ -13284,7 +14170,12 @@ roll_table "Power Field Destruction" {
           "Fellowship"
         ],
         "_source": "src_dh2_core_p109",
-        "_book_page": 108
+        "_book_page": 108,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 105,
+          "source": "src_dh2_core_p106"
+        }
       },
       {
         "id": "intimidate",
@@ -13300,7 +14191,12 @@ roll_table "Power Field Destruction" {
           "Willpower"
         ],
         "_source": "src_dh2_core_p110",
-        "_book_page": 109
+        "_book_page": 109,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 106,
+          "source": "src_dh2_core_p107"
+        }
       },
       {
         "id": "linguistics",
@@ -13316,7 +14212,12 @@ roll_table "Power Field Destruction" {
           "Fellowship"
         ],
         "_source": "src_dh2_core_p110",
-        "_book_page": 109
+        "_book_page": 109,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 106,
+          "source": "src_dh2_core_p107"
+        }
       },
       {
         "id": "logic",
@@ -13332,7 +14233,12 @@ roll_table "Power Field Destruction" {
           "Agility"
         ],
         "_source": "src_dh2_core_p111",
-        "_book_page": 110
+        "_book_page": 110,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 107,
+          "source": "src_dh2_core_p108"
+        }
       },
       {
         "id": "medicae",
@@ -13349,7 +14255,12 @@ roll_table "Power Field Destruction" {
           "Perception"
         ],
         "_source": "src_dh2_core_p111",
-        "_book_page": 110
+        "_book_page": 110,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 108,
+          "source": "src_dh2_core_p109"
+        }
       },
       {
         "id": "navigate",
@@ -13365,7 +14276,12 @@ roll_table "Power Field Destruction" {
           "Perception"
         ],
         "_source": "src_dh2_core_p112",
-        "_book_page": 111
+        "_book_page": 111,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 110,
+          "source": "src_dh2_core_p111"
+        }
       },
       {
         "id": "operate",
@@ -13381,7 +14297,12 @@ roll_table "Power Field Destruction" {
           "Intelligence"
         ],
         "_source": "src_dh2_core_p113",
-        "_book_page": 112
+        "_book_page": 112,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 110,
+          "source": "src_dh2_core_p111"
+        }
       },
       {
         "id": "parry",
@@ -13394,7 +14315,12 @@ roll_table "Power Field Destruction" {
         ],
         "specialist": false,
         "_source": "src_dh2_core_p113",
-        "_book_page": 112
+        "_book_page": 112,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 112,
+          "source": "src_dh2_core_p113"
+        }
       },
       {
         "id": "psyniscience",
@@ -13410,7 +14336,12 @@ roll_table "Power Field Destruction" {
           "Willpower"
         ],
         "_source": "src_dh2_core_p114",
-        "_book_page": 113
+        "_book_page": 113,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 112,
+          "source": "src_dh2_core_p113"
+        }
       },
       {
         "id": "scholastic_lore",
@@ -13426,7 +14357,12 @@ roll_table "Power Field Destruction" {
           "Fellowship"
         ],
         "_source": "src_dh2_core_p115",
-        "_book_page": 114
+        "_book_page": 114,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 113,
+          "source": "src_dh2_core_p114"
+        }
       },
       {
         "id": "scrutiny",
@@ -13442,7 +14378,12 @@ roll_table "Power Field Destruction" {
           "Fellowship"
         ],
         "_source": "src_dh2_core_p115",
-        "_book_page": 114
+        "_book_page": 114,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 114,
+          "source": "src_dh2_core_p115"
+        }
       },
       {
         "id": "security",
@@ -13458,7 +14399,12 @@ roll_table "Power Field Destruction" {
           "Agility"
         ],
         "_source": "src_dh2_core_p116",
-        "_book_page": 115
+        "_book_page": 115,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 115,
+          "source": "src_dh2_core_p116"
+        }
       },
       {
         "id": "sleight_of_hand",
@@ -13474,7 +14420,12 @@ roll_table "Power Field Destruction" {
           "Intelligence"
         ],
         "_source": "src_dh2_core_p117",
-        "_book_page": 116
+        "_book_page": 116,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 115,
+          "source": "src_dh2_core_p116"
+        }
       },
       {
         "id": "stealth",
@@ -13490,7 +14441,12 @@ roll_table "Power Field Destruction" {
           "Perception"
         ],
         "_source": "src_dh2_core_p117",
-        "_book_page": 116
+        "_book_page": 116,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 115,
+          "source": "src_dh2_core_p116"
+        }
       },
       {
         "id": "survival",
@@ -13507,7 +14463,12 @@ roll_table "Power Field Destruction" {
           "Intelligence"
         ],
         "_source": "src_dh2_core_p118",
-        "_book_page": 117
+        "_book_page": 117,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 116,
+          "source": "src_dh2_core_p117"
+        }
       },
       {
         "id": "tech_use",
@@ -13523,7 +14484,12 @@ roll_table "Power Field Destruction" {
           "Agility"
         ],
         "_source": "src_dh2_core_p119",
-        "_book_page": 118
+        "_book_page": 118,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 117,
+          "source": "src_dh2_core_p118"
+        }
       },
       {
         "id": "trade",
@@ -13540,7 +14506,12 @@ roll_table "Power Field Destruction" {
           "Fellowship"
         ],
         "_source": "src_dh2_core_p119",
-        "_book_page": 118
+        "_book_page": 118,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 118,
+          "source": "src_dh2_core_p119"
+        }
       }
     ],
     "eliteAdvances": [
@@ -13555,7 +14526,12 @@ roll_table "Power Field Destruction" {
           "Adepta Sororitas Background"
         ],
         "_source": "src_dh2_within_p39",
-        "_book_page": 38
+        "_book_page": 38,
+        "citation": {
+          "book": "Enemies Within",
+          "page": 38,
+          "source": "src_dh2_within_p39"
+        }
       },
       {
         "id": "astropath",
@@ -13566,7 +14542,12 @@ roll_table "Power Field Destruction" {
           "Psyker elite advance",
           "Adeptus Astra Telepathica background"
         ],
-        "_source": "src_dh2_beyond_p36"
+        "_source": "src_dh2_beyond_p36",
+        "citation": {
+          "book": "Enemies Beyond",
+          "page": null,
+          "source": "src_dh2_beyond_p36"
+        }
       },
       {
         "id": "untouchable",
@@ -13576,17 +14557,33 @@ roll_table "Power Field Destruction" {
         "prerequisites": [
           "See Untouchable section (Within ch.II)"
         ],
-        "_source": "src_dh2_within_p36"
+        "_source": "src_dh2_within_p36",
+        "citation": {
+          "book": "Enemies Within",
+          "page": null,
+          "source": "src_dh2_within_p36"
+        }
       },
       {
         "id": "inquisitor",
         "ref": "dh2:elite_advance:inquisitor",
         "name": "Inquisitor",
         "xpCost": null,
-        "_source": "src_dh2_within"
+        "_source": "src_dh2_within",
+        "citation": {
+          "book": "Enemies Within",
+          "page": null,
+          "source": "src_dh2_within"
+        }
       }
     ]
   };
+
+  // .build/prose.browser.mjs
+  var UNAVAILABLE = Object.freeze({ available: false, count: 0, prose: Object.freeze({}) });
+  async function loadProseOverlay() {
+    return UNAVAILABLE;
+  }
 
   // api/lib/character-schema.mjs
   var CHARACTER_SCHEMA_VERSION = 4;
@@ -14600,10 +15597,20 @@ roll_table "Power Field Destruction" {
     }
     return { label: canonical, got: Math.max(0, ...Object.values(specs).map((v) => v?.advances ?? 0)) };
   }
+  function expandAlternatives(name) {
+    const m = name.match(/^(.*?)\s*\((.*)\)\s*$/);
+    if (!m) {
+      return name.split(" or ").map((s) => s.trim()).filter(Boolean);
+    }
+    const [, base, inner] = m;
+    const options = inner.split(/\s+or\s+|,/).map((s) => s.trim()).filter(Boolean);
+    if (!options.length) return [name];
+    return options.map((o) => `${base} (${o})`);
+  }
   function originGrantedTalents(doc, pack) {
     const granted = /* @__PURE__ */ new Set();
     const add = (n) => {
-      for (const a of norm2(n).split(" or ")) {
+      for (const a of expandAlternatives(norm2(n))) {
         if (!a) continue;
         granted.add(a);
         granted.add(a.replace(/\s*\(.*$/, ""));
@@ -14961,6 +15968,15 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
     // Builder — aptitudes, cost tables, homeworlds/backgrounds/roles,
     // talent/skill/trait catalogs with refs. Regenerate: npm run sync:chargen.
     "/api/chargen/pack": () => CHARGEN_PACK,
+    // Sourcebook prose overlay (ST-1, decision D-N): the full verbatim-text map
+    // when the git-ignored overlay module is present (local builds), else
+    // { available:false } — the public Pages deployment and fresh clones show
+    // citations only. See api/lib/prose.mjs for where the overlay lives; this
+    // comment deliberately does not name the file, because esbuild carries it
+    // into docs/ and the D-N guard scans the built site for that name.
+    // Async: this is the ONE route whose handler returns a promise (dispatch
+    // resolves it — see below).
+    "/api/prose": () => loadProseOverlay(),
     // Character schema v1 (Phase 2): the field reference + an empty template.
     "/api/character/schema": () => ({
       version: CHARACTER_SCHEMA_VERSION,
@@ -15157,7 +16173,14 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
       const fn = GET[path];
       if (!fn) return { status: 404, body: { error: `Unknown endpoint ${path}` } };
       try {
-        return { status: 200, body: fn() };
+        const out = fn();
+        if (out && typeof out.then === "function") {
+          return out.then(
+            (body2) => ({ status: 200, body: body2 }),
+            (err) => ({ status: 400, body: { error: err.message } })
+          );
+        }
+        return { status: 200, body: out };
       } catch (err) {
         return { status: 400, body: { error: err.message } };
       }
@@ -15194,7 +16217,7 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
           body = {};
         }
       }
-      const { status, body: out } = dispatch(method, apiPath, body);
+      const { status, body: out } = await dispatch(method, apiPath, body);
       return new Response(JSON.stringify(out), {
         status,
         headers: { "Content-Type": "application/json" }
