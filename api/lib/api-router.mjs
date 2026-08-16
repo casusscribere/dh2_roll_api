@@ -8,7 +8,9 @@
  *     to call dispatch() in-process.
  * Because there is one implementation, the two can never drift.
  *
- * dispatch(method, path, body) → { status, body }.
+ * dispatch(method, path, body) → { status, body }. Synchronous for every route
+ * except GET /api/prose, whose body is a dynamic import — that one returns a
+ * promise of the same shape, so transports and tests `await dispatch(...)`.
  */
 import {
     rollTest, resolveTest, rollDamage, resolveAttack, resolveParry, resolveEngagement, applySoak,
@@ -25,6 +27,7 @@ import { weaponsJson } from './rules/sources.mjs';
 import { checkDependencies } from './rules/dependencies.mjs';
 import { CHARACTER_ROSTER } from '../data/characters/roster.mjs';
 import { CHARGEN_PACK } from '../data/chargen/pack.mjs';
+import { loadProseOverlay } from './prose.mjs';
 import {
     listAvailableAdvances, applyAdvance, applyOrigin, validateBuild, xpSummary,
 } from './advancement.mjs';
@@ -69,6 +72,12 @@ const GET = {
     // Builder — aptitudes, cost tables, homeworlds/backgrounds/roles,
     // talent/skill/trait catalogs with refs. Regenerate: npm run sync:chargen.
     '/api/chargen/pack': () => CHARGEN_PACK,
+    // Sourcebook prose overlay (ST-1, decision D-N): the full verbatim-text map
+    // when the GIT-IGNORED overlay api/data/chargen/prose.local.mjs is present
+    // (local builds), else { available:false } — the public Pages deployment and
+    // fresh clones show citations only. Async: this is the ONE route whose
+    // handler returns a promise (dispatch resolves it — see below).
+    '/api/prose': () => loadProseOverlay(),
     // Character schema v1 (Phase 2): the field reference + an empty template.
     '/api/character/schema': () => ({
         version: CHARACTER_SCHEMA_VERSION,
@@ -288,8 +297,19 @@ export function dispatch(method, path, body = {}) {
     if (verb === 'GET') {
         const fn = GET[path];
         if (!fn) return { status: 404, body: { error: `Unknown endpoint ${path}` } };
-        try { return { status: 200, body: fn() }; }
-        catch (err) { return { status: 400, body: { error: err.message } }; }
+        try {
+            const out = fn();
+            // A handler MAY return a promise (only /api/prose does — the overlay
+            // is a dynamic import). Then dispatch returns a promise of the usual
+            // { status, body }; every other route stays synchronous, so no
+            // existing caller changes. `await dispatch(...)` works for both.
+            if (out && typeof out.then === 'function') {
+                return out.then(
+                    (body) => ({ status: 200, body }),
+                    (err) => ({ status: 400, body: { error: err.message } }));
+            }
+            return { status: 200, body: out };
+        } catch (err) { return { status: 400, body: { error: err.message } }; }
     }
     if (verb === 'POST') {
         if (path === '/api/rules/validate') return validateRules(body ?? {});

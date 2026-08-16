@@ -27,7 +27,7 @@ import { dispatch } from './api-router.mjs';
         const raw = init.body ?? (typeof input === 'object' ? input.body : undefined);
         if (raw) { try { body = JSON.parse(raw); } catch { body = {}; } }
 
-        const { status, body: out } = dispatch(method, apiPath, body);
+        const { status, body: out } = await dispatch(method, apiPath, body);
         return new Response(JSON.stringify(out), {
             status,
             headers: { 'Content-Type': 'application/json' },

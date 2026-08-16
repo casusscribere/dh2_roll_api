@@ -23,8 +23,10 @@ app.use(express.static(join(__dirname, '..', 'ui')));
 const send = (res, { status, body }) => res.status(status).json(body);
 
 // GET endpoints — reference data for building forms + the DSL reference.
-for (const path of ['/api/weapons', '/api/options', '/api/rules', '/api/dsl-docs', '/api/rules/source', '/api/character/schema', '/api/characters', '/api/chargen/pack']) {
-    app.get(path, (req, res) => send(res, dispatch('GET', path)));
+// (`await` because GET /api/prose resolves the git-ignored overlay through a
+// dynamic import; every other route's dispatch result is a plain object.)
+for (const path of ['/api/weapons', '/api/options', '/api/rules', '/api/dsl-docs', '/api/rules/source', '/api/character/schema', '/api/characters', '/api/chargen/pack', '/api/prose']) {
+    app.get(path, async (req, res) => send(res, await dispatch('GET', path)));
 }
 
 // POST endpoints — validate, single rolls, parry, full + stepped engagement.

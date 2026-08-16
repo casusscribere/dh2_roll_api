@@ -21,6 +21,13 @@
  * rogue-trader-2e pack pipeline will implement — the contract is proven here
  * first (builder plan Part 6, efficiency rationale 5).
  *
+ * SECOND EMITTER (ST-1, decision D-N): api/data/chargen/prose.local.mjs — the
+ * GIT-IGNORED overlay carrying `description_verbatim` for every corpus entry
+ * that has one, keyed by the same `dh2:<type>:<snake_id>` ref. Verbatim GW text
+ * must never be committed here; the overlay is regenerated on each machine and
+ * `GET /api/prose` degrades to `{ available:false }` without it. The PUBLIC pack
+ * gains only `citation { book, page, source }` — page tags are facts, not prose.
+ *
  * Run: npm run sync:chargen        (CORPUS_DIR env overrides the default
  * monorepo-relative path). Never hand-edit api/data/chargen/pack.mjs.
  */
@@ -28,12 +35,14 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { citationOf } from '../api/lib/prose.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CORPUS = process.env.CORPUS_DIR
     ?? join(root, '..', '..', 'codified-systems', 'dark_heresy_2e');
 const OUT_DIR = join(root, 'api', 'data', 'chargen');
 const OUT = join(OUT_DIR, 'pack.mjs');
+const OUT_PROSE = join(OUT_DIR, 'prose.local.mjs');
 
 const load = (rel) => JSON.parse(readFileSync(join(CORPUS, rel), 'utf8'));
 
@@ -59,7 +68,14 @@ function applyErrata(section, entries) {
 
 // ---- allowlist projections (D-H: mechanical fields ONLY) -------------------
 const ref = (type, id) => `dh2:${type}:${id}`;
-const prov = (e) => ({ _source: e._source, ...(e._book_page !== undefined && { _book_page: e._book_page }) });
+// `citation` is the PUBLIC half of ST-1: book label + printed page + source id.
+// Facts, not expression — safe in the committed pack (D-N). `_source`/`_book_page`
+// stay for back-compat with the existing consumers and tests.
+const prov = (e) => ({
+    _source: e._source,
+    ...(e._book_page !== undefined && { _book_page: e._book_page }),
+    citation: citationOf(e),
+});
 
 const projectTalent = (tier) => (e) => ({
     id: e.id, ref: ref('talent', e.id), name: e.name, tier,
@@ -171,3 +187,67 @@ writeFileSync(OUT, `/**
 export const CHARGEN_PACK = ${JSON.stringify(pack, null, 2)};
 `);
 console.log(`✓ ${OUT}  (${pack.talents.length} talents, ${pack.skills.length} skills, ${pack.homeworlds.length} homeworlds, ${pack.backgrounds.length} backgrounds, ${pack.roles.length} roles, ${pack.traits.length} traits, ${pack.eliteAdvances.length} elite advances, ${pack.aptitudes.length} aptitudes)`);
+
+// ---- second emitter: the prose overlay (ST-1, decision D-N) ----------------
+// GIT-IGNORED. Everything with a `description_verbatim` in the corpus, keyed by
+// the same `dh2:<type>:<snake_id>` ref the pack stamps. Types the pack does not
+// (yet) emit are included so ST-2/ST-3 can resolve hover text for weapons, gear,
+// armour, cybernetics, characteristics, conditions and psychic powers too.
+const PROSE_SOURCES = [
+    // [corpus file,               errata section, ref type token]
+    ['data/talents.json', 'talents', 'talent'],           // all buckets, incl. the EW supplements
+    ['data/traits.json', null, 'trait'],
+    ['data/weapons.json', 'weapons', 'weapon'],
+    ['data/armor.json', 'armor', 'armour'],               // file is armor.json; ref token is `armour`
+    ['data/gear.json', null, 'gear'],
+    ['data/cybernetics.json', null, 'cybernetic'],
+    ['data/skills.json', 'skills', 'skill'],
+    ['data/characteristics.json', null, 'characteristic'],
+    ['data/conditions.json', null, 'condition'],
+    ['data/psychic_powers.json', null, 'psychic_power'],
+];
+
+/** Every object in `node` that is a corpus entry carrying verbatim text. */
+function collectProse(node, out = []) {
+    if (Array.isArray(node)) { for (const v of node) collectProse(v, out); return out; }
+    if (!node || typeof node !== 'object') return out;
+    if (typeof node.description_verbatim === 'string' && typeof node.id === 'string') { out.push(node); return out; }
+    for (const v of Object.values(node)) collectProse(v, out);
+    return out;
+}
+
+/** A prose source that is absent is not an error: partial corpora (and the
+ *  synthetic corpora the script tests build) legitimately lack most of them. */
+function loadOptional(rel) {
+    try { return load(rel); }
+    catch (err) { if (err?.code === 'ENOENT') return null; throw err; }
+}
+
+const prose = {};
+const proseCounts = [];
+const proseSkipped = [];
+for (const [file, section, type] of PROSE_SOURCES) {
+    const doc = loadOptional(file);
+    if (doc === null) { proseSkipped.push(file); continue; }
+    const entries = collectProse(doc);
+    if (section) applyErrata(section, entries);
+    for (const e of entries) {
+        const key = ref(type, e.id);
+        if (Object.hasOwn(prose, key)) throw new Error(`duplicate prose ref: ${key} (${file})`);
+        prose[key] = {
+            text: e.description_verbatim,
+            sha256: e._text_sha256 ?? null,
+            citation: citationOf(e),
+        };
+    }
+    proseCounts.push(`${entries.length} ${type}`);
+}
+
+writeFileSync(OUT_PROSE, `// GENERATED — NEVER COMMIT (decision D-N). Verbatim GW text for local builds only.
+// Emitted by \`npm run sync:chargen\` from ${pack.corpus.system} @ ${corpusCommit.slice(0, 12)}.
+// Git-ignored (.gitignore: api/data/chargen/*.local.mjs); GET /api/prose serves it
+// when present and reports { available:false } when it is not. Do not edit by hand.
+export const PROSE = ${JSON.stringify(prose, null, 2)};
+`);
+console.log(`✓ ${OUT_PROSE}  (${Object.keys(prose).length} prose entries: ${proseCounts.join(', ')})  [git-ignored — D-N]`);
+if (proseSkipped.length) console.warn(`  note: prose sources absent from the corpus, skipped: ${proseSkipped.join(', ')}`);
