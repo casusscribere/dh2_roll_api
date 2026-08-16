@@ -921,13 +921,13 @@ test('compiler: the defensive defaults hold for hand-built ASTs', () => {
         message: /^Unknown checkpoint 'null' in rule "Handmade"$/, line: 7, col: 3,
     });
     // A set_slot with no `op` defaults to '=' for the mode CHECK.
-    // DEFECT (compiler.mjs:65): the check defaults the op (`a.op ?? '='`) but the
-    // error message interpolates the RAW `a.op`, so the operator the compiler
-    // actually tested is not the one it names — an author reading
-    // "does not support 'undefined'" cannot tell what was rejected. Pinned here
-    // as-is; reported rather than fixed.
+    // WAS pinned as finding D-7: the check defaulted the op (`a.op ?? '='`) but
+    // the message interpolated the RAW `a.op`, so it reported "does not support
+    // 'undefined'" when the operator actually tested was '='.
+    // FLIPPED 2026-08-16 with the D-7 fix — the message now names the operator
+    // that was really tested, so an author can act on it.
     throwsDsl(() => compileRule(rule({ branches: [{ when: null, actions: [{ action: 'set_slot', slot: 'extra_dice', value: { type: 'Number', value: 1 } }] }] })), {
-        message: /^Slot 'extra_dice' does not support 'undefined' in rule "Handmade" \(modes: \+=\)$/,
+        message: /^Slot 'extra_dice' does not support '=' in rule "Handmade" \(modes: \+=\)$/,
     });
     // …and a slot that *does* allow '=' compiles through the same default
     const [eff] = compileRule(rule({ branches: [{ when: null, actions: [{ action: 'set_slot', slot: 'jam_threshold', value: { type: 'Number', value: 100 } }] }] }));
@@ -1306,20 +1306,30 @@ test('a rule that fails semantic validation contributes NO effects at all', () =
     throwsDsl(() => compile(`${bad}\n${good}`), { message: /^Unknown slot 'wibble'/ });
 });
 
-test('CHARACTERIZATION: the DSL performs no call-arity checking', () => {
-    // Neither the parser nor the compiler validates the number of arguments a
-    // vocabulary function receives, so an under-supplied call compiles clean and
-    // fails only at runtime — silently. See the coverage report notes: with a
-    // missing `default` argument, `quality_level("Nope")` returns undefined and
-    // `set pen += …` then writes NaN into penModifiers, which is invisible until
-    // the damage total comes out wrong.
+test('the DSL checks call arity at compile time', () => {
+    // WAS a characterization test pinning finding D-2 — "the DSL performs no
+    // call-arity checking" — which asserted only that these three mis-calls
+    // COMPILED (deliberately not the NaN they produced at runtime), so that
+    // adding validation would fail here loudly instead of passing silently.
     //
-    // This test pins the CURRENT behaviour (compiles without complaint) so the
-    // gap is visible; it deliberately does not assert the NaN, so adding arity
-    // validation later would fail here loudly rather than silently pass.
-    assert.equal(compile('quality "X" { on MODIFIERS when has_quality() then add modifier "m" = 1 }').length, 1);
-    assert.equal(compile('quality "Razor Sharp" { on PENETRATION then set pen += quality_level("Nope") }').length, 1);
-    assert.equal(compile('quality "Y" { on MODIFIERS then add modifier "m" = tens(1, 2, 3, 4) }').length, 1);
+    // FLIPPED 2026-08-16 with the D-2 fix: the compiler now validates every
+    // call against the `params` declared in vocabulary.mjs FUNCTION_DEFS, so
+    // all three are rejected at load time. The under-supplied quality_level no
+    // longer reaches the interpreter to write NaN into penModifiers. Full
+    // coverage of the new rule lives in dsl-arity.test.mjs.
+    throwsDsl(() => compile('quality "X" { on MODIFIERS when has_quality() then add modifier "m" = 1 }'), {
+        message: /^Function 'has_quality\(\)' expects 1 argument, got 0 in rule "X"/,
+    });
+    throwsDsl(() => compile('quality "Razor Sharp" { on PENETRATION then set pen += quality_level("Nope") }'), {
+        message: /^Function 'quality_level\(\)' expects 2 arguments, got 1 in rule "Razor Sharp"/,
+    });
+    throwsDsl(() => compile('quality "Y" { on MODIFIERS then add modifier "m" = tens(1, 2, 3, 4) }'), {
+        message: /^Function 'tens\(\)' expects 1 argument, got 4 in rule "Y"/,
+    });
+    // …and the well-formed spellings of the same three still compile
+    assert.equal(compile('quality "X" { on MODIFIERS when has_quality("Proven") then add modifier "m" = 1 }').length, 1);
+    assert.equal(compile('quality "Razor Sharp" { on PENETRATION then set pen += quality_level("Nope", 0) }').length, 1);
+    assert.equal(compile('quality "Y" { on MODIFIERS then add modifier "m" = tens(45) }').length, 1);
 });
 
 test('error positions survive a realistic multi-rule file', () => {

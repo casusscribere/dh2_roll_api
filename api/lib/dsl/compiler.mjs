@@ -3,19 +3,49 @@
  *
  * Rule AST → executable Effect ({ id, source, checkpoint, priority, when, apply }),
  * the exact shape the engine's Registry runs. This is the SEMANTIC layer: it
- * validates that the checkpoint is real and that every fact/function the rule
- * references exists in the interpreter's whitelist, failing with a positioned
- * DslError otherwise.
+ * validates that the checkpoint is real, that every fact/function the rule
+ * references exists in the interpreter's whitelist, and that every call passes
+ * the number of arguments its vocabulary entry declares — failing with a
+ * positioned DslError otherwise. Everything it can catch, it catches HERE, at
+ * rule-load time, rather than leaving a bad rule to misbehave mid-combat.
  */
 import { parse } from './parser.mjs';
 import { DslError } from './tokenizer.mjs';
 import { CHECKPOINTS } from '../pipeline.mjs';
 import { FACTS, FUNCTIONS, evalNode, applyAction, collectNames } from './interpreter.mjs';
-import { SCOPED_FACTS, SCOPED_FUNCTIONS, SCOPE_NAMES, SLOT_DEFS, FLAG_DEFS } from './vocabulary.mjs';
+import { SCOPED_FACTS, SCOPED_FUNCTIONS, SCOPE_NAMES, SLOT_DEFS, FLAG_DEFS, FUNCTION_ARITY, FUNCTION_DEFS } from './vocabulary.mjs';
 
 const KNOWN_CHECKPOINTS = new Set(Object.values(CHECKPOINTS));
 
 const slug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+const SIGNATURES = Object.fromEntries(FUNCTION_DEFS.map((d) => [d.name, d.signature]));
+
+/** "1 argument" / "2 arguments" / "1 or 2 arguments". */
+const arityPhrase = ({ min, max }) => {
+    const plural = (n) => `${n} argument${n === 1 ? '' : 's'}`;
+    return min === max ? plural(min) : `${min} or ${plural(max)}`;
+};
+
+/**
+ * Collect every fact/function reference an action makes — not just `a.value`.
+ * Actions carry expressions in several fields (`apply_status … duration/location`,
+ * `declare_smoke … radius`, `roll_on … area`, `require_test`'s on-fail riders),
+ * and shipped content uses them; a call hiding in one of those must be validated
+ * like any other. Anything with a string `type` is an expression node.
+ */
+const collectFromValue = (v, acc) => {
+    if (!v || typeof v !== 'object') return;
+    if (Array.isArray(v)) { for (const x of v) collectFromValue(x, acc); return; }
+    if (typeof v.type === 'string') { collectNames(v, acc); return; }
+    for (const x of Object.values(v)) collectFromValue(x, acc);
+};
+const collectFromAction = (a, acc) => {
+    for (const [k, v] of Object.entries(a)) {
+        if (k === 'type' || k === 'action') continue;      // the action's own tag
+        collectFromValue(v, acc);
+    }
+};
 
 /**
  * Compile one Rule AST node into an array of Effects — one per `when … then …`
@@ -32,10 +62,10 @@ export function compileRule(rule, pkg = null) {
     }
 
     // Validate every referenced name across all branches.
-    const names = { facts: new Set(), calls: new Set(), scopedFacts: new Set(), scopedCalls: new Set() };
+    const names = { facts: new Set(), calls: new Set(), scopedFacts: new Set(), scopedCalls: new Set(), callNodes: [] };
     for (const br of rule.branches) {
         if (br.when) collectNames(br.when, names);
-        for (const a of br.actions) if (a.value) collectNames(a.value, names);
+        for (const a of br.actions) collectFromAction(a, names);
     }
     for (const f of names.facts) {
         if (!(f in FACTS)) throw new DslError(`Unknown fact '${f}' in rule "${rule.name}"`, rule.line, rule.col);
@@ -55,6 +85,20 @@ export function compileRule(rule, pkg = null) {
         if (!SCOPE_NAMES.includes(scope)) throw new DslError(`Unknown scope '${scope}' in rule "${rule.name}" (scopes: ${SCOPE_NAMES.join(', ')})`, rule.line, rule.col);
         if (!(c in SCOPED_FUNCTIONS[scope])) throw new DslError(`Function '${c}()' is not available in scope '${scope}' in rule "${rule.name}"`, rule.line, rule.col);
     }
+    // Call ARITY (finding D-2): the vocabulary declares each function's params,
+    // so a mis-called function fails HERE — at rule-load time — instead of
+    // evaluating to undefined and writing NaN into the context mid-combat. Runs
+    // after the name checks, so an unknown function still reports as unknown.
+    for (const node of names.callNodes) {
+        const arity = FUNCTION_ARITY[node.name];
+        if (!arity) continue;                                // unknown → already reported above
+        const got = node.args.length;
+        if (got < arity.min || got > arity.max) {
+            throw new DslError(
+                `Function '${node.name}()' expects ${arityPhrase(arity)}, got ${got} in rule "${rule.name}" (signature: ${SIGNATURES[node.name]})`,
+                rule.line, rule.col);
+        }
+    }
     // Slots / flags (Stage 3): validate against the registered tables, incl. the
     // slot's allowed modes (e.g. `set jam_threshold += …` is rejected).
     for (const br of rule.branches) {
@@ -62,7 +106,11 @@ export function compileRule(rule, pkg = null) {
             if (a.action === 'set_slot') {
                 const slot = SLOT_DEFS[a.slot];
                 if (!slot) throw new DslError(`Unknown slot '${a.slot}' in rule "${rule.name}" (slots: ${Object.keys(SLOT_DEFS).join(', ')})`, rule.line, rule.col);
-                if (!slot.modes.includes(a.op ?? '=')) throw new DslError(`Slot '${a.slot}' does not support '${a.op}' in rule "${rule.name}" (modes: ${slot.modes.join(', ')})`, rule.line, rule.col);
+                // A hand-built AST may omit `op`; the check and the MESSAGE must
+                // name the same operator (finding D-7 — it used to report
+                // 'undefined' while actually testing '=').
+                const op = a.op ?? '=';
+                if (!slot.modes.includes(op)) throw new DslError(`Slot '${a.slot}' does not support '${op}' in rule "${rule.name}" (modes: ${slot.modes.join(', ')})`, rule.line, rule.col);
             } else if (a.action === 'set_flag' && !FLAG_DEFS[a.flag]) {
                 throw new DslError(`Unknown flag '${a.flag}' in rule "${rule.name}" (flags: ${Object.keys(FLAG_DEFS).join(', ')})`, rule.line, rule.col);
             }

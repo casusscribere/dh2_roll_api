@@ -57,7 +57,18 @@ function buildConflictPaths(xlsx, roll20) {
     const skillNames = new Set([
         ...Object.keys(xlsx.skills ?? {}), ...Object.keys(roll20.skills ?? {})
     ]);
-    for (const name of skillNames) paths.push(`skills.${name}.advances`);
+    for (const name of skillNames) {
+        paths.push(`skills.${name}.advances`);
+        // Specialist skills (Common/Forbidden/Scholastic Lore, Linguistics,
+        // Navigate, Operate, Trade) hold their ranks per speciality and leave
+        // `.advances` undefined, so the line above alone silently dropped every
+        // speciality difference (finding D-4, 2026-07-30).
+        const specNames = new Set([
+            ...Object.keys(xlsx.skills?.[name]?.specialities ?? {}),
+            ...Object.keys(roll20.skills?.[name]?.specialities ?? {})
+        ]);
+        for (const spec of specNames) paths.push(`skills.${name}.specialities.${spec}.advances`);
+    }
     paths.push('talents', 'traits', 'aptitudes', 'weapons', 'armourItems', 'gear',
         'xp.total', 'xp.ledger', 'origin', 'wounds.max', 'fate.max', 'psy.rating');
     return paths;

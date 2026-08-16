@@ -428,21 +428,26 @@ test('POST /api/resolve with an empty armourDamage map leaves the armour untouch
     assert.equal(res.body.attack.hits[0].soak.woundsInflicted, 0);   // 9 − (6 + 3)
 });
 
-test('POST /api/resolve: an encounter document with no `actors` map is rejected, not crashed into a 200', () => {
-    // FINDING (documented, not fixed): api-router.mjs withEncounter() guards the
-    // merge step with `enc?.actors` but the stats-snapshot loop below it calls
-    // encounter.mjs encounterActor(), which dereferences `encounter.actors[key]`
-    // unguarded (encounter.mjs:46). A partial document therefore surfaces a raw
-    // TypeError ("Cannot read properties of undefined (reading 'attacker')")
-    // through the throw→400 wrapper instead of a domain error. This test pins
-    // the current contract: it is a 400, and it never half-succeeds.
+test('POST /api/resolve: an encounter document with no `actors` map is normalised, not crashed', () => {
+    // FLIPPED (finding D-5, fixed): this test previously pinned the buggy
+    // behaviour — withEncounter() guarded the merge step with `enc?.actors` but
+    // the stats-snapshot loop below it with only `enc`, so encounterActor()
+    // dereferenced `encounter.actors[key]` unguarded and a raw TypeError
+    // ("Cannot read properties of undefined (reading 'attacker')") surfaced as
+    // the 400 body. The two guards are now one, and encounterActor() creates the
+    // `actors` map as part of its documented get-or-create contract, so a
+    // document with no actors YET is an empty encounter rather than a malformed
+    // one — the same reading harvestEngagement() already took of a missing
+    // document. Asserted here: it succeeds, and the snapshot lands.
     const res = dispatch('POST', '/api/resolve', {
         attacker: gunner(), defender: mook(),
         encounter: { schemaVersion: 1, kind: 'dh2.encounter', round: 1 },   // no `actors`
         forcedRolls: [11, 9],
     });
-    assertErrorShape(res);
-    assert.ok(!('attack' in res.body), 'a rejected engagement must not return partial results');
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.ok(res.body.attack, 'the engagement resolves');
+    assert.equal(res.body.encounter.actors.attacker.stats.characteristics.bs, 70);
+    assert.equal(res.body.encounter.actors.defender.stats.characteristics.ag, 30);
 });
 
 // =============================================================================
@@ -470,17 +475,21 @@ test('POST /api/rules/validate reports a DSL error with ok/error/message/line/co
     assert.deepEqual(Object.keys(res.body).sort(), ['col', 'error', 'line', 'message', 'ok']);
 });
 
-test('POST /api/rules/validate: a non-DSL failure still 400s, but carries no line/col', () => {
-    // FINDING (documented, not fixed): `rules` is never type-checked, so a
-    // non-string (a client sending a parsed object, say) reaches the tokenizer
-    // and the resulting internal TypeError is echoed verbatim in `error`
-    // ("Cannot read properties of undefined (reading 'flatMap')"). The status is
-    // right (400) and the shape is right — only the message is an internal leak.
+test('POST /api/rules/validate: a non-string `rules` 400s with a domain message and no line/col', () => {
+    // FLIPPED (finding D-6, fixed): `rules` was never type-checked, so a
+    // non-string (a client sending a parsed object, say) reached the tokenizer
+    // and the resulting internal TypeError was echoed verbatim in `error`
+    // ("Cannot read properties of undefined (reading 'flatMap')"). The status
+    // and shape were already right, so only the message assertion changes: the
+    // type is now checked inside the same try, producing an actionable domain
+    // error. See router-adapter-fixes.test.mjs for the sibling `customRules` /
+    // `disabledRules` fields, which had the identical hole.
     for (const rules of [42, { name: 'x' }, ['talent "X" {}']]) {
         const res = dispatch('POST', '/api/rules/validate', { rules });
         assert.equal(res.status, 400, `rules=${JSON.stringify(rules)} must not be accepted`);
         assert.equal(res.body.ok, false);
         assert.equal(typeof res.body.error, 'string');
+        assert.match(res.body.error, /`rules` must be a string of DSL text \(received (number|object|array)\)/);
         assert.deepEqual(Object.keys(res.body).sort(), ['error', 'ok'],
             'the non-DslError branch must not invent line/col');
     }

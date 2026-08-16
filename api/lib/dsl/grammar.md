@@ -207,6 +207,23 @@ authoritative, always-current list lives in `lib/dsl/docs.mjs`, served at
   (dsl 3 removed the prefixed aliases `target_*`/`opposing_*` and the
   `has_status`/`firing_mode` aliases — use the scoped/canonical forms)
 
+**Call arity is enforced at compile time.** Every function declares its
+parameters in `lib/dsl/vocabulary.mjs` (`FUNCTION_DEFS[].params`); the compiler
+rejects a call with too few or too many arguments when the rule file loads,
+rather than letting it evaluate to `undefined` (and then `NaN`) mid-combat:
+
+```
+set pen += quality_level("Razor Sharp")
+// Function 'quality_level()' expects 2 arguments, got 1 in rule "Razor Sharp"
+//   (signature: quality_level("Name", default))
+```
+
+A `[, arg]` in a documented signature marks an OPTIONAL argument —
+`condition_severity("Name"[, default])`, `condition_duration`,
+`circumstance_severity`: their omitted `default` is a well-defined 0. The
+`default` of `quality_level`/`trait_level` is REQUIRED, because omitting it
+returns `undefined`.
+
 ## Examples
 
 ```

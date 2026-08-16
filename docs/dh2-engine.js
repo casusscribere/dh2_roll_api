@@ -27,9 +27,11 @@
 
   // api/lib/hit-locations.mjs
   function getHitLocationForRoll(roll) {
-    const reversed = parseInt(String(roll).split("").reverse().join(""));
+    const s = String(roll).padStart(2, "0");
+    let reversed = parseInt(s[1] + s[0], 10);
+    if (reversed === 0) reversed = 100;
     const table = [
-      { name: "Head", min: 0, max: 10 },
+      { name: "Head", min: 1, max: 10 },
       { name: "Right Arm", min: 11, max: 20 },
       { name: "Left Arm", min: 21, max: 30 },
       { name: "Body", min: 31, max: 70 },
@@ -1345,78 +1347,95 @@
     } }
   ];
   var FACT_ALIASES = {};
-  var FUNCTION_DEFS = [
-    { name: "has_quality", signature: 'has_quality("Name")', returns: "bool", summary: 'Weapon has the named quality. Prefix match \u2014 "Proven (3)" matches has_quality("Proven"). Scopes: attacker/weapon (default) or opposing_weapon (the parried weapon).', scopes: {
+  var str = (name) => ({ name, kind: "string", optional: false });
+  var val = (name) => ({ name, kind: "value", optional: false });
+  var opt = (p) => ({ ...p, optional: true });
+  var renderParams = (params) => {
+    const req = params.filter((p) => !p.optional);
+    const show = (p) => p.kind === "string" ? `"${p.name}"` : p.name;
+    const tail = params.slice(req.length);
+    return `${req.map(show).join(", ")}${tail.length ? `[, ${tail.map(show).join(", ")}]` : ""}`;
+  };
+  var FUNCTION_DEFS_RAW = [
+    { name: "has_quality", params: [str("Name")], returns: "bool", summary: 'Weapon has the named quality. Prefix match \u2014 "Proven (3)" matches has_quality("Proven"). Scopes: attacker/weapon (default) or opposing_weapon (the parried weapon).', scopes: {
       attacker: (c, [n]) => hasQuality(c.qualities, String(n)),
       weapon: (c, [n]) => hasQuality(c.qualities, String(n)),
       opposing_weapon: (c, [n]) => hasQuality(c.opposingQualities, String(n))
     } },
-    { name: "quality_level", signature: 'quality_level("Name", default)', returns: "number", summary: 'Numeric level parsed from a quality like "Proven (3)" \u2192 3; returns default if absent/unnumbered.', scopes: {
+    { name: "quality_level", params: [str("Name"), val("default")], returns: "number", summary: 'Numeric level parsed from a quality like "Proven (3)" \u2192 3; returns default if absent/unnumbered.', scopes: {
       attacker: (c, [n, d2]) => qualityLevel(c.qualities, String(n), d2),
       weapon: (c, [n, d2]) => qualityLevel(c.qualities, String(n), d2),
       opposing_weapon: (c, [n, d2]) => qualityLevel(c.opposingQualities, String(n), d2)
     } },
-    { name: "has_talent", signature: 'has_talent("Name")', returns: "bool", summary: "Character has the named talent (from the attack's talents[] list). Prefix match.", scopes: {
+    { name: "has_talent", params: [str("Name")], returns: "bool", summary: "Character has the named talent (from the attack's talents[] list). Prefix match.", scopes: {
       attacker: (c, [n]) => hasNamed(c.talents ?? c.actor?.talents, n)
     } },
-    { name: "has_trait", signature: 'has_trait("Name")', returns: "bool", summary: 'Character/creature has the named DH2.0 trait (from traits[]). Prefix match \u2014 "Brutal Charge (3)" matches has_trait("Brutal Charge"). Scopes: attacker (default) or target (e.g. target.has_trait("Daemonic") \u2014 Sanctified).', scopes: {
+    { name: "has_trait", params: [str("Name")], returns: "bool", summary: 'Character/creature has the named DH2.0 trait (from traits[]). Prefix match \u2014 "Brutal Charge (3)" matches has_trait("Brutal Charge"). Scopes: attacker (default) or target (e.g. target.has_trait("Daemonic") \u2014 Sanctified).', scopes: {
       attacker: (c, [n]) => hasNamed(c.traits ?? c.actor?.traits, n),
       target: (c, [n]) => hasNamed(c.target?.traits, n)
     } },
-    { name: "trait_level", signature: 'trait_level("Name", default)', returns: "number", summary: 'Numeric level parsed from a trait like "Brutal Charge (3)" \u2192 3; returns default if absent/unnumbered. Scopes: attacker (default) or target.', scopes: {
+    { name: "trait_level", params: [str("Name"), val("default")], returns: "number", summary: 'Numeric level parsed from a trait like "Brutal Charge (3)" \u2192 3; returns default if absent/unnumbered. Scopes: attacker (default) or target.', scopes: {
       attacker: (c, [n, d2]) => qualityLevel(c.traits, String(n), d2),
       target: (c, [n, d2]) => qualityLevel(c.target?.traits, String(n), d2)
     } },
-    { name: "has_condition", signature: 'has_condition("Name")', returns: "bool", summary: 'A named Condition is active on the character (from conditions[] / statuses[]), e.g. "On Fire", "Full Aim", "Stunned".', scopes: {
+    { name: "has_condition", params: [str("Name")], returns: "bool", summary: 'A named Condition is active on the character (from conditions[] / statuses[]), e.g. "On Fire", "Full Aim", "Stunned".', scopes: {
       attacker: (c, [n]) => hasNamed(c.statuses ?? c.actor?.statuses, n)
     } },
-    { name: "has_circumstance", signature: 'has_circumstance("Name")', returns: "bool", summary: "A named environmental Circumstance is in effect (from circumstances[]).", scopes: {
+    { name: "has_circumstance", params: [str("Name")], returns: "bool", summary: "A named environmental Circumstance is in effect (from circumstances[]).", scopes: {
       attacker: (c, [n]) => hasNamed(c.circumstances ?? c.actor?.circumstances, n)
     } },
-    { name: "circumstance_severity", signature: 'circumstance_severity("Name", default)', returns: "number", summary: "Severity of a structured Circumstance in circumstances[] (e.g. the Haywire Field strength 1\u20135), or default.", scopes: {
+    { name: "circumstance_severity", params: [str("Name"), opt(val("default"))], returns: "number", summary: "Severity of a structured Circumstance in circumstances[] (e.g. the Haywire Field strength 1\u20135), or default.", scopes: {
       attacker: (c, [n, d2]) => findNamed(c.circumstances ?? c.actor?.circumstances, n)?.severity ?? num(d2)
     } },
-    { name: "configuration", signature: 'configuration("Name")', returns: "bool", summary: 'A per-character Configuration toggle is on (from configs[] / firingModes[]), e.g. configuration("Maximal").', scopes: {
+    { name: "configuration", params: [str("Name")], returns: "bool", summary: 'A per-character Configuration toggle is on (from configs[] / firingModes[]), e.g. configuration("Maximal").', scopes: {
       attacker: (c, [n]) => hasNamed(c.configs ?? c.firingModes, n)
     } },
-    { name: "is_action", signature: 'is_action("Name")', returns: "bool", summary: 'The current action is the named one (case-insensitive), e.g. is_action("Parry"). Works in every flow including reactions.', scopes: {
+    { name: "is_action", params: [str("Name")], returns: "bool", summary: 'The current action is the named one (case-insensitive), e.g. is_action("Parry"). Works in every flow including reactions.', scopes: {
       attacker: (c, [n]) => isAction(c.action, n)
     } },
-    { name: "is_test", signature: 'is_test("Name")', returns: "bool", summary: 'The generic test (test.* pipeline) is the named one, spelling-blind \u2014 is_test("Tech-Use") matches testName "tech_use"/"TechUse". THE way to write "+X to <skill>" item/talent rules: when is_test("Tech-Use") [and <condition>] then add modifier "\u2026" = X.', scopes: {
+    { name: "is_test", params: [str("Name")], returns: "bool", summary: 'The generic test (test.* pipeline) is the named one, spelling-blind \u2014 is_test("Tech-Use") matches testName "tech_use"/"TechUse". THE way to write "+X to <skill>" item/talent rules: when is_test("Tech-Use") [and <condition>] then add modifier "\u2026" = X.', scopes: {
       attacker: (c, [n]) => normName(c.testName ?? "") === normName(n)
     } },
-    { name: "is_reaction", signature: "is_reaction()", returns: "bool", summary: "The current action is a Reaction (Parry, Dodge, \u2026).", scopes: {
+    { name: "is_reaction", params: [], returns: "bool", summary: "The current action is a Reaction (Parry, Dodge, \u2026).", scopes: {
       attacker: (c) => isReaction(c.action)
     } },
-    { name: "action_subtype", signature: 'action_subtype("Name")', returns: "bool", summary: 'The current action carries the named subtype (declared via `subtype`/`attack` on the action). `is_attack` is shorthand for action_subtype("attack").', scopes: {
+    { name: "action_subtype", params: [str("Name")], returns: "bool", summary: 'The current action carries the named subtype (declared via `subtype`/`attack` on the action). `is_attack` is shorthand for action_subtype("attack").', scopes: {
       attacker: (c, [n]) => actionHasSubtype(c.action, n)
     } },
-    { name: "condition_severity", signature: 'condition_severity("Name", default)', returns: "number", summary: "Severity of a structured Condition in conditions[] (e.g. Crippled severity), or default.", scopes: {
+    { name: "condition_severity", params: [str("Name"), opt(val("default"))], returns: "number", summary: "Severity of a structured Condition in conditions[] (e.g. Crippled severity), or default.", scopes: {
       attacker: (c, [n, d2]) => findNamed(c.statuses ?? c.actor?.statuses, n)?.severity ?? num(d2)
     } },
-    { name: "condition_duration", signature: 'condition_duration("Name", default)', returns: "number", summary: "Remaining duration (rounds) of a structured Condition in conditions[], or default.", scopes: {
+    { name: "condition_duration", params: [str("Name"), opt(val("default"))], returns: "number", summary: "Remaining duration (rounds) of a structured Condition in conditions[], or default.", scopes: {
       attacker: (c, [n, d2]) => findNamed(c.statuses ?? c.actor?.statuses, n)?.duration ?? num(d2)
     } },
-    { name: "condition_location", signature: 'condition_location("Name")', returns: "string", summary: 'Hit location a structured Condition in conditions[] is bound to, or "".', scopes: {
+    { name: "condition_location", params: [str("Name")], returns: "string", summary: 'Hit location a structured Condition in conditions[] is bound to, or "".', scopes: {
       attacker: (c, [n]) => findNamed(c.statuses ?? c.actor?.statuses, n)?.location ?? ""
     } },
-    { name: "tens", signature: "tens(n)", returns: "number", summary: "The tens digit of n, i.e. floor(n / 10).", scopes: {
+    { name: "tens", params: [val("n")], returns: "number", summary: "The tens digit of n, i.e. floor(n / 10).", scopes: {
       attacker: (c, [n]) => Math.floor(num(n) / 10)
     } },
-    { name: "is_natural", signature: "is_natural(n)", returns: "bool", summary: "True if the d100 roll equals n exactly.", scopes: {
+    { name: "is_natural", params: [val("n")], returns: "bool", summary: "True if the d100 roll equals n exactly.", scopes: {
       attacker: (c, [n]) => (c.test?.roll ?? c.roll) === n
     } },
     // --- arithmetic helpers (Stage 3 — DH2 p.18: fractions round UP by default) ---
-    { name: "ceil", signature: "ceil(n)", returns: "number", summary: "Round n up to the nearest integer.", scopes: {
+    { name: "ceil", params: [val("n")], returns: "number", summary: "Round n up to the nearest integer.", scopes: {
       attacker: (c, [n]) => Math.ceil(Number(n) || 0)
     } },
-    { name: "floor", signature: "floor(n)", returns: "number", summary: "Round n down to the nearest integer.", scopes: {
+    { name: "floor", params: [val("n")], returns: "number", summary: "Round n down to the nearest integer.", scopes: {
       attacker: (c, [n]) => Math.floor(Number(n) || 0)
     } },
-    { name: "half", signature: "half(n)", returns: "number", summary: "Half of n, rounded UP \u2014 the DH2 default rounding (p.18), e.g. half(3) = 2.", scopes: {
+    { name: "half", params: [val("n")], returns: "number", summary: "Half of n, rounded UP \u2014 the DH2 default rounding (p.18), e.g. half(3) = 2.", scopes: {
       attacker: (c, [n]) => Math.ceil((Number(n) || 0) / 2)
     } }
   ];
+  var FUNCTION_DEFS = FUNCTION_DEFS_RAW.map((d2) => ({
+    ...d2,
+    signature: `${d2.name}(${renderParams(d2.params)})`
+  }));
+  var FUNCTION_ARITY = Object.fromEntries(FUNCTION_DEFS.map((d2) => [d2.name, {
+    min: d2.params.filter((p) => !p.optional).length,
+    max: d2.params.length
+  }]));
   var FUNCTION_ALIASES = {};
   var SLOT_DEFS = {
     pen: {
@@ -1799,7 +1818,7 @@
         throw new DslError(`Unknown action '${action.action}'`, 0, 0);
     }
   }
-  function collectNames(node, acc = { facts: /* @__PURE__ */ new Set(), calls: /* @__PURE__ */ new Set(), scopedFacts: /* @__PURE__ */ new Set(), scopedCalls: /* @__PURE__ */ new Set() }) {
+  function collectNames(node, acc = { facts: /* @__PURE__ */ new Set(), calls: /* @__PURE__ */ new Set(), scopedFacts: /* @__PURE__ */ new Set(), scopedCalls: /* @__PURE__ */ new Set(), callNodes: [] }) {
     if (!node || typeof node !== "object") return acc;
     switch (node.type) {
       case "Identifier":
@@ -1809,6 +1828,7 @@
       case "Call":
         if (node.scope) acc.scopedCalls.add(`${node.scope}.${node.name}`);
         else acc.calls.add(node.name);
+        (acc.callNodes ?? (acc.callNodes = [])).push(node);
         node.args.forEach((a) => collectNames(a, acc));
         break;
       case "Logical":
@@ -1827,15 +1847,38 @@
   // api/lib/dsl/compiler.mjs
   var KNOWN_CHECKPOINTS = new Set(Object.values(CHECKPOINTS));
   var slug = (name) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  var SIGNATURES = Object.fromEntries(FUNCTION_DEFS.map((d2) => [d2.name, d2.signature]));
+  var arityPhrase = ({ min, max }) => {
+    const plural = (n) => `${n} argument${n === 1 ? "" : "s"}`;
+    return min === max ? plural(min) : `${min} or ${plural(max)}`;
+  };
+  var collectFromValue = (v, acc) => {
+    if (!v || typeof v !== "object") return;
+    if (Array.isArray(v)) {
+      for (const x of v) collectFromValue(x, acc);
+      return;
+    }
+    if (typeof v.type === "string") {
+      collectNames(v, acc);
+      return;
+    }
+    for (const x of Object.values(v)) collectFromValue(x, acc);
+  };
+  var collectFromAction = (a, acc) => {
+    for (const [k, v] of Object.entries(a)) {
+      if (k === "type" || k === "action") continue;
+      collectFromValue(v, acc);
+    }
+  };
   function compileRule(rule, pkg = null) {
     const checkpoint = rule.on?.startsWith("attack.") ? rule.on.slice("attack.".length) : rule.on;
     if (!KNOWN_CHECKPOINTS.has(checkpoint)) {
       throw new DslError(`Unknown checkpoint '${rule.on}' in rule "${rule.name}"`, rule.line, rule.col);
     }
-    const names = { facts: /* @__PURE__ */ new Set(), calls: /* @__PURE__ */ new Set(), scopedFacts: /* @__PURE__ */ new Set(), scopedCalls: /* @__PURE__ */ new Set() };
+    const names = { facts: /* @__PURE__ */ new Set(), calls: /* @__PURE__ */ new Set(), scopedFacts: /* @__PURE__ */ new Set(), scopedCalls: /* @__PURE__ */ new Set(), callNodes: [] };
     for (const br of rule.branches) {
       if (br.when) collectNames(br.when, names);
-      for (const a of br.actions) if (a.value) collectNames(a.value, names);
+      for (const a of br.actions) collectFromAction(a, names);
     }
     for (const f of names.facts) {
       if (!(f in FACTS)) throw new DslError(`Unknown fact '${f}' in rule "${rule.name}"`, rule.line, rule.col);
@@ -1853,12 +1896,25 @@
       if (!SCOPE_NAMES.includes(scope)) throw new DslError(`Unknown scope '${scope}' in rule "${rule.name}" (scopes: ${SCOPE_NAMES.join(", ")})`, rule.line, rule.col);
       if (!(c in SCOPED_FUNCTIONS[scope])) throw new DslError(`Function '${c}()' is not available in scope '${scope}' in rule "${rule.name}"`, rule.line, rule.col);
     }
+    for (const node of names.callNodes) {
+      const arity = FUNCTION_ARITY[node.name];
+      if (!arity) continue;
+      const got = node.args.length;
+      if (got < arity.min || got > arity.max) {
+        throw new DslError(
+          `Function '${node.name}()' expects ${arityPhrase(arity)}, got ${got} in rule "${rule.name}" (signature: ${SIGNATURES[node.name]})`,
+          rule.line,
+          rule.col
+        );
+      }
+    }
     for (const br of rule.branches) {
       for (const a of br.actions) {
         if (a.action === "set_slot") {
           const slot = SLOT_DEFS[a.slot];
           if (!slot) throw new DslError(`Unknown slot '${a.slot}' in rule "${rule.name}" (slots: ${Object.keys(SLOT_DEFS).join(", ")})`, rule.line, rule.col);
-          if (!slot.modes.includes(a.op ?? "=")) throw new DslError(`Slot '${a.slot}' does not support '${a.op}' in rule "${rule.name}" (modes: ${slot.modes.join(", ")})`, rule.line, rule.col);
+          const op = a.op ?? "=";
+          if (!slot.modes.includes(op)) throw new DslError(`Slot '${a.slot}' does not support '${op}' in rule "${rule.name}" (modes: ${slot.modes.join(", ")})`, rule.line, rule.col);
         } else if (a.action === "set_flag" && !FLAG_DEFS[a.flag]) {
           throw new DslError(`Unknown flag '${a.flag}' in rule "${rule.name}" (flags: ${Object.keys(FLAG_DEFS).join(", ")})`, rule.line, rule.col);
         }
@@ -3096,6 +3152,9 @@ roll_table "Power Field Destruction" {
   function strengthBonusMultiple(weapon = {}, isMelee = false) {
     return isMelee || weapon.thrown === true ? weapon.sbMultiplier || 1 : 0;
   }
+  function characteristicBonus(value, unnatural = 0) {
+    return Math.floor((Number(value) || 0) / 10) + (Number(unnatural) || 0);
+  }
   function runToHit(input, rng, registry) {
     const { characteristics = {}, weapon = {}, target } = input;
     const action = canonicalAction(input.action) ?? input.action ?? "Standard Attack";
@@ -3201,7 +3260,7 @@ roll_table "Power Field Destruction" {
         };
         if (directionText) scatter.directionText = directionText;
         if (ctx.detonate) {
-          const sb2 = Math.floor((characteristics.s ?? 0) / 10) + unnaturalStrength;
+          const sb2 = characteristicBonus(characteristics.s, unnaturalStrength);
           const sbTimes2 = strengthBonusMultiple(weapon, isMelee);
           ctx.pen = Number(weapon.pen) || 0;
           ctx.penModifiers = {};
@@ -3223,7 +3282,7 @@ roll_table "Power Field Destruction" {
       return { ctx, base, success: false, scatter, hitMeta: null };
     }
     const accrual = actionInfo.hitAccrual ?? actionInfo.rate;
-    const fireRate = actionInfo.cap === "wsb" ? Math.max(1, Math.floor((characteristics.ws ?? 0) / 10) + (Number(unnatural.ws) || 0)) : actionInfo.rate === "semi" ? Math.max(1, weapon.rof?.burst ?? 1) : actionInfo.rate === "full" ? Math.max(1, weapon.rof?.full ?? 1) : 1;
+    const fireRate = actionInfo.cap === "wsb" ? Math.max(1, characteristicBonus(characteristics.ws, unnatural.ws)) : actionInfo.rate === "semi" ? Math.max(1, weapon.rof?.burst ?? 1) : actionInfo.rate === "full" ? Math.max(1, weapon.rof?.full ?? 1) : 1;
     if (accrual === "semi") ctx.additionalHits = Math.floor((test.dos - 1) / 2);
     else if (accrual === "full") ctx.additionalHits = test.dos - 1;
     else ctx.additionalHits = 0;
@@ -3233,7 +3292,7 @@ roll_table "Power Field Destruction" {
     if (ctx.additionalHits < 0) ctx.additionalHits = 0;
     runCheckpoint(registry, CHECKPOINTS.HIT_COUNT_BONUS, ctx);
     const additionalHits = ctx.additionalHits;
-    const sb = Math.floor((characteristics.s ?? 0) / 10) + unnaturalStrength;
+    const sb = characteristicBonus(characteristics.s, unnaturalStrength);
     const sbTimes = strengthBonusMultiple(weapon, isMelee);
     const firstLocation = isSpray ? "Body" : action === "Called Shot" && input.calledShotLocation ? input.calledShotLocation : getHitLocationForRoll(test.roll);
     const pen = Number(weapon.pen) || 0;
@@ -3381,7 +3440,7 @@ roll_table "Power Field Destruction" {
           damage: dmg.total,
           penetration: hitMeta.totalPen,
           armour: effArmour,
-          toughnessBonus: target.toughnessBonus ?? Math.floor((characteristics.t ?? 0) / 10),
+          toughnessBonus: target.toughnessBonus ?? characteristicBonus(characteristics.t),
           unnaturalToughness: Number(target.unnaturalToughness) || 0,
           felling: hitMeta.fellingReduction || 0
         });
@@ -3529,7 +3588,7 @@ roll_table "Power Field Destruction" {
   }
   var defenderTarget = (d2) => ({
     armour: Number(d2.armour) || 0,
-    toughnessBonus: d2.toughnessBonus ?? Math.floor((d2.characteristics?.t ?? 0) / 10),
+    toughnessBonus: d2.toughnessBonus ?? characteristicBonus(d2.characteristics?.t),
     unnaturalToughness: Number(d2.unnaturalToughness) || 0,
     toughness: d2.characteristics?.t ?? 0,
     strength: d2.characteristics?.s ?? 0,
@@ -14153,6 +14212,11 @@ roll_table "Power Field Destruction" {
     "willpower": "wp",
     "fellowship": "fel"
   };
+  var DOC_CHAR_KEY_BY_PACK_KEY = {
+    wil: "wp"
+    // corpus "wil" (advancement.json aptitude table) → document "wp"
+  };
+  var docCharKey = (packKey) => DOC_CHAR_KEY_BY_PACK_KEY[packKey] ?? packKey;
   var norm2 = (s) => String(s ?? "").trim().toLowerCase();
   var entryName2 = (e) => e && typeof e === "object" ? String(e.name ?? "") : String(e ?? "");
   function aptitudeSet(doc) {
@@ -14243,8 +14307,10 @@ roll_table "Power Field Destruction" {
     const { remaining } = xpSummary(doc);
     const out = [];
     const push = (a) => out.push({ ...a, affordable: a.cost <= remaining });
-    for (const [key, aptPair] of Object.entries(pack.characteristicAptitudes)) {
-      const cur = doc.characteristics?.[key]?.advances ?? 0;
+    for (const [packKey, aptPair] of Object.entries(pack.characteristicAptitudes)) {
+      const key = docCharKey(packKey);
+      const c = doc.characteristics?.[key];
+      const cur = (typeof c === "number" ? 0 : c?.advances) ?? 0;
       const max = pack.costs.characteristic.matches_2.length;
       if (cur >= max) continue;
       const matches = aptitudeMatches(doc, aptPair);
@@ -14348,11 +14414,13 @@ roll_table "Power Field Destruction" {
     var _a, _b, _c, _d, _e, _f;
     const d2 = structuredClone(doc);
     if (advance.prereqsMet === false && !confirmed) throw new Error(`prerequisites unmet: ${(advance.prereqProblems ?? []).join("; ")} (pass confirmed:true to override)`);
+    const purchasedName = advance.speciality ? `${String(advance.name ?? "").replace(/\s*\([^)]*\)\s*$/, "")} (${advance.speciality})` : advance.name;
     switch (advance.kind) {
       case "characteristic": {
-        let c = d2.characteristics[advance.ref];
+        const key = docCharKey(advance.ref);
+        let c = d2.characteristics[key];
         if (typeof c === "number") {
-          c = d2.characteristics[advance.ref] = { base: c, advances: 0, modifiers: [] };
+          c = d2.characteristics[key] = { base: c, advances: 0, modifiers: [] };
         }
         if (!c) throw new Error(`unknown characteristic "${advance.ref}"`);
         if ((c.advances ?? 0) + 1 !== advance.rank) throw new Error(`rank ${advance.rank} skips (current advances: ${c.advances ?? 0})`);
@@ -14379,7 +14447,7 @@ roll_table "Power Field Destruction" {
         break;
       }
       case "talent": {
-        const name = advance.speciality ? `${advance.name} (${advance.speciality})` : advance.name;
+        const name = purchasedName;
         const held = (d2.talents ?? []).some((t) => norm2(entryName2(t)) === norm2(name));
         if (held) throw new Error(`talent already held: ${name}`);
         (d2.talents ?? (d2.talents = [])).push({ name, ref: advance.ref });
@@ -14403,7 +14471,7 @@ roll_table "Power Field Destruction" {
     const { remaining } = xpSummary(doc);
     if (advance.cost > remaining) throw new Error(`insufficient XP: cost ${advance.cost}, remaining ${remaining}`);
     const entry = {
-      name: advance.speciality ? `${advance.name}` : advance.name,
+      name: purchasedName,
       cost: advance.cost,
       kind: advance.kind,
       ref: advance.ref,
@@ -14516,6 +14584,41 @@ roll_table "Power Field Destruction" {
       choicesNeeded
     };
   }
+  function skillAddress(doc, pack, e) {
+    const m = String(e.name ?? "").match(/^(.*?)\s*\(([^)]*)\)\s*$/);
+    const base = m ? m[1] : String(e.name ?? "");
+    let speciality = m ? m[2].trim() : null;
+    if (speciality && /^new speciality$/i.test(speciality)) speciality = null;
+    const canonical = canonicalSkillName(base) ?? canonicalSkillName(pack.skills?.find((s) => s.ref === e.ref)?.name ?? "");
+    if (!canonical) return null;
+    const entry = skillEntryFor(doc, canonical);
+    if (!SKILL_DEFS[canonical].specialist) return { label: canonical, got: entry?.advances ?? 0 };
+    const specs = entry?.specialities ?? {};
+    if (speciality) {
+      const key = Object.keys(specs).find((k) => norm2(k) === norm2(speciality));
+      return { label: `${canonical} (${speciality})`, got: (key ? specs[key]?.advances : 0) ?? 0 };
+    }
+    return { label: canonical, got: Math.max(0, ...Object.values(specs).map((v) => v?.advances ?? 0)) };
+  }
+  function originGrantedTalents(doc, pack) {
+    const granted = /* @__PURE__ */ new Set();
+    const add = (n) => {
+      for (const a of norm2(n).split(" or ")) {
+        if (!a) continue;
+        granted.add(a);
+        granted.add(a.replace(/\s*\(.*$/, ""));
+      }
+    };
+    const lookup = (list, member) => {
+      if (!member) return null;
+      const ref = member.ref, name = norm2(entryName2(member));
+      return list.find((x) => ref && x.ref === ref || name && norm2(x.name) === name);
+    };
+    for (const g of lookup(pack.backgrounds, doc.origin?.background)?.talentsGranted ?? []) add(g);
+    for (const g of lookup(pack.roles, doc.origin?.role)?.roleTalentChoice ?? []) add(g);
+    for (const e of doc.origin?.eliteAdvances ?? []) add(entryName2(e));
+    return granted;
+  }
   function validateBuild(doc, pack) {
     const errors = [], warnings = [];
     const ledger = doc.xp?.ledger ?? [];
@@ -14523,31 +14626,39 @@ roll_table "Power Field Destruction" {
     const report = (msg) => (fullyTyped ? errors : warnings).push(msg);
     const { total, spent, remaining } = xpSummary(doc);
     if (remaining < 0) errors.push(`overspent: ledger total ${spent} exceeds earned XP ${total}`);
-    const expChar = {}, expSkill = {};
+    const expChar = {}, expSkill = /* @__PURE__ */ new Map();
     for (const e of ledger) {
-      if (e.kind === "characteristic" && e.ref) expChar[e.ref] = Math.max(expChar[e.ref] ?? 0, e.rank ?? (expChar[e.ref] ?? 0) + 1);
+      if (e.kind === "characteristic" && e.ref) {
+        const key = docCharKey(e.ref);
+        expChar[key] = Math.max(expChar[key] ?? 0, e.rank ?? (expChar[key] ?? 0) + 1);
+      }
       if (e.kind === "skill" && e.ref) {
-        const k = `${e.ref}|${e.name}`;
-        expSkill[k] = Math.max(expSkill[k] ?? 0, e.rank ?? (expSkill[k] ?? 0) + 1);
+        const addr = skillAddress(doc, pack, e);
+        if (!addr) continue;
+        const prev = expSkill.get(addr.label)?.exp ?? 0;
+        expSkill.set(addr.label, { got: addr.got, exp: Math.max(prev, e.rank ?? prev + 1) });
       }
     }
     for (const [key, exp] of Object.entries(expChar)) {
       const got = doc.characteristics?.[key]?.advances ?? 0;
       if (got !== exp) report(`characteristic ${key}: ledger implies ${exp} advances, doc has ${got}`);
     }
+    for (const [label, { got, exp }] of expSkill) {
+      if (got !== exp) report(`skill ${label}: ledger implies ${exp} advances, doc has ${got}`);
+    }
     for (const e of ledger) {
       if (e.kind !== "talent") continue;
       const held = (doc.talents ?? []).some((t) => norm2(entryName2(t)) === norm2(e.name));
       if (!held) report(`ledger buys talent "${e.name}" but the doc does not hold it`);
     }
-    const granted = /* @__PURE__ */ new Set();
-    for (const list of [doc.origin?.eliteAdvances ?? []]) for (const g of list) granted.add(norm2(entryName2(g)));
+    const granted = originGrantedTalents(doc, pack);
     const bought = new Set(ledger.filter((e) => e.kind === "talent").map((e) => norm2(e.name)));
     for (const t of doc.talents ?? []) {
       const name = norm2(entryName2(t));
-      const inPack = pack.talents.some((p) => norm2(p.name) === name.replace(/\s*\(.*\)$/, ""));
-      if (inPack && !bought.has(name) && ledger.length) {
-        (fullyTyped ? warnings : warnings).push(`talent "${entryName2(t)}" held without a ledger purchase (origin grant or import)`);
+      const base = name.replace(/\s*\(.*\)$/, "");
+      const inPack = pack.talents.some((p) => norm2(p.name) === base);
+      if (inPack && !bought.has(name) && !granted.has(name) && !granted.has(base) && ledger.length) {
+        warnings.push(`talent "${entryName2(t)}" held without a ledger purchase (origin grant or import)`);
       }
     }
     return { ok: errors.length === 0, errors, warnings };
@@ -14685,6 +14796,7 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
     return { schemaVersion: ENCOUNTER_SCHEMA_VERSION, kind: "dh2.encounter", round: 1, actors: {} };
   }
   function encounterActor(encounter, key, name = key) {
+    if (!encounter.actors) encounter.actors = {};
     if (!encounter.actors[key]) {
       encounter.actors[key] = {
         name,
@@ -14707,6 +14819,7 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
     const checkpoint = PHASE_TO_CHECKPOINT[phase];
     if (!checkpoint) throw new Error(`Unknown upkeep phase '${phase}' (TURN_START | TURN_END | ROUND_END)`);
     const out = clone(encounter);
+    if (!out.actors) out.actors = {};
     const events = [];
     const keys = actorKey ? [actorKey] : Object.keys(out.actors);
     for (const key of keys) {
@@ -14881,19 +14994,19 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
     },
     // forcedRolls: caller-supplied die results (Foundry rolls its own dice for
     // the table UX; the engine judges them — the dh2-roll-vm pattern).
-    "/api/test": (body) => resolveTest(body, body.forcedRolls ? rollScript(body.forcedRolls) : void 0, buildRegistry(body.customRules, body.disabledRules)),
+    "/api/test": (body) => resolveTest(body, body.forcedRolls ? rollScript(body.forcedRolls) : void 0, registryFor(body)),
     "/api/damage": (body) => {
-      const out = rollDamage(body, body.forcedRolls ? rollScript(body.forcedRolls) : void 0, buildRegistry(body.customRules, body.disabledRules));
+      const out = rollDamage(body, body.forcedRolls ? rollScript(body.forcedRolls) : void 0, registryFor(body));
       if (out.error) throw new Error(out.error);
       return out;
     },
     "/api/soak": (body) => applySoak(body),
-    "/api/parry": (body) => resolveParry(body, body.forcedRolls ? rollScript(body.forcedRolls) : void 0, buildRegistry(body.customRules, body.disabledRules)),
-    "/api/attack": (body) => resolveAttack(body, body.forcedRolls ? rollScript(body.forcedRolls) : void 0, buildRegistry(body.customRules, body.disabledRules)),
+    "/api/parry": (body) => resolveParry(body, body.forcedRolls ? rollScript(body.forcedRolls) : void 0, registryFor(body)),
+    "/api/attack": (body) => resolveAttack(body, body.forcedRolls ? rollScript(body.forcedRolls) : void 0, registryFor(body)),
     "/api/resolve": (body) => {
       const rng = rollScript(body.forcedRolls ?? []);
       const input = withEncounter(body);
-      const out = resolveEngagement(input, rng, buildRegistry(body.customRules, body.disabledRules));
+      const out = resolveEngagement(input, rng, registryFor(body));
       annotateRecharge(out, body);
       if (body.encounter || body.attackerKey || body.defenderKey) {
         out.encounter = harvestEngagement(
@@ -14910,7 +15023,7 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
     "/api/engage": (body) => {
       const { phase, options = {}, state = {} } = body;
       const { attacker = {}, defender = {}, options: opts } = withEncounter({ ...body, options });
-      const reg = buildRegistry(body.customRules, body.disabledRules);
+      const reg = registryFor(body);
       const rng = rollScript(body.forcedRolls ?? []);
       let out;
       switch (phase) {
@@ -14945,7 +15058,7 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
     // Phase 4: run one upkeep phase over the encounter document.
     // { encounter, phase: 'TURN_START'|'TURN_END'|'ROUND_END', actorKey?, customRules?, disabledRules? }
     "/api/encounter/tick": (body) => {
-      const reg = buildRegistry(body.customRules, body.disabledRules);
+      const reg = registryFor(body);
       const rng = rollScript(body.forcedRolls ?? []);
       const out = tickEncounter(body.encounter ?? emptyEncounter(), body.phase, reg, rng, body.actorKey ?? null);
       out.rollTrace = rng.trace;
@@ -14959,20 +15072,36 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
       warnings: checkDependencies(body ?? {}, { talents: availableTalents, traits: availableTraits })
     })
   };
+  var typeNameOf = (v) => Array.isArray(v) ? "array" : typeof v;
+  function dslText(value, field) {
+    if (value == null) return value;
+    if (typeof value !== "string") {
+      throw new Error(`\`${field}\` must be a string of DSL text (received ${typeNameOf(value)})`);
+    }
+    return value;
+  }
+  function ruleIds(value, field) {
+    if (value == null) return value;
+    if (!Array.isArray(value)) {
+      throw new Error(`\`${field}\` must be an array of rule ids (received ${typeNameOf(value)})`);
+    }
+    return value;
+  }
+  function registryFor(body) {
+    return buildRegistry(dslText(body.customRules, "customRules"), ruleIds(body.disabledRules, "disabledRules"));
+  }
   function withEncounter(body) {
     const enc = body.encounter;
     if (!enc && !body.attackerKey && !body.defenderKey) return body;
     const input = { ...body };
     const atkKey = body.attackerKey ?? "attacker", defKey = body.defenderKey ?? "defender";
-    if (enc?.actors) {
+    if (enc) {
       if (input.attacker) input.attacker = mergeActorState(input.attacker, enc, atkKey);
       if (input.defender) {
         input.defender = mergeActorState(input.defender, enc, defKey);
-        const dmg = enc.actors[defKey]?.armourDamage;
+        const dmg = enc.actors?.[defKey]?.armourDamage;
         if (dmg && Object.keys(dmg).length) input.options = { ...input.options ?? {}, armourDamage: dmg };
       }
-    }
-    if (enc) {
       for (const [key, side] of [[atkKey, input.attacker], [defKey, input.defender]]) {
         if (!side?.characteristics) continue;
         const a = encounterActor(enc, key, side.name);
@@ -15002,9 +15131,8 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
     return { status: 200, body: out };
   }
   function validateRules(body) {
-    const text = body?.rules ?? "";
     try {
-      const effects = compile(text);
+      const effects = compile(dslText(body?.rules, "rules") ?? "");
       return {
         status: 200,
         body: {

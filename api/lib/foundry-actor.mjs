@@ -55,6 +55,57 @@ const entryFlags = (e) => (e.ref !== undefined || e.dsl !== undefined)
     : {};
 
 /**
+ * Item types that are SET-VALUED: you either have the talent or you do not, and
+ * DH3 carries no quantity on them, so two Items with the same name are one
+ * thing recorded twice. Weapons/armour/gear are deliberately NOT here — a
+ * character really can carry two lasguns, or a pict recorder equipped and a
+ * second one stowed, and collapsing those would delete inventory.
+ */
+const SET_VALUED_ITEM_TYPES = new Set(['talent']);
+
+/**
+ * De-dupe identity: item type + case/whitespace-insensitive name. Parentheticals
+ * are KEPT — `Weapon Training (Las)` and `Weapon Training (Bolt)` are different
+ * talents — so this is deliberately NOT the roster's `normalizeName`.
+ */
+const itemKey = (i) => JSON.stringify([i.type, String(i.name).toLowerCase().replace(/\s+/g, ' ').trim()]);
+
+/**
+ * Collapse duplicate set-valued Items (finding D-9, 2026-07-30). A character
+ * carrying both a `talents` entry `Weapon Training (Las)` and
+ * `weaponTrainings: ['Las']` produced the same talent Item twice, at two
+ * different tiers — real for several campaign PCs.
+ *
+ * The FIRST occurrence wins its place and identity: emission order puts
+ * `talents` (character-authored — tier, notes, source, ref/dsl flags) ahead of
+ * the synthesized `weaponTrainings` stubs. A later duplicate only FILLS fields
+ * the winner left unset, so no value either entry actually carried is lost —
+ * the stub's known tier 1 lands on a talent entry whose sheet recorded no tier,
+ * but never overwrites a real one. A talent's `system` fields are a number
+ * (`tier`, 0 = unrecorded) or a string (`benefit`/`description`, '' = absent),
+ * so "unset" is exactly "falsy" here.
+ */
+function dedupeItems(items) {
+    const out = [];
+    const byKey = new Map();
+    for (const item of items) {
+        if (!SET_VALUED_ITEM_TYPES.has(item.type)) { out.push(item); continue; }
+        const kept = byKey.get(itemKey(item));
+        if (!kept) { byKey.set(itemKey(item), item); out.push(item); continue; }
+        for (const [k, v] of Object.entries(item.system)) {
+            if (!kept.system[k] && v) kept.system[k] = v;
+        }
+        const lost = item.flags?.['dh2-roll-vm'];      // ref/dsl provenance, if any
+        if (lost) {
+            if (!kept.flags) kept.flags = { 'dh2-roll-vm': {} };
+            const ns = kept.flags['dh2-roll-vm'];
+            for (const [k, v] of Object.entries(lost)) if (ns[k] === undefined) ns[k] = v;
+        }
+    }
+    return out;
+}
+
+/**
  * Map a MIGRATED character document to Foundry Actor data.
  * Returns { name, type, system, flags, items } — items are plain
  * `{ name, type, system, flags? }` objects ready for createEmbeddedDocuments.
@@ -234,5 +285,5 @@ export function characterToFoundryActor(doc) {
         },
     };
 
-    return { name: doc.name, type: 'acolyte', system, flags, items };
+    return { name: doc.name, type: 'acolyte', system, flags, items: dedupeItems(items) };
 }

@@ -440,20 +440,27 @@ export function parseGrids({ sheet: g, xp: xpGrid, stored: storedGrid }, fileLab
 }
 
 /** One ARMAMENTS block: Name: / <name> / Quality|RoF|Range / <values> /
- *  Damage|Pen|Clip / <values> / Special / <qualities> [/ <mods>]. */
+ *  Damage|Pen|Clip / <values> / Special / <qualities> [/ <mods>].
+ *
+ *  `unmapped` is the caller's residual-gap set. A "Name:"-anchored block that
+ *  does not parse is a weapon the sheet listed and the import dropped, so it is
+ *  recorded there (D-13 — the parameter was passed but never used). A block with
+ *  no name at all is a blank template row: nothing was lost, nothing reported. */
 function parseWeaponBlock(g, r, c, unmapped) {
     // an empty name cell does NOT skip the block — some sheets leave it blank
     // (merged cells); a block with real damage still imports, visibly unnamed
-    const name = at(g, r + 1, c) || '(unnamed weapon)';
+    const named = at(g, r + 1, c);
+    const name = named || '(unnamed weapon)';
+    const drop = (why) => { if (named) unmapped.add(`weapon block "${named}" not imported (${why})`); return null; };
     // locate the Quality header within the next two rows (layouts drift)
     let qRow = null;
     for (let rr = r + 2; rr <= r + 3; rr++) if (low(at(g, rr, c)) === 'quality') { qRow = rr; break; }
-    if (qRow == null) return null;
+    if (qRow == null) return drop('no Quality row');
     const quality = at(g, qRow + 1, c);
     const rof = at(g, qRow + 1, c + 1);
     let dRow = null;
     for (let rr = qRow + 2; rr <= qRow + 3; rr++) if (low(at(g, rr, c)) === 'damage') { dRow = rr; break; }
-    if (dRow == null) return null;
+    if (dRow == null) return drop('no Damage row');
     const dmgText = at(g, dRow + 1, c);
     const pen = int(at(g, dRow + 1, c + 1)) ?? 0;
     const clipSize = int(at(g, dRow + 1, c + 2));   // the Clip column → clip { max, value }
@@ -461,7 +468,7 @@ function parseWeaponBlock(g, r, c, unmapped) {
     for (let rr = dRow + 2; rr <= dRow + 3; rr++) if (low(at(g, rr, c)) === 'special') { specials = at(g, rr + 1, c); break; }
 
     const dm = /(\d+\s*d\s*\d+(?:\s*[+\-]\s*\d+)?)/i.exec(dmgText);
-    if (!dm) return null;   // empty/placeholder block
+    if (!dm) return drop('no dice damage formula');   // empty/placeholder block
     const damage = dm[1].replace(/\s+/g, '');
     const typeTail = dmgText.slice(dm.index + dm[1].length).toLowerCase();
     const damageType = /rend|(^|\s)r\b/.test(typeTail) ? 'Rending'

@@ -105,19 +105,19 @@ const POST = {
     },
     // forcedRolls: caller-supplied die results (Foundry rolls its own dice for
     // the table UX; the engine judges them — the dh2-roll-vm pattern).
-    '/api/test': (body) => resolveTest(body, body.forcedRolls ? rollScript(body.forcedRolls) : undefined, buildRegistry(body.customRules, body.disabledRules)),
+    '/api/test': (body) => resolveTest(body, body.forcedRolls ? rollScript(body.forcedRolls) : undefined, registryFor(body)),
     '/api/damage': (body) => {
-        const out = rollDamage(body, body.forcedRolls ? rollScript(body.forcedRolls) : undefined, buildRegistry(body.customRules, body.disabledRules));
+        const out = rollDamage(body, body.forcedRolls ? rollScript(body.forcedRolls) : undefined, registryFor(body));
         if (out.error) throw new Error(out.error);
         return out;
     },
     '/api/soak': (body) => applySoak(body),
-    '/api/parry': (body) => resolveParry(body, body.forcedRolls ? rollScript(body.forcedRolls) : undefined, buildRegistry(body.customRules, body.disabledRules)),
-    '/api/attack': (body) => resolveAttack(body, body.forcedRolls ? rollScript(body.forcedRolls) : undefined, buildRegistry(body.customRules, body.disabledRules)),
+    '/api/parry': (body) => resolveParry(body, body.forcedRolls ? rollScript(body.forcedRolls) : undefined, registryFor(body)),
+    '/api/attack': (body) => resolveAttack(body, body.forcedRolls ? rollScript(body.forcedRolls) : undefined, registryFor(body)),
     '/api/resolve': (body) => {
         const rng = rollScript(body.forcedRolls ?? []);
         const input = withEncounter(body);
-        const out = resolveEngagement(input, rng, buildRegistry(body.customRules, body.disabledRules));
+        const out = resolveEngagement(input, rng, registryFor(body));
         annotateRecharge(out, body);
         if (body.encounter || body.attackerKey || body.defenderKey) {
             out.encounter = harvestEngagement(body.encounter, body.attackerKey ?? 'attacker', body.defenderKey ?? 'defender', out,
@@ -129,7 +129,7 @@ const POST = {
     '/api/engage': (body) => {
         const { phase, options = {}, state = {} } = body;
         const { attacker = {}, defender = {}, options: opts } = withEncounter({ ...body, options });
-        const reg = buildRegistry(body.customRules, body.disabledRules);
+        const reg = registryFor(body);
         const rng = rollScript(body.forcedRolls ?? []);
         let out;
         switch (phase) {
@@ -153,7 +153,7 @@ const POST = {
     // Phase 4: run one upkeep phase over the encounter document.
     // { encounter, phase: 'TURN_START'|'TURN_END'|'ROUND_END', actorKey?, customRules?, disabledRules? }
     '/api/encounter/tick': (body) => {
-        const reg = buildRegistry(body.customRules, body.disabledRules);
+        const reg = registryFor(body);
         const rng = rollScript(body.forcedRolls ?? []);
         const out = tickEncounter(body.encounter ?? emptyEncounter(), body.phase, reg, rng, body.actorKey ?? null);
         out.rollTrace = rng.trace;
@@ -168,6 +168,39 @@ const POST = {
     }),
 };
 
+/** What a caller sent, for error text — `typeof` plus the array case. Only ever
+ *  called on a value that already failed a `== null` guard. */
+const typeNameOf = (v) => (Array.isArray(v) ? 'array' : typeof v);
+
+/** A body field carrying DSL source text. The tokenizer assumes a string, so an
+ *  unchecked value escaped as an internal TypeError through the throw→400
+ *  wrapper ("Cannot read properties of undefined (reading 'flatMap')") — finding
+ *  D-6, reported against `rules` but identical for `customRules` on every
+ *  engine endpoint. Absent/null keeps its meaning: "no user rule layer". */
+function dslText(value, field) {
+    if (value == null) return value;
+    if (typeof value !== 'string') {
+        throw new Error(`\`${field}\` must be a string of DSL text (received ${typeNameOf(value)})`);
+    }
+    return value;
+}
+
+/** A body field carrying a list of rule ids. `new Set(nonIterable)` leaked
+ *  "number 42 is not iterable (…Symbol.iterator)" the same way (D-6 class). */
+function ruleIds(value, field) {
+    if (value == null) return value;
+    if (!Array.isArray(value)) {
+        throw new Error(`\`${field}\` must be an array of rule ids (received ${typeNameOf(value)})`);
+    }
+    return value;
+}
+
+/** buildRegistry() over the two rule-layer body fields, type-checked first, so
+ *  every endpoint that accepts them reports the same domain error. */
+function registryFor(body) {
+    return buildRegistry(dslText(body.customRules, 'customRules'), ruleIds(body.disabledRules, 'disabledRules'));
+}
+
 /** Merge persistent actor state (conditions, AP damage) into engagement inputs,
  *  and snapshot the combatants' stats into the document for later upkeep tests. */
 function withEncounter(body) {
@@ -175,17 +208,19 @@ function withEncounter(body) {
     if (!enc && !body.attackerKey && !body.defenderKey) return body;
     const input = { ...body };
     const atkKey = body.attackerKey ?? 'attacker', defKey = body.defenderKey ?? 'defender';
-    if (enc?.actors) {
+    // ONE guard for both steps. They used to disagree (`enc?.actors` for the
+    // merge, `enc` for the snapshot), so a document with no `actors` map skipped
+    // the merge and then crashed inside encounterActor() — finding D-5. Both
+    // steps are now optional-chained/get-or-create over the same value.
+    if (enc) {
         if (input.attacker) input.attacker = mergeActorState(input.attacker, enc, atkKey);
         if (input.defender) {
             input.defender = mergeActorState(input.defender, enc, defKey);
             // persistent AP loss seeds the corrosion accumulator (per location)
-            const dmg = enc.actors[defKey]?.armourDamage;
+            const dmg = enc.actors?.[defKey]?.armourDamage;
             if (dmg && Object.keys(dmg).length) input.options = { ...(input.options ?? {}), armourDamage: dmg };
         }
-    }
-    // snapshot stats for upkeep tests (Toughness/Agility/Willpower vs stored values)
-    if (enc) {
+        // snapshot stats for upkeep tests (Toughness/Agility/Willpower vs stored values)
         for (const [key, side] of [[atkKey, input.attacker], [defKey, input.defender]]) {
             if (!side?.characteristics) continue;
             const a = encounterActor(enc, key, side.name);
@@ -225,9 +260,10 @@ function validateCharacterRoute(body) {
 /** POST /api/rules/validate has a bespoke success/error shape (DSL line/col), so
  *  it is handled directly rather than through the throw→400 path. */
 function validateRules(body) {
-    const text = body?.rules ?? '';
     try {
-        const effects = compile(text);
+        // type-checked INSIDE the try so a wrong-typed `rules` takes the same
+        // 400 { ok, error } path as a compile failure, minus line/col (D-6).
+        const effects = compile(dslText(body?.rules, 'rules') ?? '');
         return {
             status: 200,
             body: {

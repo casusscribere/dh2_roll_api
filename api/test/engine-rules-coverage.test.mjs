@@ -1429,11 +1429,13 @@ test('roll20: an attribute with no name does not crash the mapper', () => {
     const r = fromRoll20({ name: 'Nameless', attribs: [{ current: 7 }, { name: 'TotallyUnknownAttr', current: 1 }] });
     assert.ok(r.unmapped.includes('TotallyUnknownAttr'), 'a genuinely unknown attribute IS reported');
     assert.equal(r.character.name, 'Nameless', 'the rest of the mapping still runs');
-    // CHARACTERISED, NOT ENDORSED: a nameless attribute currently lands in
-    // `unmapped` as a literal `undefined` (tools/adapters/roll20.mjs:392 pushes
-    // `a.name` unguarded). See the coverage report — this is a defect, not a
-    // contract; the assertion pins today's behaviour so a fix is a visible diff.
-    assert.ok(r.unmapped.includes(undefined), 'today: the nameless attribute is reported as `undefined`');
+    // FLIPPED (finding D-8, fixed): a nameless attribute used to land in
+    // `unmapped` as a literal `undefined` (roll20.mjs pushed `a.name` unguarded),
+    // which renders as nothing in the importer UI. It is still REPORTED — the
+    // attribute's value was not imported, so it is a genuine gap — but under the
+    // same placeholder convention the xlsx importer uses for unnamed weapons.
+    assert.ok(!r.unmapped.includes(undefined), 'no literal `undefined` reaches the user-facing gap list');
+    assert.ok(r.unmapped.includes('(unnamed attribute)'), 'the nameless attribute is reported under a placeholder');
 });
 
 test('roll20: legacy wounds/fate attributes carry max on the attribute, not a separate Max* key', () => {

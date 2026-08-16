@@ -41,8 +41,17 @@ export function emptyEncounter() {
     return { schemaVersion: ENCOUNTER_SCHEMA_VERSION, kind: 'dh2.encounter', round: 1, actors: {} };
 }
 
-/** Get-or-create an actor entry. */
+/** Get-or-create an actor entry.
+ *
+ *  Get-or-create includes the `actors` map itself: a document that arrived
+ *  without one (hand-built, or round-tripped through something that dropped the
+ *  empty object) is an encounter with no actors YET, not a malformed document —
+ *  the same reading `harvestEngagement` already takes when it accepts no
+ *  encounter at all and manufactures `emptyEncounter()`. Without this, the
+ *  unguarded `encounter.actors[key]` surfaced a raw TypeError through the
+ *  router's throw→400 wrapper (finding D-5). */
 export function encounterActor(encounter, key, name = key) {
+    if (!encounter.actors) encounter.actors = {};
     if (!encounter.actors[key]) {
         encounter.actors[key] = {
             name, stats: { characteristics: {}, unnatural: {}, talents: [], traits: [] },
@@ -69,6 +78,7 @@ export function tickEncounter(encounter, phase, registry = defaultRegistry, rng 
     const checkpoint = PHASE_TO_CHECKPOINT[phase];
     if (!checkpoint) throw new Error(`Unknown upkeep phase '${phase}' (TURN_START | TURN_END | ROUND_END)`);
     const out = clone(encounter);
+    if (!out.actors) out.actors = {};        // same normalisation as encounterActor (D-5)
     const events = [];
     const keys = actorKey ? [actorKey] : Object.keys(out.actors);
 

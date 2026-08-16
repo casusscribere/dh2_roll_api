@@ -122,58 +122,103 @@ export const FACT_DEFS = [
  *  tools/migrate-dsl.mjs rewrites old text. */
 export const FACT_ALIASES = {};
 
+// ---------------------------------------------------------------------------
+// Function parameters (the call CONTRACT).
+//
+// Each function declares its parameters ONCE, in order. From `params` are
+// derived (below): the documented `signature` string, and FUNCTION_ARITY —
+// the { min, max } the compiler enforces at load time. There is deliberately no
+// second arity table to drift out of step with the docs.
+//
+//   str(name)  a string literal argument, rendered "Name" in the signature
+//   val(name)  any expression, rendered bare
+//   opt(p)     marks a parameter OPTIONAL — allowed ONLY where the
+//              implementation defines a value for the omitted case.
+//
+// On optionality: `default` is optional for circumstance_severity /
+// condition_severity / condition_duration, whose getters wrap it in num() so an
+// omitted default is a well-defined 0. It is REQUIRED for quality_level /
+// trait_level, whose getters pass the fallback straight through — omitting it
+// returns `undefined`, and `set pen += undefined` writes NaN into the context
+// (finding D-2). Optional parameters must be trailing.
+// ---------------------------------------------------------------------------
+const str = (name) => ({ name, kind: 'string', optional: false });
+const val = (name) => ({ name, kind: 'value', optional: false });
+const opt = (p) => ({ ...p, optional: true });
+
+const renderParams = (params) => {
+    const req = params.filter((p) => !p.optional);
+    const show = (p) => (p.kind === 'string' ? `"${p.name}"` : p.name);
+    const tail = params.slice(req.length);
+    return `${req.map(show).join(', ')}${tail.length ? `[, ${tail.map(show).join(', ')}]` : ''}`;
+};
+
 /** Functions. Same shape: per-scope implementations, attacker = unscoped. */
-export const FUNCTION_DEFS = [
-    { name: 'has_quality', signature: 'has_quality("Name")', returns: 'bool', summary: 'Weapon has the named quality. Prefix match — "Proven (3)" matches has_quality("Proven"). Scopes: attacker/weapon (default) or opposing_weapon (the parried weapon).', scopes: {
+const FUNCTION_DEFS_RAW = [
+    { name: 'has_quality', params: [str('Name')], returns: 'bool', summary: 'Weapon has the named quality. Prefix match — "Proven (3)" matches has_quality("Proven"). Scopes: attacker/weapon (default) or opposing_weapon (the parried weapon).', scopes: {
         attacker: (c, [n]) => hasQuality(c.qualities, String(n)),
         weapon: (c, [n]) => hasQuality(c.qualities, String(n)),
         opposing_weapon: (c, [n]) => hasQuality(c.opposingQualities, String(n)) } },
-    { name: 'quality_level', signature: 'quality_level("Name", default)', returns: 'number', summary: 'Numeric level parsed from a quality like "Proven (3)" → 3; returns default if absent/unnumbered.', scopes: {
+    { name: 'quality_level', params: [str('Name'), val('default')], returns: 'number', summary: 'Numeric level parsed from a quality like "Proven (3)" → 3; returns default if absent/unnumbered.', scopes: {
         attacker: (c, [n, d]) => qualityLevel(c.qualities, String(n), d),
         weapon: (c, [n, d]) => qualityLevel(c.qualities, String(n), d),
         opposing_weapon: (c, [n, d]) => qualityLevel(c.opposingQualities, String(n), d) } },
-    { name: 'has_talent', signature: 'has_talent("Name")', returns: 'bool', summary: 'Character has the named talent (from the attack\'s talents[] list). Prefix match.', scopes: {
+    { name: 'has_talent', params: [str('Name')], returns: 'bool', summary: 'Character has the named talent (from the attack\'s talents[] list). Prefix match.', scopes: {
         attacker: (c, [n]) => hasNamed(c.talents ?? c.actor?.talents, n) } },
-    { name: 'has_trait', signature: 'has_trait("Name")', returns: 'bool', summary: 'Character/creature has the named DH2.0 trait (from traits[]). Prefix match — "Brutal Charge (3)" matches has_trait("Brutal Charge"). Scopes: attacker (default) or target (e.g. target.has_trait("Daemonic") — Sanctified).', scopes: {
+    { name: 'has_trait', params: [str('Name')], returns: 'bool', summary: 'Character/creature has the named DH2.0 trait (from traits[]). Prefix match — "Brutal Charge (3)" matches has_trait("Brutal Charge"). Scopes: attacker (default) or target (e.g. target.has_trait("Daemonic") — Sanctified).', scopes: {
         attacker: (c, [n]) => hasNamed(c.traits ?? c.actor?.traits, n),
         target: (c, [n]) => hasNamed(c.target?.traits, n) } },
-    { name: 'trait_level', signature: 'trait_level("Name", default)', returns: 'number', summary: 'Numeric level parsed from a trait like "Brutal Charge (3)" → 3; returns default if absent/unnumbered. Scopes: attacker (default) or target.', scopes: {
+    { name: 'trait_level', params: [str('Name'), val('default')], returns: 'number', summary: 'Numeric level parsed from a trait like "Brutal Charge (3)" → 3; returns default if absent/unnumbered. Scopes: attacker (default) or target.', scopes: {
         attacker: (c, [n, d]) => qualityLevel(c.traits, String(n), d),
         target: (c, [n, d]) => qualityLevel(c.target?.traits, String(n), d) } },
-    { name: 'has_condition', signature: 'has_condition("Name")', returns: 'bool', summary: 'A named Condition is active on the character (from conditions[] / statuses[]), e.g. "On Fire", "Full Aim", "Stunned".', scopes: {
+    { name: 'has_condition', params: [str('Name')], returns: 'bool', summary: 'A named Condition is active on the character (from conditions[] / statuses[]), e.g. "On Fire", "Full Aim", "Stunned".', scopes: {
         attacker: (c, [n]) => hasNamed(c.statuses ?? c.actor?.statuses, n) } },
-    { name: 'has_circumstance', signature: 'has_circumstance("Name")', returns: 'bool', summary: 'A named environmental Circumstance is in effect (from circumstances[]).', scopes: {
+    { name: 'has_circumstance', params: [str('Name')], returns: 'bool', summary: 'A named environmental Circumstance is in effect (from circumstances[]).', scopes: {
         attacker: (c, [n]) => hasNamed(c.circumstances ?? c.actor?.circumstances, n) } },
-    { name: 'circumstance_severity', signature: 'circumstance_severity("Name", default)', returns: 'number', summary: 'Severity of a structured Circumstance in circumstances[] (e.g. the Haywire Field strength 1–5), or default.', scopes: {
+    { name: 'circumstance_severity', params: [str('Name'), opt(val('default'))], returns: 'number', summary: 'Severity of a structured Circumstance in circumstances[] (e.g. the Haywire Field strength 1–5), or default.', scopes: {
         attacker: (c, [n, d]) => findNamed(c.circumstances ?? c.actor?.circumstances, n)?.severity ?? num(d) } },
-    { name: 'configuration', signature: 'configuration("Name")', returns: 'bool', summary: 'A per-character Configuration toggle is on (from configs[] / firingModes[]), e.g. configuration("Maximal").', scopes: {
+    { name: 'configuration', params: [str('Name')], returns: 'bool', summary: 'A per-character Configuration toggle is on (from configs[] / firingModes[]), e.g. configuration("Maximal").', scopes: {
         attacker: (c, [n]) => hasNamed(c.configs ?? c.firingModes, n) } },
-    { name: 'is_action', signature: 'is_action("Name")', returns: 'bool', summary: 'The current action is the named one (case-insensitive), e.g. is_action("Parry"). Works in every flow including reactions.', scopes: {
+    { name: 'is_action', params: [str('Name')], returns: 'bool', summary: 'The current action is the named one (case-insensitive), e.g. is_action("Parry"). Works in every flow including reactions.', scopes: {
         attacker: (c, [n]) => isAction(c.action, n) } },
-    { name: 'is_test', signature: 'is_test("Name")', returns: 'bool', summary: 'The generic test (test.* pipeline) is the named one, spelling-blind — is_test("Tech-Use") matches testName "tech_use"/"TechUse". THE way to write "+X to <skill>" item/talent rules: when is_test("Tech-Use") [and <condition>] then add modifier "…" = X.', scopes: {
+    { name: 'is_test', params: [str('Name')], returns: 'bool', summary: 'The generic test (test.* pipeline) is the named one, spelling-blind — is_test("Tech-Use") matches testName "tech_use"/"TechUse". THE way to write "+X to <skill>" item/talent rules: when is_test("Tech-Use") [and <condition>] then add modifier "…" = X.', scopes: {
         attacker: (c, [n]) => normName(c.testName ?? '') === normName(n) } },
-    { name: 'is_reaction', signature: 'is_reaction()', returns: 'bool', summary: 'The current action is a Reaction (Parry, Dodge, …).', scopes: {
+    { name: 'is_reaction', params: [], returns: 'bool', summary: 'The current action is a Reaction (Parry, Dodge, …).', scopes: {
         attacker: (c) => isReaction(c.action) } },
-    { name: 'action_subtype', signature: 'action_subtype("Name")', returns: 'bool', summary: 'The current action carries the named subtype (declared via `subtype`/`attack` on the action). `is_attack` is shorthand for action_subtype("attack").', scopes: {
+    { name: 'action_subtype', params: [str('Name')], returns: 'bool', summary: 'The current action carries the named subtype (declared via `subtype`/`attack` on the action). `is_attack` is shorthand for action_subtype("attack").', scopes: {
         attacker: (c, [n]) => actionHasSubtype(c.action, n) } },
-    { name: 'condition_severity', signature: 'condition_severity("Name", default)', returns: 'number', summary: 'Severity of a structured Condition in conditions[] (e.g. Crippled severity), or default.', scopes: {
+    { name: 'condition_severity', params: [str('Name'), opt(val('default'))], returns: 'number', summary: 'Severity of a structured Condition in conditions[] (e.g. Crippled severity), or default.', scopes: {
         attacker: (c, [n, d]) => findNamed(c.statuses ?? c.actor?.statuses, n)?.severity ?? num(d) } },
-    { name: 'condition_duration', signature: 'condition_duration("Name", default)', returns: 'number', summary: 'Remaining duration (rounds) of a structured Condition in conditions[], or default.', scopes: {
+    { name: 'condition_duration', params: [str('Name'), opt(val('default'))], returns: 'number', summary: 'Remaining duration (rounds) of a structured Condition in conditions[], or default.', scopes: {
         attacker: (c, [n, d]) => findNamed(c.statuses ?? c.actor?.statuses, n)?.duration ?? num(d) } },
-    { name: 'condition_location', signature: 'condition_location("Name")', returns: 'string', summary: 'Hit location a structured Condition in conditions[] is bound to, or "".', scopes: {
+    { name: 'condition_location', params: [str('Name')], returns: 'string', summary: 'Hit location a structured Condition in conditions[] is bound to, or "".', scopes: {
         attacker: (c, [n]) => findNamed(c.statuses ?? c.actor?.statuses, n)?.location ?? '' } },
-    { name: 'tens', signature: 'tens(n)', returns: 'number', summary: 'The tens digit of n, i.e. floor(n / 10).', scopes: {
+    { name: 'tens', params: [val('n')], returns: 'number', summary: 'The tens digit of n, i.e. floor(n / 10).', scopes: {
         attacker: (c, [n]) => Math.floor(num(n) / 10) } },
-    { name: 'is_natural', signature: 'is_natural(n)', returns: 'bool', summary: 'True if the d100 roll equals n exactly.', scopes: {
+    { name: 'is_natural', params: [val('n')], returns: 'bool', summary: 'True if the d100 roll equals n exactly.', scopes: {
         attacker: (c, [n]) => (c.test?.roll ?? c.roll) === n } },
     // --- arithmetic helpers (Stage 3 — DH2 p.18: fractions round UP by default) ---
-    { name: 'ceil', signature: 'ceil(n)', returns: 'number', summary: 'Round n up to the nearest integer.', scopes: {
+    { name: 'ceil', params: [val('n')], returns: 'number', summary: 'Round n up to the nearest integer.', scopes: {
         attacker: (c, [n]) => Math.ceil(Number(n) || 0) } },
-    { name: 'floor', signature: 'floor(n)', returns: 'number', summary: 'Round n down to the nearest integer.', scopes: {
+    { name: 'floor', params: [val('n')], returns: 'number', summary: 'Round n down to the nearest integer.', scopes: {
         attacker: (c, [n]) => Math.floor(Number(n) || 0) } },
-    { name: 'half', signature: 'half(n)', returns: 'number', summary: 'Half of n, rounded UP — the DH2 default rounding (p.18), e.g. half(3) = 2.', scopes: {
+    { name: 'half', params: [val('n')], returns: 'number', summary: 'Half of n, rounded UP — the DH2 default rounding (p.18), e.g. half(3) = 2.', scopes: {
         attacker: (c, [n]) => Math.ceil((Number(n) || 0) / 2) } },
 ];
+
+/** The function table, with `signature` rendered from `params` — the docs and
+ *  the enforced call contract are the same data by construction. */
+export const FUNCTION_DEFS = FUNCTION_DEFS_RAW.map((d) => ({
+    ...d, signature: `${d.name}(${renderParams(d.params)})`,
+}));
+
+/** name → { min, max } argument count, derived from `params`. The compiler
+ *  enforces this at LOAD time, so a mis-called function fails when the rule
+ *  file is compiled instead of writing undefined/NaN mid-combat (finding D-2). */
+export const FUNCTION_ARITY = Object.fromEntries(FUNCTION_DEFS.map((d) => [d.name, {
+    min: d.params.filter((p) => !p.optional).length,
+    max: d.params.length,
+}]));
 
 /** Legacy prefixed function names → [scope, base]. */
 /** dsl 3: the legacy prefixed function aliases (target_has_trait,

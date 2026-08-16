@@ -260,8 +260,9 @@ export function applyAction(action, ctx, meta = {}) {
 }
 
 /** Collect Identifier (fact) and Call (function) names used in a node, for
- *  compile-time validation against the whitelists. */
-export function collectNames(node, acc = { facts: new Set(), calls: new Set(), scopedFacts: new Set(), scopedCalls: new Set() }) {
+ *  compile-time validation against the whitelists. `callNodes` keeps the Call
+ *  nodes themselves (names dedupe into a Set; ARITY has to see every call). */
+export function collectNames(node, acc = { facts: new Set(), calls: new Set(), scopedFacts: new Set(), scopedCalls: new Set(), callNodes: [] }) {
     if (!node || typeof node !== 'object') return acc;
     switch (node.type) {
         case 'Identifier':
@@ -271,6 +272,7 @@ export function collectNames(node, acc = { facts: new Set(), calls: new Set(), s
         case 'Call':
             if (node.scope) acc.scopedCalls.add(`${node.scope}.${node.name}`);
             else acc.calls.add(node.name);
+            (acc.callNodes ??= []).push(node);
             node.args.forEach((a) => collectNames(a, acc));
             break;
         case 'Logical':

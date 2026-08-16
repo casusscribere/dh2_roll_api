@@ -389,7 +389,12 @@ export function fromRoll20(json, { sourceName = 'roll20-dump-v4', exportedAt = n
         const n = norm(a.name);
         if (used.has(n) || /^repeating_/.test(a.name ?? '')) continue;
         if (CONSUMED_PATTERNS.some((re) => re.test(n))) continue;
-        unmapped.push(a.name);
+        // A nameless attribute still carries an unimported value, so it IS a gap
+        // and must be reported — but `unmapped` is rendered in the importer UI,
+        // where a literal `undefined` (or '') shows as nothing. Report it under
+        // the same placeholder convention the xlsx importer uses for unnamed
+        // weapons rather than skipping it, so the gap stays visible (D-8).
+        unmapped.push(String(a.name ?? '').trim() ? a.name : '(unnamed attribute)');
     }
     // The sheet has no xp or aptitude attributes at all (verified) — never
     // invent them; the merge lane (decision D-A) fills both from the xlsx side.

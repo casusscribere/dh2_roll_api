@@ -11,8 +11,11 @@
  * unknown refs, duplicate purchases) plus the psy-rating / elite-advance /
  * duplicate-aptitude branches.
  *
- * Two tests are CHARACTERIZATION tests marked `BUG:` — they pin behaviour that
- * is currently wrong so a fix is a deliberate, visible change. See the comments.
+ * Two tests were CHARACTERIZATION tests marked `BUG:` — they pinned behaviour
+ * that was wrong so a fix would be a deliberate, visible change. Both bugs
+ * (findings D-3 and D-1) were FIXED in advancement.mjs; the two tests were
+ * inverted in place to assert the corrected behaviour and are marked `FIXED`.
+ * The fixes' own tests live in advancement-fixes.test.mjs.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -500,20 +503,25 @@ test('validateBuild: held pack talents without a ledger purchase warn; ledger bu
     assert.deepEqual(r2.errors, ['ledger buys talent "Jaded" but the doc does not hold it']);
 });
 
-test('BUG (characterization): typed SKILL ledger entries are replayed but never reconciled', () => {
-    // advancement.mjs builds `expSkill` (lines ~444-447) and never compares it,
-    // so skill-advance drift between the ledger and the doc is silently accepted
-    // even for a fully-typed (builder-written) ledger — unlike characteristics.
+test('FIXED (was BUG D-3): typed SKILL ledger entries are reconciled like characteristics', () => {
+    // WAS: advancement.mjs built `expSkill` (lines ~444-447) and never compared
+    // it, so skill-advance drift between the ledger and the doc was silently
+    // accepted even for a fully-typed (builder-written) ledger — the assertion
+    // below used to be `{ ok: true, errors: [], warnings: [] }`.
+    // NOW (finding D-3): validateBuild resolves each typed skill entry to the
+    // document slot it wrote and reports drift in the characteristic path's
+    // shape. See advancement-fixes.test.mjs for the full behaviour.
     const d = mk([], 2000);
     d.xp.ledger = [
         { kind: 'skill', ref: 'dh2:skill:dodge', name: 'Dodge', rank: 1, cost: 300, date: '2026-01-01' },
         { kind: 'skill', ref: 'dh2:skill:dodge', name: 'Dodge', rank: 2, cost: 600, date: '2026-01-02' },
     ];
     d.skills = { Dodge: { advances: 0 } };                             // ledger says 2, doc says 0
-    assert.deepEqual(validateBuild(d, PACK), { ok: true, errors: [], warnings: [] },
-        'CURRENT (wrong) behaviour — the same drift on a characteristic is an error');
+    const rs = validateBuild(d, PACK);
+    assert.equal(rs.ok, false, 'skill drift errors, exactly as characteristic drift does');
+    assert.deepEqual(rs.errors, ['skill Dodge: ledger implies 2 advances, doc has 0']);
 
-    // proof that the characteristic side does catch it
+    // the characteristic side, unchanged — the two messages are the same shape
     const chr = mk([], 2000);
     chr.xp.ledger = [{ kind: 'characteristic', ref: 'ws', name: 'WS advance 1', rank: 1, cost: 500 }];
     chr.characteristics.ws.advances = 3;
@@ -522,18 +530,25 @@ test('BUG (characterization): typed SKILL ledger entries are replayed but never 
     assert.deepEqual(r.errors, ['characteristic ws: ledger implies 1 advances, doc has 3']);
 });
 
-test('BUG (characterization): the pack keys willpower "wil" but documents key it "wp" — WIL advances are unbuyable', () => {
-    // pack.characteristicAptitudes uses the corpus key "wil"; character docs use
-    // "wp" (CHARACTERISTIC_KEYS / CHAR_KEY_BY_NAME). listAvailableAdvances reads
-    // doc.characteristics['wil'] → always undefined → always offers rank 1, and
-    // applyAdvance then throws. /api/chargen/advance answers 400 for willpower.
-    assert.ok('wil' in PACK.characteristicAptitudes && !('wp' in PACK.characteristicAptitudes));
+test('FIXED (was BUG D-1): the pack\'s "wil" is aliased to the document key "wp"', () => {
+    // The pack still keys willpower "wil" — it is GENERATED from the T1 corpus
+    // and must not be hand-edited — while character docs key it "wp"
+    // (CHARACTERISTIC_KEYS / CHAR_KEY_BY_NAME).
+    // WAS: listAvailableAdvances read doc.characteristics['wil'] → always
+    // undefined → always offered rank 1 at the rank-1 price with no 5-advance
+    // cap, and applyAdvance threw `unknown characteristic "wil"`, so
+    // /api/chargen/advance answered 400 for the advance /advances had offered.
+    // NOW (finding D-1): advancement.mjs reconciles the two vocabularies at the
+    // consumer boundary (DOC_CHAR_KEY_BY_PACK_KEY / docCharKey); only document
+    // keys leave the module. See advancement-fixes.test.mjs.
+    assert.ok('wil' in PACK.characteristicAptitudes && !('wp' in PACK.characteristicAptitudes),
+        'the generated pack is unchanged — the fix is on the consumer side');
     const d = mk(['Willpower', 'Psyker'], 5000);
     d.characteristics.wp = { base: 40, advances: 3, modifiers: [] };    // already 3 advances bought
 
-    const wil = listAvailableAdvances(d, PACK).find((a) => a.ref === 'wil');
-    assert.equal(wil.rank, 1, 'CURRENT (wrong): the stored 3 advances are invisible, so rank resets');
-    assert.equal(wil.cost, PACK.costs.characteristic.matches_2[0], 'and it is priced as a first advance');
-    assert.throws(() => applyAdvance(d, PACK, wil), /^Error: unknown characteristic "wil"$/);
-    assert.ok(!listAvailableAdvances(d, PACK).some((a) => a.ref === 'wp'), 'no "wp" advance is ever offered');
+    assert.ok(!listAvailableAdvances(d, PACK).some((a) => a.ref === 'wil'), 'the corpus key never leaks out');
+    const wp = listAvailableAdvances(d, PACK).find((a) => a.ref === 'wp');
+    assert.equal(wp.rank, 4, 'the stored 3 advances are visible');
+    assert.equal(wp.cost, PACK.costs.characteristic.matches_2[3], 'and it is priced as a 4th advance');
+    assert.equal(applyAdvance(d, PACK, wp).doc.characteristics.wp.advances, 4);
 });
