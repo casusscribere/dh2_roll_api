@@ -102,7 +102,7 @@ test('google-sheets adapter parses the shipped template into a valid character',
     const r = validateCharacter(character);
     assert.deepEqual(r.errors, []);
     assert.equal(character.name, 'Interrogator Vex');
-    assert.equal(character.characteristics.bs, 40);
+    assert.deepEqual(character.characteristics.bs, { base: 40, advances: 0, modifiers: [] });
     assert.equal(character.armour.body, 4);
     assert.deepEqual(character.talents, ['Ambidextrous', 'Two-Weapon Wielder']);
     assert.deepEqual(character.traits, ['Brutal Charge (3)']);
@@ -144,8 +144,8 @@ test('roll20 adapter maps attributes, repeating weapons/talents, and reports unm
     const r = validateCharacter(character);
     assert.deepEqual(r.errors, []);
     assert.equal(character.name, 'Acolyte Var');
-    assert.equal(character.characteristics.ws, 38);
-    assert.equal(character.characteristics.fel, 28);
+    assert.deepEqual(character.characteristics.ws, { base: 38, advances: 0, modifiers: [] });
+    assert.deepEqual(character.characteristics.fel, { base: 28, advances: 0, modifiers: [] });
     assert.equal(character.unnatural.s, 2);
     assert.equal(character.armour.body, 5);
     assert.equal(character.wounds.max, 13);

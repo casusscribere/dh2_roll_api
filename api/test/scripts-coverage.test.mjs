@@ -9,23 +9,24 @@
  *   tools/import-character.mjs    foundry/dh2-roll-vm/src/main.mjs
  *
  * ── How the scripts are exercised safely ────────────────────────────────────
- * Every one of these is a TOP-LEVEL side-effecting module (no exported main,
- * no --out flag) that writes to a HARDCODED path derived from its own
- * __dirname: docs/, dist/, foundry/dh2-roll-vm/{scripts,packs,packs-src}/,
- * api/data/chargen/pack.mjs. None of them accepts an output-path override, and
- * this file does NOT edit them to add one.
+ * Each script takes its OUTPUT ROOT from the environment, the same way they
+ * already took CORPUS_DIR and FOUNDRY_DATA: DH2_DOCS_DIR, DH2_DIST_DIR,
+ * DH2_MODULE_DIR, DH2_CHARGEN_DIR. This file points those at a `mkdtempSync`
+ * sandbox, so a real build runs unmodified and simply writes somewhere else.
  *
- * Instead the REAL script files are imported unmodified and their `fs` /
- * `esbuild` / `@foundryvtt/foundryvtt-cli` / `http` imports are swapped for
- * thin shims via `module.registerHooks()` (a synchronous, unflagged Node
- * resolve hook). The shims delegate every path through
- * `globalThis.__DH2_TEST_FS`, which
+ * These scripts used to write to HARDCODED paths derived from their own
+ * __dirname, and this file compensated by rewriting every path underneath them
+ * through a `module.registerHooks()` resolve hook. That made the tests pass
+ * while leaving the scripts themselves un-configurable — nothing outside this
+ * file could run a build anywhere but its one hardcoded destination. The
+ * overrides fix the scripts; the redirect is gone.
  *
- *   - REDIRECTS the four output zones (/docs, /dist, /foundry,
- *     /api/data/chargen) into a `mkdtempSync` sandbox, and
- *   - GUARDS every write: a resolved write path that is not under the sandbox,
- *     not under os.tmpdir() and not the scripts' own gitignored `.build/`
- *     scratch throws instead of touching the repo.
+ * A thin `fs` shim remains, but only as a WRITE GUARD: a write path not under
+ * the sandbox, os.tmpdir() or the scripts' own gitignored `.build/` scratch
+ * throws instead of touching the repo. (It earns its keep — it caught a wrong
+ * assumption while these overrides were being added.) The `http` shim keeps
+ * serve-static from binding a real port, and a fault-injection hook on rmSync
+ * drives the "Foundry holds the LevelDB lock" branch.
  *
  * Because the real file URL is what gets imported, `--experimental-test-
  * coverage` attributes the executed lines to the real script.
@@ -39,7 +40,8 @@
  * asserted to bail out (its built-in default is the Windows-syntax string
  * `C:\Users\...`, which cannot exist on this Linux host). The EPERM/EBUSY
  * "Foundry holds the LevelDB lock" branch is driven by a fault-injection hook
- * on the shimmed rmSync, not by a real lock.
+ * on the shimmed rmSync, not by a real lock. The cases that deploy the REAL
+ * module dir set DH2_MODULE_DIR back to it explicitly.
  */
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -69,18 +71,20 @@ const scratch = (name) => {
     return d;
 };
 
-// ── redirect / write-guard ──────────────────────────────────────────────────
-const ZONES = ['/docs', '/dist', '/foundry', '/api/data/chargen'];
-const inZone = (rest) => ZONES.some((z) => rest === z || rest.startsWith(z + '/'));
+// ── output redirection (env) + write-guard (shim) ───────────────────────────
+// The scripts now take their output roots from the environment, the same way
+// they already took CORPUS_DIR and FOUNDRY_DATA. Pointing those at the sandbox
+// is what keeps a real build off the repo — no path rewriting required.
+//
+// This replaces a resolve-hook redirect that rewrote every REPO/<zone> path
+// underneath the scripts. That redirect made the tests pass while the scripts
+// themselves remained un-configurable: nothing outside this file could run a
+// build anywhere but its hardcoded destination.
+process.env.DH2_DOCS_DIR = join(SANDBOX, 'docs');
+process.env.DH2_DIST_DIR = join(SANDBOX, 'dist');
+process.env.DH2_MODULE_DIR = join(SANDBOX, 'foundry', 'dh2-roll-vm');
+process.env.DH2_CHARGEN_DIR = join(SANDBOX, 'api', 'data', 'chargen');
 
-/** Default: map REPO/<zone>/... → SANDBOX/<zone>/...; everything else passes through. */
-const sandboxRedirect = (p) => {
-    if (typeof p !== 'string' || !p.startsWith(REPO)) return p;
-    const rest = p.slice(REPO.length);
-    return inZone(rest) ? SANDBOX + rest : p;
-};
-/** Identity redirect (used for deploy-foundry, which must read the REAL module dir). */
-const identityRedirect = (p) => p;
 
 const BUILD_SCRATCH = join(REPO, '.build');
 const writeAllowed = (p) =>
@@ -89,23 +93,22 @@ const writeAllowed = (p) =>
     || p.startsWith(TMPROOT + sep)
     || p === BUILD_SCRATCH || p.startsWith(BUILD_SCRATCH + sep);
 
+// The shim no longer rewrites paths — it only GUARDS writes. A resolved write
+// outside the sandbox, os.tmpdir() or the gitignored .build/ scratch throws
+// instead of touching the repo. (This is not belt-and-braces: it caught a wrong
+// assumption while these overrides were being added — that export-packs' own
+// packs-src/ was a read root, when the script in fact generates it.)
 const FS_STATE = {
-    redirect: sandboxRedirect,
     /** every blocked write attempt lands here (asserted to stay empty) */
     blocked: [],
     /** fault injection for rmSync (LevelDB-lock simulation) */
     rmFault: null,
-    r(p) { return this.redirect(p); },
     w(p) {
-        const out = this.redirect(p);
-        if (!writeAllowed(out)) {
-            this.blocked.push(out);
-            throw new Error(`scripts-coverage: BLOCKED write outside the sandbox: ${out}`);
+        if (!writeAllowed(p)) {
+            this.blocked.push(p);
+            throw new Error(`scripts-coverage: BLOCKED write outside the sandbox: ${p}`);
         }
-        if (this.rmFault && this.rmFault.armed && String(out).includes(this.rmFault.match)) {
-            // consumed by the shimmed rmSync only (see fsShimSrc)
-        }
-        return out;
+        return p;
     },
 };
 globalThis.__DH2_TEST_FS = FS_STATE;
@@ -125,19 +128,8 @@ export const rmSync = (p, ...a) => {
     if (f && f.armed && String(p).includes(f.match)) { const e = new Error('simulated ' + f.code); e.code = f.code; throw e; }
     return R.rmSync(${H}.w(p), ...a);
 };
-export const copyFileSync = (s, d, ...a) => R.copyFileSync(${H}.r(s), ${H}.w(d), ...a);
-export const cpSync = (s, d, ...a) => R.cpSync(${H}.r(s), ${H}.w(d), ...a);
-export const readFileSync = (p, ...a) => R.readFileSync(${H}.r(p), ...a);
-export const readdirSync = (p, ...a) => R.readdirSync(${H}.r(p), ...a);
-export const statSync = (p, ...a) => R.statSync(${H}.r(p), ...a);
-export const existsSync = (p) => R.existsSync(${H}.r(p));
-`);
-
-const fsPromisesShim = dataUrl(`
-import * as P from 'node:fs/promises';
-export * from 'node:fs/promises';
-export const readFile = (p, ...a) => P.readFile(${H}.r(p), ...a);
-export const stat = (p, ...a) => P.stat(${H}.r(p), ...a);
+export const copyFileSync = (s, d, ...a) => R.copyFileSync(s, ${H}.w(d), ...a);
+export const cpSync = (s, d, ...a) => R.cpSync(s, ${H}.w(d), ...a);
 `);
 
 const esbuildShim = dataUrl(`
@@ -151,7 +143,7 @@ export const build = (o) => E.build({
 
 const fvttShim = dataUrl(`
 import { compilePack as CP } from ${JSON.stringify(import.meta.resolve('@foundryvtt/foundryvtt-cli'))};
-export const compilePack = (src, out, ...rest) => CP(${H}.r(src), ${H}.w(out), ...rest);
+export const compilePack = (src, out, ...rest) => CP(src, ${H}.w(out), ...rest);
 `);
 
 const HTTP_STATE = { handler: null, port: null, listening: false };
@@ -172,7 +164,7 @@ const SHIMS = [
     ['/scripts/build-engine-lib.mjs', { fs: fsShim, 'node:fs': fsShim, esbuild: esbuildShim }],
     ['/scripts/export-packs.mjs', { fs: fsShim, 'node:fs': fsShim, '@foundryvtt/foundryvtt-cli': fvttShim }],
     ['/scripts/deploy-foundry.mjs', { fs: fsShim, 'node:fs': fsShim }],
-    ['/scripts/serve-static.mjs', { http: httpShim, 'node:http': httpShim, 'fs/promises': fsPromisesShim, 'node:fs/promises': fsPromisesShim }],
+    ['/scripts/serve-static.mjs', { http: httpShim, 'node:http': httpShim }],
     ['/tools/sync-chargen.mjs', { fs: fsShim, 'node:fs': fsShim }],
 ];
 registerHooks({
@@ -216,7 +208,8 @@ after(() => {
         rmSync(BUILD_SCRATCH, { recursive: true, force: true });
         cpSync(BUILD_BACKUP, BUILD_SCRATCH, { recursive: true });
     }
-    for (const k of ['FOUNDRY_DATA', 'CORPUS_DIR', 'PORT']) {
+    for (const k of ['FOUNDRY_DATA', 'CORPUS_DIR', 'PORT', 'DH2_DOCS_DIR',
+        'DH2_DIST_DIR', 'DH2_MODULE_DIR', 'DH2_CHARGEN_DIR']) {
         if (k in ENV_BACKUP) process.env[k] = ENV_BACKUP[k]; else delete process.env[k];
     }
     rmSync(SANDBOX, { recursive: true, force: true });
@@ -536,8 +529,8 @@ test('deploy-foundry: refuses to deploy when the module bundle is missing', asyn
     const emptyFoundry = scratch('empty-foundry');
     const dataDir = scratch('fake-foundry-data-1');
     process.env.FOUNDRY_DATA = dataDir;
-    FS_STATE.redirect = (p) => (typeof p === 'string' && p.startsWith(join(REPO, 'foundry'))
-        ? emptyFoundry + p.slice(join(REPO, 'foundry').length) : p);
+    const moduleDirWas = process.env.DH2_MODULE_DIR;
+    process.env.DH2_MODULE_DIR = join(emptyFoundry, 'dh2-roll-vm');
     try {
         const r = await capture(() => withExitTrap(() => importScript('scripts/deploy-foundry.mjs', 'nobundle')));
         assert.ok(r.threw instanceof ExitSignal);
@@ -545,14 +538,16 @@ test('deploy-foundry: refuses to deploy when the module bundle is missing', asyn
         assert.match(r.err.join('\n'), /Module bundle missing/);
         assert.equal(readdirSync(dataDir).length, 0, 'nothing may be written when the bundle is missing');
     } finally {
-        FS_STATE.redirect = sandboxRedirect;
+        process.env.DH2_MODULE_DIR = moduleDirWas;
     }
 });
 
 test('deploy-foundry: copies manifest, README, bundle and packs into FOUNDRY_DATA/modules', async () => {
     const dataDir = scratch('fake-foundry-data-2');
     process.env.FOUNDRY_DATA = dataDir;
-    FS_STATE.redirect = identityRedirect;   // read the REAL module dir; writes land in dataDir
+    // deploy the REAL module dir; writes land in dataDir
+    const moduleDirWas = process.env.DH2_MODULE_DIR;
+    process.env.DH2_MODULE_DIR = join(REPO, 'foundry', 'dh2-roll-vm');
     try {
         const r = await capture(() => withExitTrap(() => importScript('scripts/deploy-foundry.mjs', 'ok')));
         assert.equal(r.threw, null, r.threw?.stack);
@@ -569,14 +564,15 @@ test('deploy-foundry: copies manifest, README, bundle and packs into FOUNDRY_DAT
         assert.match(log, /Targets: dark-heresy-3rd-edition, dark-heresy-2nd/);
         assert.ok(dest.startsWith(SANDBOX), 'SAFETY: the destination stayed inside the sandbox');
     } finally {
-        FS_STATE.redirect = sandboxRedirect;
+        process.env.DH2_MODULE_DIR = moduleDirWas;
     }
 });
 
 test('deploy-foundry: a locked pack directory (EPERM/EBUSY) warns and still deploys the code', async () => {
     const dataDir = scratch('fake-foundry-data-3');
     process.env.FOUNDRY_DATA = dataDir;
-    FS_STATE.redirect = identityRedirect;
+    const moduleDirWas = process.env.DH2_MODULE_DIR;
+    process.env.DH2_MODULE_DIR = join(REPO, 'foundry', 'dh2-roll-vm');
     FS_STATE.rmFault = { armed: true, match: join(dataDir, 'modules', 'dh2-roll-vm', 'packs'), code: 'EPERM' };
     try {
         const r = await capture(() => withExitTrap(() => importScript('scripts/deploy-foundry.mjs', 'locked')));
@@ -589,14 +585,15 @@ test('deploy-foundry: a locked pack directory (EPERM/EBUSY) warns and still depl
         assert.match(r.out.join('\n'), /Deployed dh2-roll-vm/);
     } finally {
         FS_STATE.rmFault = null;
-        FS_STATE.redirect = sandboxRedirect;
+        process.env.DH2_MODULE_DIR = moduleDirWas;
     }
 });
 
 test('deploy-foundry: a non-lock filesystem error is NOT swallowed', async () => {
     const dataDir = scratch('fake-foundry-data-4');
     process.env.FOUNDRY_DATA = dataDir;
-    FS_STATE.redirect = identityRedirect;
+    const moduleDirWas = process.env.DH2_MODULE_DIR;
+    process.env.DH2_MODULE_DIR = join(REPO, 'foundry', 'dh2-roll-vm');
     FS_STATE.rmFault = { armed: true, match: join(dataDir, 'modules', 'dh2-roll-vm', 'packs'), code: 'EACCES' };
     try {
         const r = await capture(() => withExitTrap(() => importScript('scripts/deploy-foundry.mjs', 'eacces')));
@@ -604,19 +601,28 @@ test('deploy-foundry: a non-lock filesystem error is NOT swallowed', async () =>
         assert.equal(r.threw.code, 'EACCES');
     } finally {
         FS_STATE.rmFault = null;
-        FS_STATE.redirect = sandboxRedirect;
+        process.env.DH2_MODULE_DIR = moduleDirWas;
     }
 });
 
 // ════════════════════════════════════════════════════════════════════════════
 // scripts/serve-static.mjs — no port is ever bound
 // ════════════════════════════════════════════════════════════════════════════
+// Importing this module no longer binds a port (it used to .listen() at module
+// scope, so the handler was reachable only by intercepting http.createServer,
+// and a plain import hung). Take the exported handler, and call main()
+// explicitly to cover the listen path.
+let SERVE_HANDLER = null;
 const runServeStatic = memo(async () => {
     await runBuildStatic();                       // docsDir is redirected to SANDBOX/docs
     mkdirSync(join(DOCS, 'sub'), { recursive: true });
     writeFileSync(join(DOCS, 'sub', 'index.html'), '<html>sub</html>');
     process.env.PORT = '61999';
-    const r = await capture(() => importScript('scripts/serve-static.mjs'));
+    const r = await capture(async () => {
+        const mod = await importScript('scripts/serve-static.mjs');
+        SERVE_HANDLER = mod.handler;
+        mod.main();                               // the shimmed createServer records port + handler
+    });
     if (r.threw) throw r.threw;
     return r;
 });
@@ -625,7 +631,7 @@ async function request(url) {
     const res = { status: null, headers: null, body: null };
     let done;
     const p = new Promise((r) => { done = r; });
-    await HTTP_STATE.handler({ url }, {
+    await SERVE_HANDLER({ url }, {
         writeHead(status, headers) { res.status = status; res.headers = headers; },
         end(data) { res.body = data; done(); },
     });
@@ -635,7 +641,8 @@ async function request(url) {
 
 test('serve-static: creates a server and listens on $PORT without binding in tests', async () => {
     const r = await runServeStatic();
-    assert.equal(typeof HTTP_STATE.handler, 'function');
+    assert.equal(typeof SERVE_HANDLER, 'function', 'the handler is a named export, not a hidden callback');
+    assert.equal(HTTP_STATE.handler, SERVE_HANDLER, 'main() passes that same handler to createServer');
     assert.equal(HTTP_STATE.port, '61999', 'PORT env must win over the 8080 default');
     assert.match(r.out.join('\n'), /Static docs\/ served at http:\/\/localhost:61999/);
 });
@@ -1013,11 +1020,20 @@ test('migrate-dsl: FIXED — a newer DSL version is refused, not silently downgr
 /** The CLI's `isMain` guard compares only the BASENAME of process.argv[1] to
  *  the tail of import.meta.url, so the cache-busting query has to be part of
  *  the faked argv (see the testability findings). */
-const runMigrateCli = (args, tag) => {
-    const argv = process.argv;
-    process.argv = [argv[0], `/x/migrate-dsl.mjs?case=${tag}`, ...args];
-    return capture(() => withExitTrap(() => importScript('tools/migrate-dsl.mjs', tag)), { stdout: true })
-        .finally(() => { process.argv = argv; });
+// Drive the CLI through its exported main(args).
+//
+// This used to set process.argv[1] = `/x/migrate-dsl.mjs?case=<tag>` and import
+// the module with a cache-busting query, which "worked" only because the old
+// isMain compared BASENAMES — the fake argv matched the real import URL by
+// coincidence. The suite was therefore a consumer of the defect it should have
+// caught, and it also defeated coverage (Node merges coverage per module URL,
+// so each cache-busted re-import was discarded). main() takes the args
+// directly, so no global is touched and the exit code is a return value.
+const runMigrateCli = async (args, _tag) => {
+    const { main } = await import('../../tools/migrate-dsl.mjs');
+    let code;
+    const r = await capture(() => { code = main(args); }, { stdout: true });
+    return { ...r, code };
 };
 
 test('migrate-dsl CLI: prints to stdout by default and writes with --write', async () => {
@@ -1026,13 +1042,13 @@ test('migrate-dsl CLI: prints to stdout by default and writes with --write', asy
     writeFileSync(file, original);
 
     let r = await runMigrateCli([file], 'stdout');
-    assert.equal(r.threw, null, r.threw?.stack);
+    assert.equal(r.code, 0);
     assert.match(r.out.join(''), /^dsl 3\n/);
     assert.match(r.out.join(''), /target\.armour > 1 then set extra_dice \+= 1/);
     assert.equal(readFileSync(file, 'utf8'), original, 'no --write → the file is untouched');
 
     r = await runMigrateCli([file, '--write'], 'write');
-    assert.equal(r.threw, null, r.threw?.stack);
+    assert.equal(r.code, 0);
     assert.match(r.out.join('\n'), new RegExp(`${file} — 3 change\\(s\\)`));
     assert.match(readFileSync(file, 'utf8'), /^dsl 3\n/);
     assert.match(readFileSync(file, 'utf8'), /set extra_dice \+= 1/);
@@ -1041,7 +1057,7 @@ test('migrate-dsl CLI: prints to stdout by default and writes with --write', asy
 test('migrate-dsl CLI: --all reads every built-in rule file (read-only without --write)', async () => {
     const before = treeFingerprint(join(REPO, 'api', 'data', 'rules'));
     const r = await runMigrateCli(['--all'], 'all');
-    assert.equal(r.threw, null, r.threw?.stack);
+    assert.equal(r.code, 0, 'a read-only --all run succeeds');
     const printed = r.out.join('');
     const dslFiles = readdirSync(join(REPO, 'api', 'data', 'rules')).filter((f) => f.endsWith('.dsl'));
     assert.ok(dslFiles.length >= 8);
@@ -1053,8 +1069,7 @@ test('migrate-dsl CLI: --all reads every built-in rule file (read-only without -
 
 test('migrate-dsl CLI: no file arguments exits 2 with usage', async () => {
     const r = await runMigrateCli([], 'usage');
-    assert.ok(r.threw instanceof ExitSignal);
-    assert.equal(r.threw.code, 2);
+    assert.equal(r.code, 2, 'usage is exit 2, and the CLI wrapper passes it to process.exit');
     assert.match(r.err.join('\n'), /usage: node tools\/migrate-dsl\.mjs/);
 });
 
@@ -1119,7 +1134,7 @@ test('import-character: auto-detects a Roll20 attribute dump and reports unmappe
     assert.equal(r.threw, null, r.threw?.stack);
     const written = JSON.parse(readFileSync(out, 'utf8'));
     assert.equal(written.name, 'Roll20 Acolyte');
-    assert.equal(written.characteristics.ws, 38);
+    assert.deepEqual(written.characteristics.ws, { base: 38, advances: 0, modifiers: [] });
     assert.equal(written.wounds.max, 12);
     assert.match(r.err.join('\n'), /note: unmapped Roll20 attributes: .*ThisIsNotASheetAttribute/);
 });
@@ -1132,7 +1147,7 @@ test('import-character: a .csv is routed to the Google-Sheets adapter and unknow
     assert.equal(r.threw, null, r.threw?.stack);
     const written = JSON.parse(readFileSync(out, 'utf8'));
     assert.equal(written.name, 'CSV Acolyte');
-    assert.equal(written.characteristics.ws, 41);
+    assert.deepEqual(written.characteristics.ws, { base: 41, advances: 0, modifiers: [] });
     assert.equal(written.wounds.max, 11);
     assert.match(r.err.join('\n'), /note: unknown template keys ignored: no such key/);
 });

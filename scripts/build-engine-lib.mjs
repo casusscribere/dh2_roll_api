@@ -26,7 +26,8 @@ import { ruleSources, weaponsJson, RULE_FILES } from '../api/lib/rules/sources.m
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
 const buildDir = join(root, '.build');
-const outFile = join(root, 'dist', 'dh2-engine.mjs');
+// Env-overridable output root (see CORPUS_DIR / FOUNDRY_DATA convention).
+const outFile = join(process.env.DH2_DIST_DIR ?? join(root, 'dist'), 'dh2-engine.mjs');
 const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
 
 mkdirSync(buildDir, { recursive: true });

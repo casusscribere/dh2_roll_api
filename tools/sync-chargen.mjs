@@ -40,7 +40,7 @@ import { citationOf } from '../api/lib/prose.mjs';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CORPUS = process.env.CORPUS_DIR
     ?? join(root, '..', '..', 'codified-systems', 'dark_heresy_2e');
-const OUT_DIR = join(root, 'api', 'data', 'chargen');
+const OUT_DIR = process.env.DH2_CHARGEN_DIR ?? join(root, 'api', 'data', 'chargen');
 const OUT = join(OUT_DIR, 'pack.mjs');
 const OUT_PROSE = join(OUT_DIR, 'prose.local.mjs');
 

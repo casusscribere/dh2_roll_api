@@ -1411,10 +1411,10 @@ test('schema: characterToCombatant defaults on a document with no weapons and no
 test('roll20: accepts a JSON string, `attributes`, and a character with no attributes at all', () => {
     const fromString = fromRoll20(JSON.stringify({ name: 'Stringly', attribs: [{ name: 'WeaponSkill', current: 40 }] }));
     assert.equal(fromString.character.name, 'Stringly');
-    assert.equal(fromString.character.characteristics.ws, 40);
+    assert.deepEqual(fromString.character.characteristics.ws, { base: 40, advances: 0, modifiers: [] });
 
     const altKey = fromRoll20({ name: 'AltKey', attributes: [{ name: 'Toughness', current: 35 }] });
-    assert.equal(altKey.character.characteristics.t, 35, '`attributes` is accepted alongside `attribs`');
+    assert.deepEqual(altKey.character.characteristics.t, { base: 35, advances: 0, modifiers: [] }, '`attributes` is accepted alongside `attribs`');
 
     const empty = fromRoll20({});
     assert.equal(empty.character.name, 'Roll20 import', 'a nameless character gets the placeholder name');
@@ -1596,7 +1596,7 @@ test('google-sheets: unknown keys are collected, not fatal', () => {
     ].join('\n');
     const { character, unknownKeys } = fromGoogleSheetCsv(csv);
     assert.equal(character.name, 'Coverage Probe');
-    assert.equal(character.characteristics.ws, 42);
+    assert.deepEqual(character.characteristics.ws, { base: 42, advances: 0, modifiers: [] });
     assert.deepEqual(unknownKeys, ['favourite colour', 'Warp Signature'], 'unknown keys are trimmed and reported');
     assert.equal(validateCharacter(migrateCharacter(character)).ok, true, 'unknown keys do not break the document');
 });

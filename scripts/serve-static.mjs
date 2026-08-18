@@ -5,11 +5,11 @@
  */
 import { createServer } from 'http';
 import { readFile, stat } from 'fs/promises';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { dirname, join, normalize, extname } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const docsDir = join(__dirname, '..', 'docs');
+const docsDir = process.env.DH2_DOCS_DIR ?? join(__dirname, '..', 'docs');
 const PORT = process.env.PORT || 8080;
 
 const MIME = {
@@ -22,7 +22,15 @@ const MIME = {
     '.ico': 'image/x-icon',
 };
 
-createServer(async (req, res) => {
+/**
+ * The request handler, exported so it can be exercised directly.
+ *
+ * This used to be an anonymous callback passed straight to createServer, with
+ * .listen() called at MODULE SCOPE — so merely importing this file bound a
+ * port, and the route/MIME logic was reachable only by intercepting
+ * http.createServer. A test that imported it simply hung.
+ */
+export async function handler(req, res) {
     try {
         const urlPath = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
         let rel = normalize(urlPath).replace(/^(\.\.[\\/])+/, '');
@@ -37,4 +45,14 @@ createServer(async (req, res) => {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
         res.end('404 Not Found');
     }
-}).listen(PORT, () => console.log(`Static docs/ served at http://localhost:${PORT} (no API backend)`));
+}
+
+/** Bind the port. Exported so a test can cover this without faking argv. */
+export function main() {
+    return createServer(handler).listen(PORT,
+        () => console.log(`Static docs/ served at http://localhost:${PORT} (no API backend)`));
+}
+
+// Only bind a port when invoked as a script, never on import.
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isMain) main();

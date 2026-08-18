@@ -31,7 +31,10 @@ import { ruleSources, weaponsJson, RULE_FILES } from '../api/lib/rules/sources.m
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
 const buildDir = join(root, '.build');
-const outDir = join(root, 'docs');
+// Output roots are env-overridable (same convention as CORPUS_DIR /
+// FOUNDRY_DATA) so a test can point a real build at a sandbox instead of
+// intercepting fs through a module resolve hook.
+const outDir = process.env.DH2_DOCS_DIR ?? join(root, 'docs');
 const uiDir = join(root, 'ui');
 
 // ---- 1. inline the data ----------------------------------------------------

@@ -25,7 +25,10 @@ import { rollTables, weaponQualityEffects, availableValued } from '../api/lib/ru
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
-const moduleDir = join(root, 'foundry', 'dh2-roll-vm');
+// Output root, env-overridable (see the CORPUS_DIR / FOUNDRY_DATA convention).
+// Both packs-src/ and packs/ are WRITE targets: this script generates the
+// source JSON and then compiles it, so the whole module dir moves together.
+const moduleDir = process.env.DH2_MODULE_DIR ?? join(root, 'foundry', 'dh2-roll-vm');
 
 /** Deterministic 16-char alphanumeric Foundry id from a seed string. */
 const fid = (seed) => createHash('sha1').update(seed).digest('base64')

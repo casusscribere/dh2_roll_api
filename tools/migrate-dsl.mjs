@@ -26,7 +26,7 @@
 import { readFileSync, writeFileSync } from 'fs';
 import { readdirSync } from 'fs';
 import { join, dirname, resolve } from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath , pathToFileURL } from 'url';
 
 // Longest-first so e.g. target_unnatural_toughness wins over target_tb prefixes.
 const REPLACEMENTS = [
@@ -147,9 +147,16 @@ export function migrateDsl(src) {
 }
 
 // ---- CLI ---------------------------------------------------------------------
-const isMain = process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/').split('/').pop());
-if (isMain) {
-    const args = process.argv.slice(2);
+/**
+ * The CLI body, as a pure-ish function of its arguments returning an exit code.
+ *
+ * Extracted so tests can drive it directly. They used to import this module
+ * with a cache-busting query while setting process.argv[1] to
+ * `/x/migrate-dsl.mjs?case=<tag>` — which worked only because the old isMain
+ * compared BASENAMES, so the fake argv matched the real import URL by
+ * coincidence. That made the test suite a consumer of the very defect below.
+ */
+export function main(args) {
     const write = args.includes('--write');
     const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
     const files = args.includes('--all')
@@ -157,7 +164,7 @@ if (isMain) {
         : args.filter((a) => !a.startsWith('--'));
     if (!files.length) {
         console.error('usage: node tools/migrate-dsl.mjs <file.dsl>|--all [--write]');
-        process.exit(2);
+        return 2;
     }
     for (const f of files) {
         let migrated;
@@ -168,15 +175,25 @@ if (isMain) {
             // condition, not a crash. Report it and stop rather than dumping a
             // stack — and stop BEFORE writing, so --all cannot half-migrate a
             // directory and leave the rest in an unknown state.
-            console.error(`✗ ${f}: ${err.message}`);
-            process.exit(1);
+            console.error(`\u2717 ${f}: ${err.message}`);
+            return 1;
         }
         const { text, changes } = migrated;
         if (write) {
             writeFileSync(f, text);
-            console.log(`✓ ${f} — ${changes} change(s)`);
+            console.log(`\u2713 ${f} \u2014 ${changes} change(s)`);
         } else {
             process.stdout.write(text);
         }
     }
+    return 0;
+}
+
+// Compare the FULL resolved URL. The old form matched only the basename of
+// argv[1], so importing this module from any process whose argv[1] happened to
+// be named migrate-dsl.mjs ran the CLI as a side effect.
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isMain) {
+    const code = main(process.argv.slice(2));
+    if (code) process.exit(code);
 }

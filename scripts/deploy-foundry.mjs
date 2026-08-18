@@ -15,7 +15,10 @@ import { dirname, join, resolve } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
-const srcDir = join(root, 'foundry', 'dh2-roll-vm');
+// The module dir to deploy FROM, env-overridable like FOUNDRY_DATA (the
+// destination) — so a test can deploy a sandbox-built module without
+// rewriting this script's paths underneath it.
+const srcDir = process.env.DH2_MODULE_DIR ?? join(root, 'foundry', 'dh2-roll-vm');
 
 const dataDir = process.env.FOUNDRY_DATA ?? 'C:\\Users\\kirkl\\AppData\\Local\\FoundryVTT\\Data';
 if (!existsSync(dataDir)) {

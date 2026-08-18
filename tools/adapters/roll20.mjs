@@ -145,8 +145,17 @@ export function fromRoll20(json, { sourceName = 'roll20-dump-v4', exportedAt = n
 
     // --- characteristics: flat <Name> = sheet TOTAL; <Name>Upgrades = advances.
     // base = total − 5×advances (clamped ≥ 0). When the sheet gives no Upgrades
-    // attribute (legacy userscript exports) the total is kept as the v1 flat-int
-    // shorthand — total-preserving either way (migrateCharacter normalises).
+    // attribute (legacy userscript exports), advances are 0 and the total IS
+    // the base — total-preserving either way.
+    //
+    // The no-Upgrades branch used to emit the v1 flat-int shorthand, on the
+    // stated grounds that "migrateCharacter normalises". It does not: this
+    // adapter stamps schemaVersion = CHARACTER_SCHEMA_VERSION below, and the
+    // v1→v2 flat-int normalisation is gated on the document's version, so it
+    // can never fire on anything this adapter produces. The result was two
+    // different characteristic shapes inside documents that both claimed v4 —
+    // exactly the mixed-shape hazard behind R-1 and R-7. Normalise here, at
+    // the boundary, which is where the shape is decided.
     for (const [key, candidates] of Object.entries(CHAR_MAP)) {
         const a = pick(candidates);
         if (!a) continue;
@@ -157,7 +166,7 @@ export function fromRoll20(json, { sourceName = 'roll20-dump-v4', exportedAt = n
             const advances = clamp(intOf(byName.get(upName)), 0, 5);
             doc.characteristics[key] = { base: Math.max(0, total - 5 * advances), advances, modifiers: [] };
         } else {
-            doc.characteristics[key] = total;   // v1 shorthand (still a valid total)
+            doc.characteristics[key] = { base: total, advances: 0, modifiers: [] };
         }
     }
     // unnatural: `<Name>Unnat` (this sheet) or `unnatural_<name>` (legacy).

@@ -161,8 +161,12 @@ test('roll20 v4: characteristics — total/Upgrades → base + advances; Unnat �
     assert.deepEqual(character.characteristics.bs, { base: 48, advances: 4, modifiers: [] });
     assert.deepEqual(character.characteristics.ws, { base: 31, advances: 0, modifiers: [] });
     assert.deepEqual(character.characteristics.int, { base: 45, advances: 5, modifiers: [] });
-    assert.equal(character.characteristics.s, 34);         // no Upgrades attrib → flat total (v1 shorthand)
-    assert.equal(character.characteristics.fel, 29);
+    // No Upgrades attrib → advances 0 and the total IS the base. This used to
+    // be emitted as a v1 flat int on the claim that migrateCharacter would
+    // normalise it; it cannot, because the adapter stamps the current schema
+    // version and that normalisation is version-gated. Now normalised here.
+    assert.deepEqual(character.characteristics.s, { base: 34, advances: 0, modifiers: [] });
+    assert.deepEqual(character.characteristics.fel, { base: 29, advances: 0, modifiers: [] });
     assert.equal(character.unnatural.s, 2);
     assert.equal(character.unnatural.ws, 0);               // '0' on the sheet stays 0
 });
@@ -250,7 +254,7 @@ test('roll20 v4: synthetic character validates; xp/aptitudes stay empty with the
     assert.equal(character.source.roll20CharacterId, '-TestRowId0000000001');
 });
 
-test('roll20 v4: bare legacy userscript export keeps working (flat totals, no envelope)', () => {
+test('roll20 v4: bare legacy userscript export keeps working (totals preserved, no envelope)', () => {
     const { character } = fromRoll20({
         name: 'Acolyte Legacy',
         attribs: [
@@ -261,7 +265,8 @@ test('roll20 v4: bare legacy userscript export keeps working (flat totals, no en
             attr('repeating_weapons_-Nabc123_damage', '1d10+3'),
         ],
     });
-    assert.equal(character.characteristics.ws, 38);        // v1 flat shorthand preserved
+    // total preserved; shape normalised at the adapter boundary
+    assert.deepEqual(character.characteristics.ws, { base: 38, advances: 0, modifiers: [] });
     assert.equal(character.unnatural.s, 2);
     assert.deepEqual({ max: character.wounds.max, current: character.wounds.current }, { max: 13, current: 9 });
     assert.equal(character.weapons[0].name, 'Autogun');

@@ -20,7 +20,9 @@ import { ruleSources, weaponsJson, RULE_FILES } from '../api/lib/rules/sources.m
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
 const buildDir = join(root, '.build');
-const outFile = join(root, 'foundry', 'dh2-roll-vm', 'scripts', 'dh2-vm.js');
+// Env-overridable output root (see CORPUS_DIR / FOUNDRY_DATA convention).
+const moduleDir = process.env.DH2_MODULE_DIR ?? join(root, 'foundry', 'dh2-roll-vm');
+const outFile = join(moduleDir, 'scripts', 'dh2-vm.js');
 
 // 1. inline the data (no filesystem inside Foundry)
 mkdirSync(buildDir, { recursive: true });

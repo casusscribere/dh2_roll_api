@@ -63,7 +63,10 @@ export function fromGoogleSheetCsv(csvText, { sourceName = 'google-sheets' } = {
 
         let m;
         if (key === 'name') doc.name = value;
-        else if (key in CHAR_KEYS) doc.characteristics[CHAR_KEYS[key]] = int();
+        // Nested shape, not a flat int: this adapter stamps the current schema
+        // version, so the v1→v2 normalisation in migrateCharacter (gated on
+        // version) would never run to fix a flat int up. See roll20.mjs.
+        else if (key in CHAR_KEYS) doc.characteristics[CHAR_KEYS[key]] = { base: int(), advances: 0, modifiers: [] };
         else if ((m = /^unnatural (ws|bs|s|t|ag)$/.exec(key))) doc.unnatural[m[1]] = int();
         else if ((m = /^armour (head|body|left arm|right arm|left leg|right leg)$/.exec(key))) doc.armour[ARMOUR_KEYS[m[1]]] = int();
         else if (key === 'wounds max') doc.wounds.max = int();
