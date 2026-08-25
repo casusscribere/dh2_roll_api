@@ -263,6 +263,26 @@ everything and normalizes legacy shapes.
   have **5 ranks** (Simple→Expert; matches the schema's `advances 0–5`), skills 4; there are
   **19 aptitudes** (10 named + 9 characteristic-based).
 
+## 6d. ST-4 addendum (SHIPPED 2026-08-25) — description/citation on entry objects
+
+Optional author-owned text on the seven content lists' entry objects — no version bump
+(additive, no migration; schemaVersion stays 4). Spec: monorepo
+`docs/SOURCEBOOK_TEXT_PLAN_2026-07-29.md` §3 ST-4; landed as Phase 4 task E-2.
+
+- `<talents|traits|psychicPowers|weapons|armourItems|gear|cybernetics>[].description`
+  (string) — prose for CUSTOM content, travelling in the document exactly like `dsl` (D-L),
+  portable Pages ⇄ Foundry. (weapons/armourItems/gear already carried `description` since
+  v3; ST-4 extends it to the four named-entry lists.)
+- `[].citation { book?, page?, source? }` (string / int-or-null / string) on all seven
+  lists — provenance for that text, mirroring the pack's public citation shape (ST-1).
+- **Drift guard**: canon entries resolve their text by `ref` (the E-1 prose overlay), so
+  `validateCharacter` **warns** — `"description present but ref '<ref>' resolves in the
+  pack — canon text is resolved by ref"` — when a description rides an entry whose ref the
+  chargen pack resolves. The doc copy would shadow nothing and can silently rot; custom
+  refs (`house:…`) stay quiet.
+- Tests: `api/test/schema-prose-fields.test.mjs` (acceptance per list, type errors, both
+  drift-guard directions, artifact coverage); JSON Schema artifact regenerated.
+
 ## 7. Open decisions (answer before implementation)
 
 > Status 2026-07-24: **resolved by v4** — #1 count ✓ (unchanged), #3 full ledger ✓ (now
