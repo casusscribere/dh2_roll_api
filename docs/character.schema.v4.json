@@ -119,7 +119,18 @@
           },
           {
             "type": "object",
-            "additionalProperties": true
+            "additionalProperties": true,
+            "properties": {
+              "description": {
+                "type": "string",
+                "description": "Author-owned prose for a CUSTOM entry (ST-4) — travels in the doc like dsl. Canon entries resolve text by ref; the validator warns when both are present (drift guard)."
+              },
+              "citation": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Provenance for author-owned text (ST-4): book (string), page (int | null), source (string, e.g. \"homebrew\"). Mirrors the pack's public citation shape (ST-1)."
+              }
+            }
           }
         ],
         "description": "Installed cybernetics (⇄ Foundry cybernetic Items)."
@@ -146,6 +157,11 @@
         "additionalProperties": true,
         "description": "Worn armour as items: AP + covered locations (\"all\" or head/body/…). Equipped items derive per-location AP (highest wins — armour does not stack); the flat `armour` block is a manual override used when no item is equipped.",
         "properties": {
+          "citation": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Provenance for author-owned text (ST-4): book (string), page (int | null), source (string, e.g. \"homebrew\"). Mirrors the pack's public citation shape (ST-1)."
+          },
           "description": {
             "type": "string",
             "description": "Free-text item description."
@@ -164,6 +180,11 @@
         "additionalProperties": true,
         "description": "Equipment. equipped=true (default) counts weight × quantity toward encumbrance; false = stored (quarters/ship).",
         "properties": {
+          "citation": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Provenance for author-owned text (ST-4): book (string), page (int | null), source (string, e.g. \"homebrew\"). Mirrors the pack's public citation shape (ST-1)."
+          },
           "description": {
             "type": "string",
             "description": "Free-text item description."
@@ -203,6 +224,15 @@
               "dsl": {
                 "type": "string",
                 "description": "Entry-granted rules in the DSL (custom talents/traits/powers) — compiled into the customRules layer at roll time; portable between the Pages UI and Foundry."
+              },
+              "description": {
+                "type": "string",
+                "description": "Author-owned prose for a CUSTOM entry (ST-4) — travels in the doc like dsl. Canon entries resolve text by ref; the validator warns when both are present (drift guard)."
+              },
+              "citation": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Provenance for author-owned text (ST-4): book (string), page (int | null), source (string, e.g. \"homebrew\"). Mirrors the pack's public citation shape (ST-1)."
               }
             }
           }
@@ -300,6 +330,15 @@
               "dsl": {
                 "type": "string",
                 "description": "Entry-granted rules in the DSL (custom talents/traits/powers) — compiled into the customRules layer at roll time; portable between the Pages UI and Foundry."
+              },
+              "description": {
+                "type": "string",
+                "description": "Author-owned prose for a CUSTOM entry (ST-4) — travels in the doc like dsl. Canon entries resolve text by ref; the validator warns when both are present (drift guard)."
+              },
+              "citation": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Provenance for author-owned text (ST-4): book (string), page (int | null), source (string, e.g. \"homebrew\"). Mirrors the pack's public citation shape (ST-1)."
               }
             }
           }
@@ -325,6 +364,15 @@
               "dsl": {
                 "type": "string",
                 "description": "Entry-granted rules in the DSL (custom talents/traits/powers) — compiled into the customRules layer at roll time; portable between the Pages UI and Foundry."
+              },
+              "description": {
+                "type": "string",
+                "description": "Author-owned prose for a CUSTOM entry (ST-4) — travels in the doc like dsl. Canon entries resolve text by ref; the validator warns when both are present (drift guard)."
+              },
+              "citation": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Provenance for author-owned text (ST-4): book (string), page (int | null), source (string, e.g. \"homebrew\"). Mirrors the pack's public citation shape (ST-1)."
               }
             }
           }
@@ -369,6 +417,11 @@
         "type": "object",
         "additionalProperties": true,
         "properties": {
+          "citation": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Provenance for author-owned text (ST-4): book (string), page (int | null), source (string, e.g. \"homebrew\"). Mirrors the pack's public citation shape (ST-1)."
+          },
           "weight": {
             "type": "number",
             "minimum": 0,

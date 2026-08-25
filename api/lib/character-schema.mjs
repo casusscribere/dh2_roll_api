@@ -21,12 +21,21 @@
  *   entries (`kind`/`ref`/`rank`/`matches`) and uniform `{ name, ref?, dsl? }`
  *   talent/trait/psychic-power entries. `ref` is a corpus slug
  *   (`dh2:<type>:<snake_id>`) that resolves mechanically to compendium UUIDs.
+ * v4 addendum ST-4 (additive, no version bump — optional fields, no
+ *   migration): entry objects in the seven content lists (talents, traits,
+ *   psychicPowers, weapons, armourItems, gear, cybernetics) may carry
+ *   author-owned `description` (string) and `citation { book?, page?, source? }`
+ *   — custom-content text that travels IN the document exactly like `dsl`
+ *   (D-L), portable Pages ⇄ Foundry. Canon entries keep resolving text by
+ *   `ref`; the validator WARNS when a description rides an entry whose ref
+ *   resolves in the chargen pack (drift guard — that text shadows nothing).
  *
  * Single-sourced: the FIELDS table drives validateCharacter and
  * /api/character/schema; fields map 1:1 onto Foundry DataFields (Phase 8).
  * Documents carry `schemaVersion`; run migrateCharacter() at every boundary.
  */
 import { canonList, normName } from './rules/_util.mjs';
+import { CHARGEN_PACK } from '../data/chargen/pack.mjs';
 
 export const CHARACTER_SCHEMA_VERSION = 4;
 
@@ -48,6 +57,21 @@ export function normalizeAptitudeSource(a) {
 }
 /** Corpus-ref shape: `<system>:<type>:<snake_id>` (nonconforming refs WARN). */
 const REF_PATTERN = /^[a-z0-9_]+:[a-z0-9_]+:[a-z0-9_]+$/;
+
+/** Every ref the chargen pack can resolve (ST-4 drift guard). Built once by
+ *  walking the pack — the pack is generated data with a fixed `ref` key, so a
+ *  structural walk stays correct as sections are added. */
+const PACK_REFS = (() => {
+    const refs = new Set();
+    (function walk(v) {
+        if (Array.isArray(v)) { v.forEach(walk); return; }
+        if (v && typeof v === 'object') {
+            if (typeof v.ref === 'string') refs.add(v.ref);
+            Object.values(v).forEach(walk);
+        }
+    })(CHARGEN_PACK);
+    return refs;
+})();
 
 const CHARACTERISTIC_KEYS = ['ws', 'bs', 's', 't', 'ag', 'int', 'per', 'wp', 'fel'];
 const UNNATURAL_KEYS = ['ws', 'bs', 's', 't', 'ag'];
@@ -155,6 +179,8 @@ export const CHARACTER_FIELDS = [
     { path: 'pools.profitFactor', type: '(reserved)', required: false, summary: 'Reserved for Rogue Trader — not populated by any current adapter.' },
     { path: '<talents|traits|psychicPowers>[].ref', type: 'string "dh2:<type>:<snake_id>"', required: false, summary: 'Corpus ref — resolves mechanically to compendium UUIDs (deterministic slug ids; no name-matching).' },
     { path: '<talents|traits|psychicPowers>[].dsl', type: 'string (DSL source)', required: false, summary: 'Entry-granted rules in the DSL (custom talents/traits/powers) — compiled into the customRules layer at roll time; portable between the Pages UI and Foundry.' },
+    { path: '<talents|traits|psychicPowers|cybernetics>[].description', type: 'string', required: false, summary: 'Author-owned prose for a CUSTOM entry (ST-4) — travels in the doc like dsl. Canon entries resolve text by ref; the validator warns when both are present (drift guard).' },
+    { path: '<talents|traits|psychicPowers|weapons|armourItems|gear|cybernetics>[].citation', type: '{ book?, page?, source? }', required: false, summary: 'Provenance for author-owned text (ST-4): book (string), page (int | null), source (string, e.g. "homebrew"). Mirrors the pack\'s public citation shape (ST-1).' },
     { path: 'tarot', type: '{ card?, text?, effect? }', required: false, summary: "The Emperor's Tarot / divination drawn at creation (⇄ Foundry bio.divination)." },
     { path: 'weapons[].weight', type: 'number ≥ 0 (kg)', required: false, summary: 'Weapon weight — counts toward encumbrance while equipped.' },
     { path: 'weapons[].equipped', type: 'bool (default true)', required: false, summary: 'On the character (counts weight; available in combat). false = stored.' },
@@ -347,6 +373,26 @@ export function validateCharacter(doc, opts = {}) {
         }
         if (entry.dsl !== undefined && typeof entry.dsl !== 'string') err(`${path}.dsl`, 'String (DSL source) required');
     };
+    // description/citation checks shared by the seven ST-4 content lists —
+    // including the drift guard: author text on an entry whose ref the pack
+    // resolves is a warning (canon text is resolved by ref; the doc copy
+    // shadows nothing and can silently rot).
+    const checkProse = (entry, path) => {
+        if (!entry || typeof entry !== 'object') return;
+        if (entry.description !== undefined && typeof entry.description !== 'string') err(`${path}.description`, 'String required');
+        if (entry.citation !== undefined) {
+            const c = entry.citation;
+            if (!c || typeof c !== 'object' || Array.isArray(c)) err(`${path}.citation`, 'Object { book?, page?, source? } required');
+            else {
+                if (c.book !== undefined && typeof c.book !== 'string') err(`${path}.citation.book`, 'String required');
+                if (c.page !== undefined && c.page !== null && !isInt(c.page)) err(`${path}.citation.page`, 'Integer or null required');
+                if (c.source !== undefined && typeof c.source !== 'string') err(`${path}.citation.source`, 'String required');
+            }
+        }
+        if (typeof entry.description === 'string' && typeof entry.ref === 'string' && PACK_REFS.has(entry.ref)) {
+            warn(path, `description present but ref '${entry.ref}' resolves in the pack — canon text is resolved by ref`);
+        }
+    };
 
     if (!doc || typeof doc !== 'object') return { ok: false, errors: [{ path: '', message: 'Not an object' }], warnings };
 
@@ -492,6 +538,7 @@ export function validateCharacter(doc, opts = {}) {
             if (!isNamedEntry(p)) { err(`psychicPowers[${i}]`, 'Must be a string or { name, … }'); return; }
             if (p && typeof p === 'object') {
                 checkRefDsl(p, `psychicPowers[${i}]`);
+                checkProse(p, `psychicPowers[${i}]`);
                 if (p.equipped !== undefined && typeof p.equipped !== 'boolean') err(`psychicPowers[${i}].equipped`, 'Boolean required');
                 if (p.cost !== undefined && !isNonNegInt(p.cost)) err(`psychicPowers[${i}].cost`, 'Non-negative integer required');
                 for (const f of ['discipline', 'notes']) if (p[f] !== undefined && typeof p[f] !== 'string') err(`psychicPowers[${i}].${f}`, 'String required');
@@ -531,7 +578,7 @@ export function validateCharacter(doc, opts = {}) {
     for (const listName of ['weapons', 'armourItems', 'gear']) {
         (Array.isArray(doc[listName]) ? doc[listName] : []).forEach((item, i) => {
             if (item && typeof item === 'object') {
-                if (item.description !== undefined && typeof item.description !== 'string') err(`${listName}[${i}].description`, 'String required');
+                checkProse(item, `${listName}[${i}]`);   // description + citation + drift guard (ST-4)
                 if (item.dsl !== undefined && typeof item.dsl !== 'string') err(`${listName}[${i}].dsl`, 'String (DSL source) required');
             }
         });
@@ -566,7 +613,10 @@ export function validateCharacter(doc, opts = {}) {
         if (!Array.isArray(list)) { err(listName, 'Must be an array'); continue; }
         list.forEach((entry, i) => {
             if (!isNamedEntry(entry)) { err(`${listName}[${i}]`, 'Must be a string or { name, … } object'); return; }
-            if (listName === 'talents' || listName === 'traits') checkRefDsl(entry, `${listName}[${i}]`);
+            if (listName === 'talents' || listName === 'traits') {
+                checkRefDsl(entry, `${listName}[${i}]`);
+                checkProse(entry, `${listName}[${i}]`);
+            }
         });
     }
     // weapons
@@ -636,6 +686,7 @@ export function validateCharacter(doc, opts = {}) {
             if (!isNamedEntry(c)) { err(`cybernetics[${i}]`, 'Must be a string or { name, location?, notes?, ref?, dsl? }'); return; }
             if (c && typeof c === 'object') {
                 checkRefDsl(c, `cybernetics[${i}]`);
+                checkProse(c, `cybernetics[${i}]`);
                 for (const f of ['location', 'notes']) if (c[f] !== undefined && typeof c[f] !== 'string') err(`cybernetics[${i}].${f}`, 'String required');
             }
         });
