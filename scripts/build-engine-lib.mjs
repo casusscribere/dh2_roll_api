@@ -3,9 +3,9 @@
  * Foundry system vendors this — architecture: "the engine bundle is imported
  * by the system; zero foundry./game. globals inside it; stateless").
  *
- * Same recipe as scripts/build-foundry.mjs (inline the rule/weapon data via a
+ * Same recipe as the Pages build (inline the rule/weapon data via a
  * generated sources twin, esbuild ESM), but the entry is a pure library
- * surface instead of the dh2-roll-vm module UI:
+ * surface:
  *
  *   import { dispatch, CHARACTER_SCHEMA_VERSION, migrateCharacter,
  *            validateCharacter, emptyCharacter, characterToCombatant,

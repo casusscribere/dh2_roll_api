@@ -15,17 +15,17 @@ lives here.
   GitHub Pages build (CI: test → build:static → deploy already in place). The
   site remains the dev harness + headless simulator + authoring surface — not
   the product UI.
-- **Lane C (Foundry):** **gradual adoption**, not a big-bang port. Each phase
-  adds one concrete Foundry element, starting with a throwaway seam validation
-  and compounding toward a distributable module. **Primary target:
-  `dark-heresy-3rd-edition` (live-validated on Foundry v14.360)** with
-  `dark-heresy-2nd` (v12) as compat secondary and `rogue-trader-2nd` as the
-  Phase-7 target — all present in the user's live install
-  (`…\FoundryVTT\Data\systems`). Increments land via `npm run deploy:foundry`
-  (build + copy into `Data/modules/`) and are validated with the Playwright
-  join harness — see FOUNDRY_MIGRATION.md "Live-install survey & integration
-  plan". A mismatch discovered in Lane C feeds back into Lane A while change
-  is cheap.
+- **Lane C (Foundry):** **RETIRED 2026-08-25** (workspace decision OD-1;
+  `dark-heresy-3rd-edition` became reference-only on 2026-07-29 and the module
+  lane was dropped rather than retargeted). The lane ran Phases 0–5 as written
+  below — walking-skeleton module, actor importer, pack export, ActiveEffect
+  mirror, all validated against `dark-heresy-3rd-edition` on v14.360 — and its
+  phase rows are kept as the historical record. The engine's sole Foundry
+  delivery is now the **library bundle** (`npm run build:engine-lib` →
+  `dist/dh2-engine.mjs`) vendored by the `rogue-trader-2e` system, which is
+  also where sheets, packs, and Foundry-side validation live. What Lane C
+  proved (schema↔DataFields mapping, EncounterState↔AE mirror, pack formats)
+  carries forward through that system, not through a module from this repo.
 
 **Cross-cutting rules (all phases):**
 - Every rule authored or migrated carries `meta` (book/page) once Phase 0 lands.

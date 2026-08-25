@@ -1,5 +1,15 @@
 # Foundry VTT migration map — for Claude
 
+> **HISTORICAL (module lane retired 2026-08-25, workspace decision OD-1).**
+> `dark-heresy-3rd-edition` — this doc's primary target — was ruled a
+> **reference system only** (2026-07-29), and the whole `dh2-roll-vm` module
+> lane (`foundry/`, `build:foundry`, `export:packs`, `deploy:foundry`) was
+> subsequently dropped rather than retargeted; git history is the undo. The
+> engine's only Foundry delivery is now the library bundle vendored by the
+> `rogue-trader-2e` system. Keep this doc as the record of the live-install
+> survey, the schema↔DataFields mapping tables, and the pack-format decisions —
+> several of which the `rogue-trader-2e` system inherited.
+
 ## Live-install survey & integration plan (2026-07-01 — supersedes parts of the Phase 0 baseline)
 
 The user's actual Foundry install is now known:
