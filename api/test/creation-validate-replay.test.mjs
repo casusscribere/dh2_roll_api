@@ -46,7 +46,7 @@ function completeDoc() {
         homeworldRef: 'dh2:home_world:feral_world',
         backgroundRef: 'dh2:background:outcast',
         roleRef: 'dh2:role:desperado',
-        choices: { roleTalent: 'Quick Draw' },
+        choices: { roleTalent: 'Quick Draw', 'Enemy (chosen group)': 'Enforcers' },
     });
     doc.characteristics = Object.fromEntries(
         ['ws', 'bs', 's', 't', 'ag', 'int', 'per', 'wp', 'fel']

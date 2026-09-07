@@ -411,7 +411,15 @@ test('applyOrigin: duplicate aptitudes surface as a choice instead of stacking',
     const d = emptyCharacter('Dup');
     d.aptitudes = [{ name: 'Toughness', source: 'prior' }];           // Feral World also grants Toughness
     const res = applyOrigin(d, PACK, { homeworldRef: 'dh2:home_world:feral_world' });
-    assert.deepEqual(res.choicesNeeded, [{ kind: 'duplicate_aptitude', duplicate: 'Toughness', source: 'homeworld' }]);
+    assert.equal(res.choicesNeeded.length, 1);
+    const dup = res.choicesNeeded[0];
+    assert.equal(dup.kind, 'duplicate_aptitude');
+    assert.equal(dup.duplicate, 'Toughness');
+    assert.equal(dup.source, 'homeworld');
+    // 2026-08-27: the dead end became a real choice — a stable key plus every
+    // not-yet-held aptitude as a replacement option (RAW "pick another").
+    assert.ok(dup.key);
+    assert.ok(Array.isArray(dup.options) && dup.options.length > 0 && !dup.options.includes('Toughness'));
     assert.deepEqual(res.doc.aptitudes, [{ name: 'Toughness', source: 'prior' }], 'no duplicate pushed');
     assert.deepEqual(res.doc.origin.homeworld, { name: 'Feral World', ref: 'dh2:home_world:feral_world' });
     assert.deepEqual(res.doc.fate, { max: 2, current: 2 });
@@ -424,11 +432,14 @@ test('applyOrigin: every "X or Y" grant is a choice point, and answering them ap
 
     const unanswered = applyOrigin(base, PACK, { backgroundRef: 'dh2:background:adepta_sororitas' });
     assert.deepEqual(unanswered.choicesNeeded.map((c) => c.kind), ['aptitude', 'skill', 'skill', 'talent']);
+    // the paren-or clause splits INSIDE the parens now (2026-08-27)
+    assert.deepEqual(unanswered.choicesNeeded[3].options, ['Weapon Training (Flame)', 'Weapon Training (Las)']);
     assert.deepEqual(unanswered.choicesNeeded[1], {
         kind: 'skill', options: ['Charm', 'Intimidate'], key: 'Charm or Intimidate', source: 'background',
     });
     assert.deepEqual(unanswered.doc.aptitudes, []);
-    assert.deepEqual(unanswered.doc.talents, []);
+    // fixed segments of a compound grant land even while the or-half waits
+    assert.deepEqual(unanswered.doc.talents, [{ name: 'Weapon Training (Chain)', ref: 'dh2:talent:weapon_training' }]);
     assert.deepEqual(Object.keys(unanswered.doc.skills), ['Athletics', 'Common Lore', 'Linguistics']);
     assert.deepEqual(unanswered.doc.skills['Common Lore'], { specialities: { 'Adepta Sororitas': { advances: 1 } } });
     assert.equal(unanswered.doc.xp.total, 1234);
@@ -442,14 +453,20 @@ test('applyOrigin: every "X or Y" grant is a choice point, and answering them ap
             'Offence or Social': 'Social',
             'Charm or Intimidate': 'Intimidate',
             'Medicae or Parry': 'Parry',
-            'Weapon Training (Flame or Las, Chain)': 'Weapon Training (Las)',
+            'Weapon Training (Flame or Las)': 'Weapon Training (Las)',
         },
     });
     assert.deepEqual(answered.choicesNeeded, []);
     assert.deepEqual(answered.doc.aptitudes, [{ name: 'Social', source: 'background' }]);
     assert.equal(answered.doc.skills.Intimidate.advances, 1);
     assert.equal(answered.doc.skills.Parry.advances, 1);
-    assert.deepEqual(answered.doc.talents, [{ name: 'Weapon Training (Las)' }]);
+    // the FIXED segment ("Chain") grants alongside the chosen one — the old
+    // naive split silently dropped it (2026-08-27 fix); refs now attach.
+    assert.deepEqual(answered.doc.talents.map((t) => t.name).sort(),
+        ['Weapon Training (Chain)', 'Weapon Training (Las)']);
+    const granted = answered.doc.xp.ledger.filter((e) => /^Character creation:/.test(e.source ?? ''));
+    assert.ok(granted.some((e) => e.name === 'Weapon Training (Chain)' && e.cost === 0),
+        'origin grants land in the audit trail');
 });
 
 test('applyOrigin: bare specialist grants ask for a speciality, unknown grants are flagged, duplicate talents grant once', () => {
@@ -464,12 +481,15 @@ test('applyOrigin: bare specialist grants ask for a speciality, unknown grants a
         }],
     };
     const res = applyOrigin(emptyCharacter('Synthetic'), pack, { backgroundRef: 'test:bg' });
-    assert.deepEqual(res.choicesNeeded, [
-        { kind: 'speciality', skill: 'Trade', key: 'Trade', source: 'background' },
-        { kind: 'unresolved_skill', grant: 'Xenoarchaeology', source: 'background' },
+    assert.equal(res.choicesNeeded.length, 2);
+    assert.deepEqual(
+        res.choicesNeeded.map(({ kind, key, source }) => ({ kind, key, source })), [
+        { kind: 'speciality', key: 'Trade', source: 'background' },
+        { kind: 'unresolved_skill', key: 'Xenoarchaeology', source: 'background' },
     ]);
+    assert.equal(res.choicesNeeded[0].writeIn, true, 'a bare specialist grant takes a write-in');
     assert.deepEqual(res.doc.skills, { Athletics: { advances: 1 } });
-    assert.deepEqual(res.doc.talents, [{ name: 'Jaded' }], 'a talent already held is not pushed twice');
+    assert.deepEqual(res.doc.talents, [{ name: 'Jaded', ref: 'dh2:talent:jaded' }], 'a talent already held is not pushed twice');
     assert.deepEqual(res.doc.aptitudes, [{ name: 'Tech', source: 'background' }]);
     assert.equal(res.doc.xp.total, PACK.startingXp);
 

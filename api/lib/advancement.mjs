@@ -185,7 +185,7 @@ const skillEntryFor = (doc, canonical) => {
  * Skills: known specialities advance individually; specialist skills also
  * offer a "new speciality" template entry (rank 1, speciality: null).
  */
-export function listAvailableAdvances(doc, pack) {
+export function listAvailableAdvances(doc, pack, { includeHeld = false } = {}) {
     const { remaining } = xpSummary(doc);
     const out = [];
     const push = (a) => out.push({ ...a, affordable: a.cost <= remaining });
@@ -243,11 +243,13 @@ export function listAvailableAdvances(doc, pack) {
             const gate = pack.eliteAdvances.find((e) => e.id === t.eliteAdvance);
             if (!gate || !heldEAs.has(norm(gate.name))) continue;
         }
-        if (!t.specialist && held.has(norm(t.name))) continue;
+        const isHeld = !t.specialist && held.has(norm(t.name));
+        if (isHeld && !includeHeld) continue;
         const matches = aptitudeMatches(doc, t.aptitudes);
         const { met, problems } = checkPrerequisites(doc, t.prerequisites);
         push({
             kind: 'talent', ref: t.ref, name: t.name, tier: t.tier, matches,
+            ...(isHeld && { held: true }),               // already on the sheet — display-only row
             ...(t.specialist && { specialist: true }),   // needs a sub-selection to buy
             cost: advanceCost(pack, { kind: 'talent', matches, tier: t.tier }),
             prereqsMet: met, prereqProblems: problems,
@@ -517,6 +519,43 @@ export function applyAdvance(doc, pack, advance, { confirmed = false, override =
  * function records `characteristicModifiers` info without touching scores.
  * Returns { doc, woundsFormula, fateThreshold, emperorsBlessing, choicesNeeded[] }.
  */
+const OR_SPLIT = /\s+or\s+/i;
+const PLACEHOLDER = /^(one|chosen|choose|any|pick)\b/i;
+
+/**
+ * Context-aware expansion of a pack grant string into direct grants and
+ * choice points. Handles the real corpus shapes:
+ *   "Awareness"                             → grant
+ *   "Charm or Intimidate"                   → choice of two
+ *   "Operate (Aeronautica or Voidship)"     → choice INSIDE the parens
+ *   "Weapon Training (Flame or Las, Chain)" → grant "(Chain)" + choose Flame/Las
+ *   "Enemy (chosen group)"                  → WRITE-IN choice (options: null)
+ * Choice keys are the human-readable sub-clause, stable across rebuilds.
+ */
+export function expandGrant(text) {
+    const t = String(text ?? '').trim();
+    const m = t.match(/^([^(]+?)\s*\(([^)]+)\)\s*$/);
+    if (!m) {
+        if (OR_SPLIT.test(t)) return { grants: [], choices: [{ key: t, options: t.split(OR_SPLIT).map((x) => x.trim()) }] };
+        return { grants: t ? [t] : [], choices: [] };
+    }
+    const base = m[1].trim();
+    const grants = [], choices = [];
+    for (const seg of m[2].split(',').map((x) => x.trim()).filter(Boolean)) {
+        if (PLACEHOLDER.test(seg)) {
+            choices.push({ key: `${base} (${seg})`, options: null, base });          // write-in
+        } else if (OR_SPLIT.test(seg)) {
+            choices.push({
+                key: `${base} (${seg})`, base,
+                options: seg.split(OR_SPLIT).map((o) => `${base} (${o.trim()})`),
+            });
+        } else {
+            grants.push(`${base} (${seg})`);
+        }
+    }
+    return { grants, choices };
+}
+
 export function applyOrigin(doc, pack, { homeworldRef, backgroundRef, roleRef, choices = {} } = {}) {
     const d = structuredClone(doc);
     const find = (list, r) => list.find((e) => e.ref === r) ?? null;
@@ -529,6 +568,22 @@ export function applyOrigin(doc, pack, { homeworldRef, backgroundRef, roleRef, c
     const choicesNeeded = [];
     d.origin ??= { homeworld: null, background: null, role: null, eliteAdvances: [] };
     d.aptitudes ??= [];
+    d.xp ??= { total: 0, ledger: [] };
+    d.xp.ledger ??= [];
+
+    /** Origin acquisitions land in the SAME audit trail as purchases: 0 XP,
+     *  sourced "Character creation: <member>" — the advance list can grey
+     *  them out and replay regenerates them (never re-buys them). */
+    const ledgerGrant = (name, kind, memberLabel, ref) => {
+        d.xp.ledger.push({
+            name, cost: 0, kind, grantKind: kind,
+            ...(ref && { ref }),
+            ...(kind === 'skill' && { rank: 1 }),
+            source: `Character creation: ${memberLabel}`,
+            date: today(),
+        });
+    };
+
     const grantAptitude = (name, source) => {
         if (!name) return;
         if (/\s+or\s+/i.test(name)) {
@@ -536,12 +591,67 @@ export function applyOrigin(doc, pack, { homeworldRef, backgroundRef, roleRef, c
             if (!pick) { choicesNeeded.push({ kind: 'aptitude', options: name.split(/\s+or\s+/i), key: name, source }); return; }
             name = pick;
         }
-        // duplicate aptitude → the player picks another (RAW); surface as a choice
+        // duplicate aptitude → the player picks another (RAW). The choice
+        // carries a stable key AND real options (every pack aptitude not yet
+        // held) — previously option-less, which dead-ended the creation flow.
         if (d.aptitudes.some((a) => norm(entryName(a)) === norm(name))) {
-            choicesNeeded.push({ kind: 'duplicate_aptitude', duplicate: name, source });
+            const key = `duplicate aptitude: ${name} (${source})`;
+            const replacement = choices[key];
+            if (replacement) { grantAptitude(replacement, source); return; }
+            choicesNeeded.push({
+                kind: 'duplicate_aptitude', duplicate: name, source, key,
+                options: pack.aptitudes.map((a) => a.name)
+                    .filter((n) => !d.aptitudes.some((h) => norm(entryName(h)) === norm(n))),
+            });
             return;
         }
         d.aptitudes.push({ name, source });
+    };
+
+    /** Resolve one grant string via expandGrant + the caller's choices, then
+     *  hand each concrete name to applyFn. Unresolved choice points surface
+     *  in choicesNeeded (write-ins carry options: null). */
+    const resolveGrant = (text, source, kind, applyFn) => {
+        const { grants, choices: points } = expandGrant(text);
+        for (const c of points) {
+            const pick = choices[c.key];
+            if (!pick) { choicesNeeded.push({ kind, options: c.options, key: c.key, source, ...(c.options ? {} : { writeIn: true, base: c.base }) }); continue; }
+            grants.push(c.options ? pick : `${c.base} (${pick})`);
+        }
+        for (const name of grants) applyFn(name);
+    };
+
+    const grantSkill = (g, memberLabel, source) => {
+        const m = g.match(/^([^(]+?)\s*\(([^)]+)\)\s*$/);
+        const canonical = canonicalSkillName(m ? m[1] : g);
+        if (!canonical) { choicesNeeded.push({ kind: 'unresolved_skill', grant: g, key: g, source }); return; }
+        if (SKILL_DEFS[canonical].specialist) {
+            const spec = m ? m[2] : null;
+            if (!spec) { choicesNeeded.push({ kind: 'speciality', skill: canonical, key: g, source, writeIn: true, base: canonical, options: null }); return; }
+            const entry = (d.skills[canonical] ??= { specialities: {} });
+            entry.specialities ??= {};
+            entry.specialities[spec] = { advances: Math.max(1, entry.specialities[spec]?.advances ?? 0) };
+            ledgerGrant(`${canonical} (${spec})`, 'skill', memberLabel);
+        } else {
+            const entry = (d.skills[canonical] ??= { advances: 0 });
+            entry.advances = Math.max(1, entry.advances ?? 0);
+            ledgerGrant(canonical, 'skill', memberLabel);
+        }
+    };
+
+    const grantTalent = (g, memberLabel, source) => {
+        const m = g.match(/^([^(]+?)\s*\(([^)]+)\)\s*$/);
+        const base = (m ? m[1] : g).trim();
+        const packTalent = pack.talents.find((t) => norm(t.name) === norm(base));
+        // a specialist talent granted WITHOUT a concrete spec needs one
+        if (packTalent?.specialist && !m) {
+            choicesNeeded.push({ kind: 'talent_speciality', key: g, source, writeIn: true, base, options: null });
+            return;
+        }
+        if (!(d.talents ?? []).some((t) => norm(entryName(t)) === norm(g))) {
+            (d.talents ??= []).push({ name: g, ...(packTalent?.ref && { ref: packTalent.ref }) });
+            ledgerGrant(g, 'talent', memberLabel, packTalent?.ref);
+        }
     };
 
     if (hw) {
@@ -553,36 +663,8 @@ export function applyOrigin(doc, pack, { homeworldRef, backgroundRef, roleRef, c
         d.origin.background = { name: bg.name, ref: bg.ref };
         grantAptitude(bg.startingAptitude, 'background');
         d.skills ??= {};
-        for (const grant of bg.skillsGranted) {
-            let g = grant;
-            if (/\s+or\s+/i.test(g)) {
-                const pick = choices[g];
-                if (!pick) { choicesNeeded.push({ kind: 'skill', options: g.split(/\s+or\s+/i), key: g, source: 'background' }); continue; }
-                g = pick;
-            }
-            const m = g.match(/^([^(]+?)\s*\(([^)]+)\)\s*$/);
-            const canonical = canonicalSkillName(m ? m[1] : g);
-            if (!canonical) { choicesNeeded.push({ kind: 'unresolved_skill', grant: g, source: 'background' }); continue; }
-            if (SKILL_DEFS[canonical].specialist) {
-                const spec = m ? m[2] : null;
-                if (!spec) { choicesNeeded.push({ kind: 'speciality', skill: canonical, key: g, source: 'background' }); continue; }
-                const entry = (d.skills[canonical] ??= { specialities: {} });
-                entry.specialities ??= {};
-                entry.specialities[spec] = { advances: Math.max(1, entry.specialities[spec]?.advances ?? 0) };
-            } else {
-                const entry = (d.skills[canonical] ??= { advances: 0 });
-                entry.advances = Math.max(1, entry.advances ?? 0);
-            }
-        }
-        for (const grant of bg.talentsGranted) {
-            let g = grant;
-            if (/\s+or\s+/i.test(g)) {
-                const pick = choices[g];
-                if (!pick) { choicesNeeded.push({ kind: 'talent', options: g.split(/\s+or\s+/i), key: g, source: 'background' }); continue; }
-                g = pick;
-            }
-            if (!(d.talents ?? []).some((t) => norm(entryName(t)) === norm(g))) (d.talents ??= []).push({ name: g });
-        }
+        for (const grant of bg.skillsGranted) resolveGrant(grant, 'background', 'skill', (g) => grantSkill(g, bg.name, 'background'));
+        for (const grant of bg.talentsGranted) resolveGrant(grant, 'background', 'talent', (g) => grantTalent(g, bg.name, 'background'));
     }
     if (role) {
         d.origin.role = { name: role.name, ref: role.ref };
@@ -590,11 +672,34 @@ export function applyOrigin(doc, pack, { homeworldRef, backgroundRef, roleRef, c
         const pick = choices.roleTalent;
         if (role.roleTalentChoice?.length) {
             if (!pick) choicesNeeded.push({ kind: 'talent', options: role.roleTalentChoice, key: 'roleTalent', source: 'role' });
-            else if (!(d.talents ?? []).some((t) => norm(entryName(t)) === norm(pick))) (d.talents ??= []).push({ name: pick });
+            else grantTalent(pick, role.name, 'role');
         }
     }
-    d.xp ??= { total: 0, ledger: [] };
     if (!d.xp.total) d.xp.total = pack.startingXp;
+
+    // Engine-computed choice points — every choice of the selected members
+    // WITH its current value (resolved ones included), so pickers persist and
+    // the option lists come from ONE legality-aware expansion.
+    const choicePoints = [];
+    const addPoints = (member, text, label) => {
+        for (const c of expandGrant(text ?? '').choices) {
+            choicePoints.push({ member, key: c.key, options: c.options, label,
+                value: choices[c.key] ?? null, ...(c.options ? {} : { writeIn: true, base: c.base }) });
+        }
+    };
+    if (hw) addPoints('homeworldRef', hw.aptitude, 'home-world aptitude');
+    if (bg) {
+        addPoints('backgroundRef', bg.startingAptitude, 'background aptitude');
+        for (const g of bg.skillsGranted) addPoints('backgroundRef', g, 'background skill');
+        for (const g of bg.talentsGranted) addPoints('backgroundRef', g, 'background talent');
+    }
+    if (role) {
+        if (role.roleTalentChoice?.length) {
+            choicePoints.push({ member: 'roleRef', key: 'roleTalent', options: [...role.roleTalentChoice],
+                label: 'role talent', value: choices.roleTalent ?? null });
+        }
+        for (const a of role.roleAptitudes) addPoints('roleRef', a, 'role aptitude');
+    }
 
     return {
         doc: d,
@@ -603,6 +708,7 @@ export function applyOrigin(doc, pack, { homeworldRef, backgroundRef, roleRef, c
         emperorsBlessing: hw?.emperorsBlessing ?? null,
         characteristicModifiers: hw?.characteristicModifiers ?? {},
         choicesNeeded,
+        choicePoints,
     };
 }
 
@@ -781,8 +887,11 @@ const originEntryFor = (pack, list, member) => {
     return pack[list].find((e) => (ref && e.ref === ref) || norm(e.name) === name) ?? null;
 };
 
-const orChoiceSatisfied = (options, satisfied) =>
-    options.split(/\s+or\s+/i).some((o) => satisfied(o.trim()));
+/** One choice point of a grant is satisfied when any of its options (or, for
+ *  a write-in, any "Base (…)" variant) is held. */
+const grantChoicesSatisfied = (text, satisfied, heldWithBase) =>
+    expandGrant(text).choices.every((c) =>
+        c.options ? c.options.some((o) => satisfied(o)) : heldWithBase(c.base));
 
 /**
  * Findings over the CHARACTER CREATION process — unselected origin members,
@@ -821,18 +930,25 @@ export function validateCreation(doc, pack) {
     if (role?.roleTalentChoice?.length && !role.roleTalentChoice.some(talentHeld)) {
         findings.push(`role talent choice unresolved: ${role.roleTalentChoice.join(' or ')}`);
     }
+    const talentWithBase = (base) => (doc.talents ?? [])
+        .some((t) => norm(entryName(t)).startsWith(norm(base)) && /\(.+\)/.test(entryName(t)));
+    const skillWithBase = (base) => {
+        const canonical = canonicalSkillName(base);
+        const s = canonical ? skillEntryFor(doc, canonical) : null;
+        return !!s && Object.values(s.specialities ?? {}).some((sv) => (sv.advances ?? 0) >= 1);
+    };
     for (const [entry, kind] of [[hw?.aptitude, 'home world aptitude'], [bg?.startingAptitude, 'background aptitude']]) {
-        if (entry && /\s+or\s+/i.test(entry) && !orChoiceSatisfied(entry, aptitudeHeld)) {
+        if (entry && !grantChoicesSatisfied(entry, aptitudeHeld, aptitudeHeld)) {
             findings.push(`${kind} choice unresolved: ${entry}`);
         }
     }
     for (const grant of bg?.skillsGranted ?? []) {
-        if (/\s+or\s+/i.test(grant) && !orChoiceSatisfied(grant, skillTrained)) {
+        if (!grantChoicesSatisfied(grant, skillTrained, skillWithBase)) {
             findings.push(`background skill choice unresolved: ${grant}`);
         }
     }
     for (const grant of bg?.talentsGranted ?? []) {
-        if (/\s+or\s+/i.test(grant) && !orChoiceSatisfied(grant, talentHeld)) {
+        if (!grantChoicesSatisfied(grant, talentHeld, talentWithBase)) {
             findings.push(`background talent choice unresolved: ${grant}`);
         }
     }
@@ -883,7 +999,7 @@ export function replayPurchases(doc, pack, entries) {
     const conflicts = [];
     for (const e of entries ?? []) {
         try {
-            if ((e.cost ?? 0) === 0 && /^Elite Advance: /.test(e.source ?? '')) continue;
+            if ((e.cost ?? 0) === 0 && /^(Elite Advance: |Character creation)/.test(e.source ?? '')) continue;
             if ((e.cost ?? 0) === 0 && e.kind !== 'elite_advance') {
                 const grantKind = e.grantKind
                     ?? (['talent', 'skill', 'psy_rating'].includes(e.kind) ? e.kind : 'note');

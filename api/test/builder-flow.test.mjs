@@ -47,7 +47,10 @@ const wizard = (rng) => createWizard({ pack: CHARGEN_PACK, api, rng });
 
 async function chooseOrigin(w, roleChoices = { roleTalent: 'Quick Draw' }) {
     await w.choose('homeWorld', { ref: 'dh2:home_world:feral_world' });
-    await w.choose('background', { ref: 'dh2:background:outcast' });
+    // Outcast's "Enemy (chosen group)" is a WRITE-IN choice since the grant
+    // validation landed (a literal "Enemy (chosen group)" talent is not legal
+    // post-CC content) — the fixture names its group.
+    await w.choose('background', { ref: 'dh2:background:outcast', choices: { 'Enemy (chosen group)': 'Enforcers' } });
     await w.choose('role', { ref: 'dh2:role:desperado', choices: roleChoices });
 }
 
@@ -82,7 +85,10 @@ test('background and role grants land; the role talent choice resolves', async (
     assert.equal(d.origin.role.name, 'Desperado');
     assert.deepEqual(d.aptitudes.map((a) => a.name).sort(), [...EXPECTED.aptitudes].sort());
     assert.ok(d.talents.some((t) => t.name === 'Quick Draw'), 'role talent choice');
+    assert.ok(d.talents.some((t) => t.name === 'Enemy (Enforcers)'), 'write-in specialization granted');
     assert.equal(d.skills.Awareness.advances, 1, 'background skill grant');
+    assert.ok(d.xp.ledger.some((e) => e.name === 'Awareness' && e.cost === 0 && /^Character creation:/.test(e.source)),
+        'origin grants ledger at 0 XP');
     assert.equal(d.xp.total, EXPECTED.startingXp);
     assert.deepEqual(w.state.pendingChoices, []);
 });
@@ -172,12 +178,13 @@ test('changing an earlier step PROPAGATES: origin swap recomputes wounds/fate fr
     assert.ok(!d.aptitudes.some((a) => a.name === 'Toughness' && a.source === 'homeworld'), 'old aptitude gone');
     assert.equal(d.characteristics.ag.base, EXPECTED.characteristics.ag, 'values preserved');
     assert.equal(d.characteristics.ag.advances, 1, 'the purchase survived the rebuild');
-    assert.equal(d.xp.ledger[0].cost, 100, 'Desperado still holds both Ag aptitudes — price unchanged');
+    const agEntry = (x) => x.xp.ledger.find((e) => e.ref === 'ag' && e.kind === 'characteristic');
+    assert.equal(agEntry(d).cost, 100, 'Desperado still holds both Ag aptitudes — price unchanged');
     assert.deepEqual(w.state.conflicts, []);
 
     // …and swapping the ROLE moves aptitudes, so the same purchase REPRICES
     await w.choose('role', { ref: 'dh2:role:chirurgeon' });
-    assert.equal(w.state.doc.xp.ledger[0].cost, 500, 'repriced at 0 matches after the role swap');
+    assert.equal(agEntry(w.state.doc).cost, 500, 'repriced at 0 matches after the role swap');
     assert.equal(w.state.doc.characteristics.ag.advances, 1);
 });
 
@@ -265,9 +272,10 @@ test('full flow: one legal character; XP spend equals the fixture; validators cl
     assert.equal(audit.woundsFate.woundsRoll, 5);
     assert.equal(audit.divination, 'Trust in your fear.');
 
-    // every creation purchase carries its source note
+    // every ledger entry carries its source note: purchases say Creation,
+    // origin grants say which member granted them
     assert.ok(doc.xp.ledger.length >= 3);
-    assert.ok(doc.xp.ledger.every((e) => e.source === 'Creation'), JSON.stringify(doc.xp.ledger));
+    assert.ok(doc.xp.ledger.every((e) => /^(Creation$|Character creation: )/.test(e.source)), JSON.stringify(doc.xp.ledger));
 
     // validators: character 0 errors; build reconciliation 0 errors
     const vc = validateCharacter(migrateCharacter(structuredClone(doc)));

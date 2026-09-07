@@ -92,12 +92,20 @@ test('session.undoLast restores the exact pre-purchase doc', async () => {
     assert.equal(s.xp.remaining, 1000);
 });
 
-test('session.grantTrait writes a {name, ref} trait with no ledger entry', async () => {
+test('session.grantTrait writes the trait AND a 0-XP ledger entry with the note as source', async () => {
     const s = new BuilderSession({ doc: freshDoc(), api });
     await s.load();
-    await s.grantTrait({ name: 'Dark-sight', ref: 'dh2:trait:dark_sight' });
+    await s.grantTrait({ name: 'Dark-sight', ref: 'dh2:trait:dark_sight', note: 'Voidborn mutation, GM-approved' });
     assert.deepEqual(s.doc.traits.at(-1), { name: 'Dark-sight', ref: 'dh2:trait:dark_sight' });
-    assert.equal((s.doc.xp.ledger ?? []).length, 0);
+    let e = s.doc.xp.ledger.at(-1);
+    assert.equal(e.cost, 0);
+    assert.equal(e.grantKind, 'trait');
+    assert.equal(e.source, 'Voidborn mutation, GM-approved');
+
+    // no note → the override indicator is the default source
+    await s.grantTrait({ name: 'Sturdy' });
+    e = s.doc.xp.ledger.at(-1);
+    assert.equal(e.source, 'manual override');
 });
 
 test('session.validate returns the build report', async () => {

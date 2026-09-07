@@ -56,9 +56,11 @@ export class BuilderSession {
         await this.refresh();
     }
 
-    /** Re-list available advances + XP summary; migrates the doc engine-side. */
+    /** Re-list available advances + XP summary; migrates the doc engine-side.
+     *  includeHeld: origin-granted / already-held talents come back flagged so
+     *  the panel can grey them out instead of hiding them. */
     async refresh() {
-        const r = await this.api('POST', '/api/chargen/advances', { doc: this.doc });
+        const r = await this.api('POST', '/api/chargen/advances', { doc: this.doc, includeHeld: true });
         this.advances = r.advances;
         this.xp = r.xp;
     }
@@ -85,11 +87,18 @@ export class BuilderSession {
         await this.refresh();
     }
 
-    /** Traits are never purchased in DH2 — grants bypass the XP ledger. */
-    async grantTrait({ name, ref }) {
-        this.doc.traits = this.doc.traits ?? [];
-        this.doc.traits.push(ref ? { name, ref } : { name });
+    /** Traits are never purchased in DH2, but every applied trait still
+     *  lands in the audit trail: a 0-XP ledger entry whose source is the
+     *  user's note, defaulting to the override indicator. */
+    async grantTrait({ name, ref, note } = {}) {
+        const r = await this.api('POST', '/api/chargen/grant', {
+            doc: this.doc,
+            grant: { kind: 'trait', name, ...(ref && { ref }) },
+            source: (note ?? '').trim() || 'manual override',
+        });
+        this.doc = r.doc;
         await this.refresh();
+        return r.entry;
     }
 
     /**
@@ -304,6 +313,7 @@ export function createWizard({ pack, api, rng = Math.random, doc = null } = {}) 
             fateThreshold: r.fateThreshold,
             emperorsBlessing: r.emperorsBlessing,
             characteristicModifiers: r.characteristicModifiers ?? {},
+            choicePoints: r.choicePoints ?? [],
         };
         if (state.characteristics?.values) writeCharacteristics(state.characteristics.values);
         applyWoundsFate();
@@ -322,23 +332,16 @@ export function createWizard({ pack, api, rng = Math.random, doc = null } = {}) 
         persistRecipe();
     };
 
-    /** Choice-point KEYS attached to one origin member (used to rescind a
-     *  member's choices when that member changes). */
-    const choiceKeysFor = (memberKey, ref) => {
-        const keys = [];
-        if (!ref) return keys;
-        const OR = /\s+or\s+/i;
-        if (memberKey === 'homeworldRef') {
-            const e = pack.homeworlds.find((x) => x.ref === ref);
-            if (e?.aptitude && OR.test(e.aptitude)) keys.push(e.aptitude);
-        } else if (memberKey === 'backgroundRef') {
-            const e = pack.backgrounds.find((x) => x.ref === ref);
-            if (e?.startingAptitude && OR.test(e.startingAptitude)) keys.push(e.startingAptitude);
-            for (const g of [...(e?.skillsGranted ?? []), ...(e?.talentsGranted ?? [])]) if (OR.test(g)) keys.push(g);
-        } else if (memberKey === 'roleRef') {
-            const e = pack.roles.find((x) => x.ref === ref);
-            if (e?.roleTalentChoice?.length) keys.push('roleTalent');
-            for (const a of e?.roleAptitudes ?? []) if (OR.test(a)) keys.push(a);
+    /** Choice-point KEYS attached to one origin member — read from the
+     *  ENGINE-computed points of the outgoing selection (one legality-aware
+     *  expansion, no second parser here), plus any pending choices the engine
+     *  attributed to that member's source. */
+    const SOURCE_MEMBER = { homeworld: 'homeworldRef', background: 'backgroundRef', role: 'roleRef' };
+    const choiceKeysFor = (memberKey) => {
+        const keys = (state.originInfo?.choicePoints ?? [])
+            .filter((c) => c.member === memberKey).map((c) => c.key);
+        for (const c of state.pendingChoices ?? []) {
+            if (c.key && SOURCE_MEMBER[c.source] === memberKey) keys.push(c.key);
         }
         return keys;
     };
@@ -354,6 +357,7 @@ export function createWizard({ pack, api, rng = Math.random, doc = null } = {}) 
         state.originInfo = {
             woundsFormula: r.woundsFormula, fateThreshold: r.fateThreshold,
             emperorsBlessing: r.emperorsBlessing, characteristicModifiers: r.characteristicModifiers ?? {},
+            choicePoints: r.choicePoints ?? [],
         };
     };
 
@@ -369,7 +373,7 @@ export function createWizard({ pack, api, rng = Math.random, doc = null } = {}) 
                 if (choice.ref !== undefined && choice.ref !== state.selections[memberKey]) {
                     // a member change RESCINDS every choice attached to the
                     // outgoing selection (its keys are meaningless now)
-                    for (const k of choiceKeysFor(memberKey, state.selections[memberKey])) {
+                    for (const k of choiceKeysFor(memberKey)) {
                         delete state.selections.choices[k];
                     }
                     state.selections[memberKey] = choice.ref;
@@ -462,31 +466,11 @@ export function createWizard({ pack, api, rng = Math.random, doc = null } = {}) 
         },
 
         /** Every choice point of the currently-selected origin members, with
-         *  its current value — resolved points INCLUDED, so pickers persist
-         *  (they only reset when their member changes). */
+         *  its current value — resolved points INCLUDED (pickers persist and
+         *  reset only when their member changes). ENGINE-computed: one
+         *  legality-aware expansion serves core, UI, and validator alike. */
         choicePoints() {
-            const points = [];
-            const OR = /\s+or\s+/i;
-            const push = (member, key, options, label) => points.push({
-                member, key, options, label, value: state.selections.choices[key] ?? null,
-            });
-            const hw = pack.homeworlds.find((x) => x.ref === state.selections.homeworldRef);
-            if (hw?.aptitude && OR.test(hw.aptitude)) {
-                push('homeworldRef', hw.aptitude, hw.aptitude.split(OR).map((o) => o.trim()), 'home-world aptitude');
-            }
-            const bg = pack.backgrounds.find((x) => x.ref === state.selections.backgroundRef);
-            if (bg?.startingAptitude && OR.test(bg.startingAptitude)) {
-                push('backgroundRef', bg.startingAptitude, bg.startingAptitude.split(OR).map((o) => o.trim()), 'background aptitude');
-            }
-            for (const g of [...(bg?.skillsGranted ?? []), ...(bg?.talentsGranted ?? [])]) {
-                if (OR.test(g)) push('backgroundRef', g, g.split(OR).map((o) => o.trim()), 'background grant');
-            }
-            const role = pack.roles.find((x) => x.ref === state.selections.roleRef);
-            if (role?.roleTalentChoice?.length) push('roleRef', 'roleTalent', [...role.roleTalentChoice], 'role talent');
-            for (const a of role?.roleAptitudes ?? []) {
-                if (OR.test(a)) push('roleRef', a, a.split(OR).map((o) => o.trim()), 'role aptitude');
-            }
-            return points;
+            return state.originInfo?.choicePoints ?? [];
         },
 
         /** The Equip Acolyte guidance: background kit class + RAW acquisition

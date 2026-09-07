@@ -15687,7 +15687,7 @@ roll_table "Power Field Destruction" {
     const key = Object.keys(doc.skills ?? {}).find((k) => canonicalSkillName(k) === canonical);
     return key ? doc.skills[key] : null;
   };
-  function listAvailableAdvances(doc, pack) {
+  function listAvailableAdvances(doc, pack, { includeHeld = false } = {}) {
     const { remaining } = xpSummary(doc);
     const out = [];
     const push = (a) => out.push({ ...a, affordable: a.cost <= remaining });
@@ -15751,7 +15751,8 @@ roll_table "Power Field Destruction" {
         const gate = pack.eliteAdvances.find((e) => e.id === t.eliteAdvance);
         if (!gate || !heldEAs.has(norm2(gate.name))) continue;
       }
-      if (!t.specialist && held.has(norm2(t.name))) continue;
+      const isHeld = !t.specialist && held.has(norm2(t.name));
+      if (isHeld && !includeHeld) continue;
       const matches = aptitudeMatches(doc, t.aptitudes);
       const { met, problems } = checkPrerequisites(doc, t.prerequisites);
       push({
@@ -15760,6 +15761,8 @@ roll_table "Power Field Destruction" {
         name: t.name,
         tier: t.tier,
         matches,
+        ...isHeld && { held: true },
+        // already on the sheet — display-only row
         ...t.specialist && { specialist: true },
         // needs a sub-selection to buy
         cost: advanceCost(pack, { kind: "talent", matches, tier: t.tier }),
@@ -15982,8 +15985,34 @@ roll_table "Power Field Destruction" {
     }
     return { doc: d2, entry };
   }
+  var OR_SPLIT = /\s+or\s+/i;
+  var PLACEHOLDER = /^(one|chosen|choose|any|pick)\b/i;
+  function expandGrant(text) {
+    const t = String(text ?? "").trim();
+    const m = t.match(/^([^(]+?)\s*\(([^)]+)\)\s*$/);
+    if (!m) {
+      if (OR_SPLIT.test(t)) return { grants: [], choices: [{ key: t, options: t.split(OR_SPLIT).map((x) => x.trim()) }] };
+      return { grants: t ? [t] : [], choices: [] };
+    }
+    const base = m[1].trim();
+    const grants = [], choices = [];
+    for (const seg of m[2].split(",").map((x) => x.trim()).filter(Boolean)) {
+      if (PLACEHOLDER.test(seg)) {
+        choices.push({ key: `${base} (${seg})`, options: null, base });
+      } else if (OR_SPLIT.test(seg)) {
+        choices.push({
+          key: `${base} (${seg})`,
+          base,
+          options: seg.split(OR_SPLIT).map((o) => `${base} (${o.trim()})`)
+        });
+      } else {
+        grants.push(`${base} (${seg})`);
+      }
+    }
+    return { grants, choices };
+  }
   function applyOrigin(doc, pack, { homeworldRef, backgroundRef, roleRef, choices = {} } = {}) {
-    var _a, _b;
+    var _a;
     const d2 = structuredClone(doc);
     const find = (list, r) => list.find((e) => e.ref === r) ?? null;
     const hw = homeworldRef ? find(pack.homeworlds, homeworldRef) : null;
@@ -15995,6 +16024,20 @@ roll_table "Power Field Destruction" {
     const choicesNeeded = [];
     d2.origin ?? (d2.origin = { homeworld: null, background: null, role: null, eliteAdvances: [] });
     d2.aptitudes ?? (d2.aptitudes = []);
+    d2.xp ?? (d2.xp = { total: 0, ledger: [] });
+    (_a = d2.xp).ledger ?? (_a.ledger = []);
+    const ledgerGrant = (name, kind, memberLabel, ref) => {
+      d2.xp.ledger.push({
+        name,
+        cost: 0,
+        kind,
+        grantKind: kind,
+        ...ref && { ref },
+        ...kind === "skill" && { rank: 1 },
+        source: `Character creation: ${memberLabel}`,
+        date: today()
+      });
+    };
     const grantAptitude = (name, source) => {
       if (!name) return;
       if (/\s+or\s+/i.test(name)) {
@@ -16006,10 +16049,71 @@ roll_table "Power Field Destruction" {
         name = pick;
       }
       if (d2.aptitudes.some((a) => norm2(entryName2(a)) === norm2(name))) {
-        choicesNeeded.push({ kind: "duplicate_aptitude", duplicate: name, source });
+        const key = `duplicate aptitude: ${name} (${source})`;
+        const replacement = choices[key];
+        if (replacement) {
+          grantAptitude(replacement, source);
+          return;
+        }
+        choicesNeeded.push({
+          kind: "duplicate_aptitude",
+          duplicate: name,
+          source,
+          key,
+          options: pack.aptitudes.map((a) => a.name).filter((n) => !d2.aptitudes.some((h) => norm2(entryName2(h)) === norm2(n)))
+        });
         return;
       }
       d2.aptitudes.push({ name, source });
+    };
+    const resolveGrant = (text, source, kind, applyFn) => {
+      const { grants, choices: points } = expandGrant(text);
+      for (const c of points) {
+        const pick = choices[c.key];
+        if (!pick) {
+          choicesNeeded.push({ kind, options: c.options, key: c.key, source, ...c.options ? {} : { writeIn: true, base: c.base } });
+          continue;
+        }
+        grants.push(c.options ? pick : `${c.base} (${pick})`);
+      }
+      for (const name of grants) applyFn(name);
+    };
+    const grantSkill = (g, memberLabel, source) => {
+      var _a2, _b;
+      const m = g.match(/^([^(]+?)\s*\(([^)]+)\)\s*$/);
+      const canonical = canonicalSkillName(m ? m[1] : g);
+      if (!canonical) {
+        choicesNeeded.push({ kind: "unresolved_skill", grant: g, key: g, source });
+        return;
+      }
+      if (SKILL_DEFS[canonical].specialist) {
+        const spec = m ? m[2] : null;
+        if (!spec) {
+          choicesNeeded.push({ kind: "speciality", skill: canonical, key: g, source, writeIn: true, base: canonical, options: null });
+          return;
+        }
+        const entry = (_a2 = d2.skills)[canonical] ?? (_a2[canonical] = { specialities: {} });
+        entry.specialities ?? (entry.specialities = {});
+        entry.specialities[spec] = { advances: Math.max(1, entry.specialities[spec]?.advances ?? 0) };
+        ledgerGrant(`${canonical} (${spec})`, "skill", memberLabel);
+      } else {
+        const entry = (_b = d2.skills)[canonical] ?? (_b[canonical] = { advances: 0 });
+        entry.advances = Math.max(1, entry.advances ?? 0);
+        ledgerGrant(canonical, "skill", memberLabel);
+      }
+    };
+    const grantTalent = (g, memberLabel, source) => {
+      const m = g.match(/^([^(]+?)\s*\(([^)]+)\)\s*$/);
+      const base = (m ? m[1] : g).trim();
+      const packTalent = pack.talents.find((t) => norm2(t.name) === norm2(base));
+      if (packTalent?.specialist && !m) {
+        choicesNeeded.push({ kind: "talent_speciality", key: g, source, writeIn: true, base, options: null });
+        return;
+      }
+      if (!(d2.talents ?? []).some((t) => norm2(entryName2(t)) === norm2(g))) {
+        (d2.talents ?? (d2.talents = [])).push({ name: g, ...packTalent?.ref && { ref: packTalent.ref } });
+        ledgerGrant(g, "talent", memberLabel, packTalent?.ref);
+      }
     };
     if (hw) {
       d2.origin.homeworld = { name: hw.name, ref: hw.ref };
@@ -16020,48 +16124,8 @@ roll_table "Power Field Destruction" {
       d2.origin.background = { name: bg.name, ref: bg.ref };
       grantAptitude(bg.startingAptitude, "background");
       d2.skills ?? (d2.skills = {});
-      for (const grant of bg.skillsGranted) {
-        let g = grant;
-        if (/\s+or\s+/i.test(g)) {
-          const pick = choices[g];
-          if (!pick) {
-            choicesNeeded.push({ kind: "skill", options: g.split(/\s+or\s+/i), key: g, source: "background" });
-            continue;
-          }
-          g = pick;
-        }
-        const m = g.match(/^([^(]+?)\s*\(([^)]+)\)\s*$/);
-        const canonical = canonicalSkillName(m ? m[1] : g);
-        if (!canonical) {
-          choicesNeeded.push({ kind: "unresolved_skill", grant: g, source: "background" });
-          continue;
-        }
-        if (SKILL_DEFS[canonical].specialist) {
-          const spec = m ? m[2] : null;
-          if (!spec) {
-            choicesNeeded.push({ kind: "speciality", skill: canonical, key: g, source: "background" });
-            continue;
-          }
-          const entry = (_a = d2.skills)[canonical] ?? (_a[canonical] = { specialities: {} });
-          entry.specialities ?? (entry.specialities = {});
-          entry.specialities[spec] = { advances: Math.max(1, entry.specialities[spec]?.advances ?? 0) };
-        } else {
-          const entry = (_b = d2.skills)[canonical] ?? (_b[canonical] = { advances: 0 });
-          entry.advances = Math.max(1, entry.advances ?? 0);
-        }
-      }
-      for (const grant of bg.talentsGranted) {
-        let g = grant;
-        if (/\s+or\s+/i.test(g)) {
-          const pick = choices[g];
-          if (!pick) {
-            choicesNeeded.push({ kind: "talent", options: g.split(/\s+or\s+/i), key: g, source: "background" });
-            continue;
-          }
-          g = pick;
-        }
-        if (!(d2.talents ?? []).some((t) => norm2(entryName2(t)) === norm2(g))) (d2.talents ?? (d2.talents = [])).push({ name: g });
-      }
+      for (const grant of bg.skillsGranted) resolveGrant(grant, "background", "skill", (g) => grantSkill(g, bg.name, "background"));
+      for (const grant of bg.talentsGranted) resolveGrant(grant, "background", "talent", (g) => grantTalent(g, bg.name, "background"));
     }
     if (role) {
       d2.origin.role = { name: role.name, ref: role.ref };
@@ -16069,18 +16133,49 @@ roll_table "Power Field Destruction" {
       const pick = choices.roleTalent;
       if (role.roleTalentChoice?.length) {
         if (!pick) choicesNeeded.push({ kind: "talent", options: role.roleTalentChoice, key: "roleTalent", source: "role" });
-        else if (!(d2.talents ?? []).some((t) => norm2(entryName2(t)) === norm2(pick))) (d2.talents ?? (d2.talents = [])).push({ name: pick });
+        else grantTalent(pick, role.name, "role");
       }
     }
-    d2.xp ?? (d2.xp = { total: 0, ledger: [] });
     if (!d2.xp.total) d2.xp.total = pack.startingXp;
+    const choicePoints = [];
+    const addPoints = (member, text, label) => {
+      for (const c of expandGrant(text ?? "").choices) {
+        choicePoints.push({
+          member,
+          key: c.key,
+          options: c.options,
+          label,
+          value: choices[c.key] ?? null,
+          ...c.options ? {} : { writeIn: true, base: c.base }
+        });
+      }
+    };
+    if (hw) addPoints("homeworldRef", hw.aptitude, "home-world aptitude");
+    if (bg) {
+      addPoints("backgroundRef", bg.startingAptitude, "background aptitude");
+      for (const g of bg.skillsGranted) addPoints("backgroundRef", g, "background skill");
+      for (const g of bg.talentsGranted) addPoints("backgroundRef", g, "background talent");
+    }
+    if (role) {
+      if (role.roleTalentChoice?.length) {
+        choicePoints.push({
+          member: "roleRef",
+          key: "roleTalent",
+          options: [...role.roleTalentChoice],
+          label: "role talent",
+          value: choices.roleTalent ?? null
+        });
+      }
+      for (const a of role.roleAptitudes) addPoints("roleRef", a, "role aptitude");
+    }
     return {
       doc: d2,
       woundsFormula: hw?.woundsFormula ?? null,
       fateThreshold: hw?.fateThreshold ?? null,
       emperorsBlessing: hw?.emperorsBlessing ?? null,
       characteristicModifiers: hw?.characteristicModifiers ?? {},
-      choicesNeeded
+      choicesNeeded,
+      choicePoints
     };
   }
   function skillAddress(doc, pack, e) {
@@ -16178,7 +16273,7 @@ roll_table "Power Field Destruction" {
     const name = norm2(entryName2(member));
     return pack[list].find((e) => ref && e.ref === ref || norm2(e.name) === name) ?? null;
   };
-  var orChoiceSatisfied = (options, satisfied) => options.split(/\s+or\s+/i).some((o) => satisfied(o.trim()));
+  var grantChoicesSatisfied = (text, satisfied, heldWithBase) => expandGrant(text).choices.every((c) => c.options ? c.options.some((o) => satisfied(o)) : heldWithBase(c.base));
   function validateCreation(doc, pack) {
     const findings = [];
     const origin = doc.origin ?? {};
@@ -16207,18 +16302,24 @@ roll_table "Power Field Destruction" {
     if (role?.roleTalentChoice?.length && !role.roleTalentChoice.some(talentHeld)) {
       findings.push(`role talent choice unresolved: ${role.roleTalentChoice.join(" or ")}`);
     }
+    const talentWithBase = (base) => (doc.talents ?? []).some((t) => norm2(entryName2(t)).startsWith(norm2(base)) && /\(.+\)/.test(entryName2(t)));
+    const skillWithBase = (base) => {
+      const canonical = canonicalSkillName(base);
+      const s = canonical ? skillEntryFor(doc, canonical) : null;
+      return !!s && Object.values(s.specialities ?? {}).some((sv) => (sv.advances ?? 0) >= 1);
+    };
     for (const [entry, kind] of [[hw?.aptitude, "home world aptitude"], [bg?.startingAptitude, "background aptitude"]]) {
-      if (entry && /\s+or\s+/i.test(entry) && !orChoiceSatisfied(entry, aptitudeHeld)) {
+      if (entry && !grantChoicesSatisfied(entry, aptitudeHeld, aptitudeHeld)) {
         findings.push(`${kind} choice unresolved: ${entry}`);
       }
     }
     for (const grant of bg?.skillsGranted ?? []) {
-      if (/\s+or\s+/i.test(grant) && !orChoiceSatisfied(grant, skillTrained)) {
+      if (!grantChoicesSatisfied(grant, skillTrained, skillWithBase)) {
         findings.push(`background skill choice unresolved: ${grant}`);
       }
     }
     for (const grant of bg?.talentsGranted ?? []) {
-      if (/\s+or\s+/i.test(grant) && !orChoiceSatisfied(grant, talentHeld)) {
+      if (!grantChoicesSatisfied(grant, talentHeld, talentWithBase)) {
         findings.push(`background talent choice unresolved: ${grant}`);
       }
     }
@@ -16254,7 +16355,7 @@ roll_table "Power Field Destruction" {
     const conflicts = [];
     for (const e of entries ?? []) {
       try {
-        if ((e.cost ?? 0) === 0 && /^Elite Advance: /.test(e.source ?? "")) continue;
+        if ((e.cost ?? 0) === 0 && /^(Elite Advance: |Character creation)/.test(e.source ?? "")) continue;
         if ((e.cost ?? 0) === 0 && e.kind !== "elite_advance") {
           const grantKind = e.grantKind ?? (["talent", "skill", "psy_rating"].includes(e.kind) ? e.kind : "note");
           const grant = grantKind === "note" ? { kind: "note", text: e.name } : {
@@ -16692,7 +16793,7 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
     // Foundry sheet's XP-spend will call through the VM bundle.
     "/api/chargen/advances": (body) => {
       const doc = migrateCharacter(body.doc ?? body.character ?? {});
-      return { advances: listAvailableAdvances(doc, CHARGEN_PACK), xp: xpSummary(doc) };
+      return { advances: listAvailableAdvances(doc, CHARGEN_PACK, { includeHeld: !!body.includeHeld }), xp: xpSummary(doc) };
     },
     "/api/chargen/advance": (body) => {
       const doc = migrateCharacter(body.doc ?? {});

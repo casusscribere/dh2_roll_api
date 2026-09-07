@@ -28,6 +28,10 @@
 .badge.rankpips .off { color:#3a3226; }
 .advrow button.gmwarn { background:#4a3a1a; color:#e0b050; border:1px solid #8a6a20; }
 #gmUnlockRow { margin-bottom:.5rem; }
+#docSummary .chip .src { color:var(--dim); font-size:.65rem; margin-left:.25rem; }
+.advrow.heldrow { opacity:.55; }
+.advrow.heldrow .aname { text-decoration:none; }
+.badge.heldbadge { color:#7ec07e; border-color:#3c5a3c; }
 .badge.warn { color:var(--red); border-color:var(--red); cursor:help; }
 .advrow button { width:auto; margin:0; padding:.15rem .7rem; font-size:.78rem; }
 .advrow button:disabled { background:#3a3226; color:#6b5f4a; cursor:not-allowed; }
@@ -114,6 +118,12 @@
       <div id="ccConflicts" class="vreport"></div>
     </div>
 
+    <fieldset id="docSummary" hidden>
+      <legend>Aptitudes &amp; traits</legend>
+      <div id="aptChips" class="chiplist" style="display:flex;flex-wrap:wrap;gap:.3rem"></div>
+      <div id="traitChips" style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.35rem"></div>
+    </fieldset>
+
     <div class="xpstrip" id="xpstrip" hidden>
       <div class="xptile"><div class="xv" id="xpTotal">0</div><div class="xl">XP total</div></div>
       <div class="xptile"><div class="xv" id="xpSpent">0</div><div class="xl">Spent</div></div>
@@ -126,8 +136,10 @@
     <fieldset id="traitBox" hidden>
       <legend>Grant a trait</legend>
       <div class="hint">Traits are never purchased in DH2 — grants come from origins, elite advances, and the GM. This writes a <code>{name, ref}</code> entry with no XP cost.</div>
-      <div style="display:flex; gap:.5rem; align-items:end">
-        <div style="flex:1"><label for="traitSel">Trait</label><select id="traitSel"></select></div>
+      <div style="display:flex; gap:.5rem; align-items:end; flex-wrap:wrap">
+        <div style="flex:1; min-width:9rem"><label for="traitSel">Trait</label><select id="traitSel"></select></div>
+        <div style="flex:2; min-width:12rem"><label for="traitNote">Note (ledger source — defaults to "manual override")</label>
+          <input id="traitNote" placeholder="e.g. Voidborn mutation, GM-approved"></div>
         <button id="traitBtn" class="minibtn" style="margin:0 0 .1rem">Grant</button>
       </div>
     </fieldset>
@@ -245,6 +257,7 @@ function render() {
     $('traitBox').hidden = false;
     $('ledgerBox').hidden = false;
     renderOverride();
+    renderDocSummary();
     $('xpTotal').textContent = session.xp.total;
     $('xpSpent').textContent = session.xp.spent;
     $('xpRemaining').textContent = session.xp.remaining;
@@ -261,7 +274,7 @@ function render() {
         rows.className = 'advrows';
         for (const a of group.entries) {
             const row = document.createElement('div');
-            row.className = 'advrow' + (a.affordable ? '' : ' unaffordable');
+            row.className = 'advrow' + (a.held ? ' heldrow' : a.affordable ? '' : ' unaffordable');
             if (a.ref && a.ref.includes(':')) row.dataset.ref = a.ref;
             const badges = [];
             if (a.matches !== undefined) badges.push(`<span class="badge${a.matches === 2 ? ' match2' : a.matches === 1 ? ' match1' : ''}">${a.matches} apt</span>`);
@@ -272,6 +285,13 @@ function render() {
             if (a.prereqProblems?.length) badges.push(`<span class="badge warn" data-tip-text="${esc(a.prereqProblems.join('; '))}" data-tip-cite="prerequisites" title="${esc(a.prereqProblems.join('; '))}">prereq?</span>`);
             row.innerHTML = `<span class="aname">${esc(a.name)}${a.speciality ? ` <span class="dim">(${esc(a.speciality)})</span>` : ''}${a.specialist ? ' <span class="dim">(pick a specialization)</span>' : ''}</span>`
                 + badges.join('') + `<span class="cost">${a.cost} xp</span>`;
+            if (a.held) {
+                // already on the sheet (origin grant or earlier purchase) —
+                // display-only row; the ledger names how it got there
+                row.insertAdjacentHTML('beforeend', '<span class="badge heldbadge">held</span>');
+                rows.appendChild(row);
+                continue;
+            }
             const btn = document.createElement('button');
             const locked = a.prereqsMet === false && !gmUnlocked();
             const overriding = a.prereqsMet === false && gmUnlocked();
@@ -379,11 +399,36 @@ $('undoBtn').addEventListener('click', async () => { await session.undoLast(); p
 $('traitBtn').addEventListener('click', async () => {
     const sel = $('traitSel');
     if (!sel.value) return;
-    await session.grantTrait({ name: sel.options[sel.selectedIndex].text, ref: sel.value });
+    await session.grantTrait({ name: sel.options[sel.selectedIndex].text, ref: sel.value, note: $('traitNote').value });
+    $('traitNote').value = '';
     persist();
     render();
     syncToCreation();
 });
+
+// ---- aptitudes & traits strip (visible for every loaded character) ---------
+
+function renderDocSummary() {
+    $('docSummary').hidden = false;
+    const apts = $('aptChips');
+    apts.innerHTML = '';
+    const list = session.doc.aptitudes ?? [];
+    apts.innerHTML = list.length
+        ? list.map((a) => {
+            const name = typeof a === 'object' ? a.name : a;
+            const src = typeof a === 'object' ? a.source : null;
+            return `<span class="chip">${esc(name)}${src ? `<span class="src">· ${esc(src)}</span>` : ''}</span>`;
+        }).join('')
+        : '<span class="hint">no aptitudes recorded (General always applies)</span>';
+    const traits = $('traitChips');
+    const tlist = session.doc.traits ?? [];
+    traits.innerHTML = tlist.length
+        ? tlist.map((t) => {
+            const name = typeof t === 'object' ? t.name : t;
+            return `<span class="chip" data-tipname="${esc(name)}">${esc(name)}${typeof t === 'object' && t.level != null ? ` <span class="src">(${t.level})</span>` : ''}</span>`;
+        }).join('')
+        : '<span class="hint">no traits applied</span>';
+}
 
 // ---- GM override door ------------------------------------------------------
 
@@ -544,33 +589,51 @@ function renderCreation() {
     // origin member changes (the core rescinds their keys then).
     const MEMBER_STEP = { homeworldRef: 'homeWorld', backgroundRef: 'background', roleRef: 'role' };
     const shown = new Set();
+    const choiceControl = (cp, step) => {
+        const row = document.createElement('div');
+        row.className = 'ccrow';
+        row.innerHTML = `<div class="hint" style="flex:0 1 auto">${esc(cp.label ?? cp.key)}:</div>`;
+        if (cp.options) {
+            const sel = document.createElement('select');
+            sel.add(new Option('— choose —', ''));
+            for (const o of cp.options) sel.add(new Option(o, o));
+            if (cp.value) sel.value = cp.value;
+            sel.addEventListener('change', ccAct(() =>
+                sel.value && creation.choose(step, { choices: { [cp.key]: sel.value } })));
+            row.appendChild(sel);
+        } else {
+            // write-in specialization ("Enemy (chosen group)", "one weapon group")
+            const input = document.createElement('input');
+            input.placeholder = `${cp.base ?? ''} specialization…`;
+            if (cp.value) input.value = cp.value;
+            input.style.width = '11rem';
+            const ok = document.createElement('button');
+            ok.className = 'minibtn';
+            ok.textContent = '✓';
+            ok.addEventListener('click', ccAct(() => {
+                if (!input.value.trim()) throw new Error('a specialization is required');
+                return creation.choose(step, { choices: { [cp.key]: input.value.trim() } });
+            }));
+            input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') ok.click(); });
+            row.append(input, ok);
+        }
+        return row;
+    };
     for (const cp of creation.choicePoints()) {
         shown.add(cp.key);
-        const row = document.createElement('div');
-        row.className = 'ccrow';
-        row.innerHTML = `<div class="hint" style="flex:0 1 auto">${esc(cp.label)}:</div>`;
-        const sel = document.createElement('select');
-        sel.add(new Option('— choose —', ''));
-        for (const o of cp.options) sel.add(new Option(o, o));
-        if (cp.value) sel.value = cp.value;
-        sel.addEventListener('change', ccAct(() =>
-            sel.value && creation.choose(MEMBER_STEP[cp.member], { choices: { [cp.key]: sel.value } })));
-        row.appendChild(sel);
-        pend.appendChild(row);
+        pend.appendChild(choiceControl(cp, MEMBER_STEP[cp.member]));
     }
-    // anything else the engine surfaced (duplicate aptitudes, unresolved grants)
+    // anything else the engine surfaced (duplicate aptitudes, unresolved
+    // grants, write-in specialities) — selects when options exist, write-ins
+    // otherwise; never a dead end
+    const STEP_OF_SOURCE = { homeworld: 'homeWorld', background: 'background', role: 'role' };
     for (const c of st.pendingChoices) {
-        if (!c.options || shown.has(c.key)) continue;
-        const row = document.createElement('div');
-        row.className = 'ccrow';
-        row.innerHTML = `<div class="hint" style="flex:0 1 auto">Choice (${esc(c.source ?? c.kind)}): ${esc(c.key ?? '')}</div>`;
-        const sel = document.createElement('select');
-        sel.add(new Option('— choose —', ''));
-        for (const o of c.options) sel.add(new Option(o, o));
-        sel.addEventListener('change', ccAct(() =>
-            sel.value && creation.choose('role', { choices: { [c.key]: sel.value } })));
-        row.appendChild(sel);
-        pend.appendChild(row);
+        if (!c.key || shown.has(c.key)) continue;
+        shown.add(c.key);
+        pend.appendChild(choiceControl(
+            { key: c.key, options: c.options ?? null, base: c.base ?? c.skill ?? '', value: null,
+              label: `${c.kind === 'duplicate_aptitude' ? `duplicate aptitude (${c.duplicate}) — pick another` : c.key}` },
+            STEP_OF_SOURCE[c.source] ?? 'role'));
     }
     if (!st.hasRecipe && (st.selections.homeworldRef || st.selections.backgroundRef || st.selections.roleRef)) {
         pend.insertAdjacentHTML('beforeend',

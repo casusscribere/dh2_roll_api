@@ -1682,16 +1682,21 @@ test('builder-core: undoLast on an empty stack is a no-op that does not re-hit t
     assert.equal(s.doc, doc, 'the document object is untouched');
 });
 
-test('builder-core: grantTrait creates the traits list and writes a bare { name } when no ref is given', async () => {
+test('builder-core: grantTrait writes the trait AND its 0-XP audit entry (2026-08-27: traits ledger now)', async () => {
     const doc = builderDoc();
     assert.equal(doc.traits, undefined, 'the fixture starts with no traits key at all');
     const s = new BuilderSession({ doc, api });
     await s.load();
     await s.grantTrait({ name: 'Fear (1)' });
-    assert.deepEqual(s.doc.traits, [{ name: 'Fear (1)' }], 'no ref → a bare { name } entry');
-    await s.grantTrait({ name: 'Daemonic', ref: 'dh2:trait:daemonic' });
-    assert.deepEqual(s.doc.traits[1], { name: 'Daemonic', ref: 'dh2:trait:daemonic' });
-    assert.equal(s.doc.xp.ledger.length, 0, 'granted traits never touch the XP ledger');
-    assert.equal(s.canUndo, false, 'a grant is not an undoable purchase');
+    assert.deepEqual(s.doc.traits.at(-1).name, 'Fear (1)', 'no ref → name-only entry');
+    await s.grantTrait({ name: 'Daemonic', ref: 'dh2:trait:daemonic', note: 'possessed relic' });
+    assert.equal(s.doc.traits.at(-1).name, 'Daemonic');
+    // Until 2026-08-27 grants deliberately skipped the ledger; the user
+    // reversed that: every applied trait is a 0-XP audit entry whose source
+    // is the note, defaulting to the override indicator.
+    assert.equal(s.doc.xp.ledger.length, 2);
+    assert.equal(s.doc.xp.ledger[0].source, 'manual override');
+    assert.equal(s.doc.xp.ledger[1].source, 'possessed relic');
+    assert.ok(s.doc.xp.ledger.every((e) => e.cost === 0 && e.grantKind === 'trait'));
     assert.equal(JSON.parse(s.exportJson()).traits.length, 2, 'the export carries the grants');
 });

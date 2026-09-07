@@ -100,7 +100,7 @@ const POST = {
     // Foundry sheet's XP-spend will call through the VM bundle.
     '/api/chargen/advances': (body) => {
         const doc = migrateCharacter(body.doc ?? body.character ?? {});
-        return { advances: listAvailableAdvances(doc, CHARGEN_PACK), xp: xpSummary(doc) };
+        return { advances: listAvailableAdvances(doc, CHARGEN_PACK, { includeHeld: !!body.includeHeld }), xp: xpSummary(doc) };
     },
     '/api/chargen/advance': (body) => {
         const doc = migrateCharacter(body.doc ?? {});
