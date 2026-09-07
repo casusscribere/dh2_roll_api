@@ -419,7 +419,7 @@ function buildRulePanel(containerId, side, rules) {
       const val = valued.has(name)
         ? `<input type="number" class="rval" placeholder="X" title="severity / level value (X)">`
         : '';
-      h += `<span class="rrow"><label><input type="checkbox" class="rtoggle" data-side="${side}" data-cat="${g.cat}" value="${esc(name)}"${g.on ? ' checked' : ''}> ${esc(name)}</label>${val}</span>`;
+      h += `<span class="rrow" data-tipname="${esc(name)}"><label><input type="checkbox" class="rtoggle" data-side="${side}" data-cat="${g.cat}" value="${esc(name)}"${g.on ? ' checked' : ''}> ${esc(name)}</label>${val}</span>`;
     }
     h += '</div></div>';
   }
@@ -1224,6 +1224,10 @@ async function validateRules() {
     out.innerHTML = `<span class="bad">PARSE ERROR</span> ${r.line ? `<span class="dim">(line ${r.line}, col ${r.col})</span>` : ''}\n${r.message || r.error}`;
   }
 }
+</script>
+<script type="module">
+import { mount } from './prose-tip.mjs';
+mount({ api: async (m, p) => { const r = await fetch(p); if (!r.ok) throw new Error(r.status); return r.json(); } });
 </script>
 </body>
 </html>

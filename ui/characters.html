@@ -267,7 +267,7 @@ function aptitudesPanel(doc) {
   return `<div class="dhpanel"><h3>Aptitudes (${a.length})</h3>` +
     (a.length ? `<div class="chiplist">${a.map((x) => {
       const name = nameOf(x), src = (x && typeof x === 'object') ? x.source : null;
-      return `<span class="chip" ${src ? `title="from ${esc(src)}" style="cursor:help"` : ''}>${esc(name)}${src ? ` <span class="dim">· ${esc(src)}</span>` : ''}</span>`;
+      return `<span class="chip" data-tipname="${esc(name)}" ${src ? `title="from ${esc(src)}" style="cursor:help"` : ''}>${esc(name)}${src ? ` <span class="dim">· ${esc(src)}</span>` : ''}</span>`;
     }).join('')}</div>` : '<div class="v2note">none recorded</div>') + '</div>';
 }
 // --- v3: equipment, encumbrance, psy, condition-state panels --------------------
@@ -360,7 +360,9 @@ function statePanel(doc) {
 }
 function mindPanel(doc) {
   const ins = doc.insanity ?? {}, cor = doc.corruption ?? {};
-  const list = (arr) => (arr ?? []).length ? (arr).map((x) => `<span class="chip">${esc(nameOf(x))}</span>`).join(' ') : '<span class="dim">none</span>';
+  const list = (arr) => (arr ?? []).length ? (arr).map((x) => (x && typeof x === 'object' && x.description)
+    ? `<span class="chip" data-tip-text="${esc(x.description)}" data-tip-cite="${esc(x.citation?.book ? x.citation.book + (x.citation.page != null ? ' p.' + x.citation.page : '') : '')}">${esc(nameOf(x))}</span>`
+    : `<span class="chip" data-tipname="${esc(nameOf(x))}">${esc(nameOf(x))}</span>`).join(' ') : '<span class="dim">none</span>';
   const pts = (label, act, v) => INPUT_MODE
     ? `${label} <input type="number" data-act="${act}" value="${v}" min="0" max="100" style="width:4.2rem">/100`
     : `${label} <span class="hl">${v}</span>/100`;
@@ -599,6 +601,10 @@ async function addItemFromEditor() {
 }
 
 init();
+</script>
+<script type="module">
+import { mount } from './prose-tip.mjs';
+mount({ api: async (m, p) => { const r = await fetch(p); if (!r.ok) throw new Error(r.status); return r.json(); } });
 </script>
 </body>
 </html>
