@@ -588,10 +588,44 @@ $('newCharBtn').addEventListener('click', async () => {
     renderCreation();
 });
 
-function ccVisible(stepId) {
-    if (!creating) return true;                          // loaded docs: everything shows
-    const order = WIZARD_STEPS;
-    return order.indexOf(stepId) <= order.indexOf(creation.state.step);
+/** Why a CC panel is still waiting, or null when its prerequisites are met.
+ *  Panels are ALWAYS visible — this string powers the greyed state and the
+ *  "waiting on:" hint, so it is never unclear what is missing. */
+function ccWaitingReason(stepId) {
+    if (!creating) return null;              // loaded characters: no sequence gate
+    const st = creation.state;
+    const missing = [];
+    if (!st.selections.homeworldRef) missing.push('select a home world');
+    if (!st.selections.backgroundRef) missing.push('select a background');
+    if (!st.selections.roleRef) missing.push('select a role');
+    if (!missing.length && st.pendingChoices.length) {
+        missing.push(`resolve ${st.pendingChoices.length} origin choice${st.pendingChoices.length > 1 ? 's' : ''} above`);
+    }
+    if (stepId === 'characteristics') return missing[0] ?? null;
+    if (!missing.length && !st.characteristics) missing.push('generate characteristics');
+    if (stepId === 'woundsFate') return missing[0] ?? null;
+    if (!missing.length && !st.woundsFate) missing.push('roll wounds & fate');
+    if (stepId === 'divination') return missing[0] ?? null;
+    if (!missing.length && !st.divination) missing.push('record a divination');
+    return missing[0] ?? null;
+}
+
+/** Grey a CC fieldset: disabled by the completion lock or an unmet
+ *  prerequisite, with the reason shown inline. */
+function ccGate(id, stepId, locked) {
+    const reason = ccWaitingReason(stepId);
+    const fs = $(id);
+    fs.hidden = false;
+    fs.disabled = locked || !!reason;
+    let hint = fs.querySelector('.ccwait');
+    if (!hint) {
+        hint = document.createElement('div');
+        hint.className = 'hint ccwait';
+        fs.insertBefore(hint, fs.children[1] ?? null);
+    }
+    hint.hidden = !reason || locked;
+    hint.textContent = reason ? `⏳ waiting on: ${reason}` : '';
+    return !!reason;
 }
 
 function ccSelect(list, currentRef, onPick, placeholder) {
@@ -617,7 +651,7 @@ function renderCreation() {
     $('ccLockHint').innerHTML = locked
         ? '🔒 Creation is complete — these options are locked. Enable the <b>GM override</b> (below) to revise them; every revision is logged in the ledger.'
         : '⚠ GM override active — creation revisions are unlocked and will be logged in the ledger.';
-    for (const id of ['ccOrigin', 'ccChars', 'ccWounds', 'ccDiv']) $(id).disabled = locked;
+    $('ccOrigin').disabled = locked;      // origin is step one — only the completion lock greys it
 
     // Origin -------------------------------------------------------------
     const ob = $('ccOriginBody');
@@ -689,8 +723,8 @@ function renderCreation() {
     }
 
     // Characteristics ------------------------------------------------------
-    $('ccChars').hidden = !ccVisible('characteristics');
-    if (!$('ccChars').hidden) {
+    ccGate('ccChars', 'characteristics', locked);
+    {
         const cb = $('ccCharsBody');
         cb.innerHTML = '';
         const grid = document.createElement('div');
@@ -731,8 +765,8 @@ function renderCreation() {
     }
 
     // Wounds & Fate --------------------------------------------------------
-    $('ccWounds').hidden = !ccVisible('woundsFate');
-    if (!$('ccWounds').hidden) {
+    ccGate('ccWounds', 'woundsFate', locked);
+    {
         const wb = $('ccWoundsBody');
         wb.innerHTML = '';
         const doc = st.doc ?? {};
@@ -750,8 +784,8 @@ function renderCreation() {
     }
 
     // Divination -----------------------------------------------------------
-    $('ccDiv').hidden = !ccVisible('divination');
-    if (!$('ccDiv').hidden) {
+    ccGate('ccDiv', 'divination', locked);
+    {
         const db = $('ccDivBody');
         db.innerHTML = '';
         const input = document.createElement('input');
@@ -767,7 +801,8 @@ function renderCreation() {
     }
 
     // Equip & finish (creation mode only; loaded docs use the panel below) ---
-    $('ccFinish').hidden = !creating || !ccVisible('startingXp');
+    $('ccFinish').hidden = !creating;
+    if (creating) ccGate('ccFinish', 'finish', locked);
     if (!$('ccFinish').hidden) {
         const fb = $('ccFinishBody');
         fb.innerHTML = '';
