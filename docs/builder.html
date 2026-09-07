@@ -29,6 +29,9 @@
 .badge.rankpips .off { color:#3a3226; }
 .advrow button.gmwarn { background:#4a3a1a; color:#e0b050; border:1px solid #8a6a20; }
 #gmUnlockRow { margin-bottom:.5rem; }
+#creation fieldset[disabled] { opacity:.55; }
+#creation fieldset[disabled] * { cursor:not-allowed; }
+#ccLockHint { margin-bottom:.5rem; }
 #docSummary .chip .src { color:var(--dim); font-size:.65rem; margin-left:.25rem; }
 .advrow.heldrow { opacity:.55; }
 .advrow.heldrow .aname { text-decoration:none; }
@@ -95,6 +98,8 @@
 
   <div>
     <div id="creation" hidden>
+      <div id="ccLockHint" class="hint" hidden>🔒 Creation is complete — these options are locked.
+        Enable the <b>GM override</b> (below) to revise them; every revision is logged in the ledger.</div>
       <fieldset id="ccOrigin">
         <legend>Origin</legend>
         <div id="ccOriginBody" class="ccrow"></div>
@@ -148,8 +153,9 @@
     <fieldset id="overrideBox" hidden>
       <legend>GM override</legend>
       <div id="gmUnlockRow"><label><input type="checkbox" id="gmUnlock">
-        <b>Unlock prerequisite-locked purchases</b> — locked 🔒 rows become buyable and every such
-        buy is ledgered as <code>[manual override — prerequisites bypassed]</code>.</label></div>
+        <b>GM override</b> — unlocks prerequisite-locked purchases (ledgered as
+        <code>[manual override — prerequisites bypassed]</code>) and the locked post-creation
+        panels above (every revision logged as <code>creation revised: …</code>).</label></div>
       <div class="hint">The panel below instead ADDS content with all prerequisites ignored, at 0 XP.
         The ledger records the entry with source <code>manual override</code> — the audit trail always
         shows how it got there.</div>
@@ -478,7 +484,7 @@ function renderOverride() {
 }
 
 $('ovKind').addEventListener('change', renderOverride);
-$('overrideBox').addEventListener('change', (ev) => { if (ev.target.id === 'gmUnlock') render(); });
+$('overrideBox').addEventListener('change', (ev) => { if (ev.target.id === 'gmUnlock') { render(); renderCreation(); } });
 
 $('ovBtn').addEventListener('click', async () => {
     try {
@@ -594,14 +600,25 @@ function ccSelect(list, currentRef, onPick, placeholder) {
     sel.add(new Option(placeholder ?? '— choose —', ''));
     for (const e of list) sel.add(new Option(e.name, e.ref));
     if (currentRef) sel.value = currentRef;
-    sel.addEventListener('change', ccAct(() => onPick(sel.value || null)));
+    sel.addEventListener('change', ccAct(() => onPick(sel.value || null)));  // origin picks route through onPick
     return sel;
 }
+
+const ccOverride = () => creation?.state.completed && gmUnlocked();
 
 function renderCreation() {
     if (!creation) { $('creation').hidden = true; return; }
     $('creation').hidden = false;
     const st = creation.state;
+
+    // Finished creations grey out and lock the CC panels (native fieldset
+    // disable) unless the GM override is on; the core enforces it too.
+    const locked = st.completed && !gmUnlocked();
+    $('ccLockHint').hidden = !st.completed;
+    $('ccLockHint').innerHTML = locked
+        ? '🔒 Creation is complete — these options are locked. Enable the <b>GM override</b> (below) to revise them; every revision is logged in the ledger.'
+        : '⚠ GM override active — creation revisions are unlocked and will be logged in the ledger.';
+    for (const id of ['ccOrigin', 'ccChars', 'ccWounds', 'ccDiv']) $(id).disabled = locked;
 
     // Origin -------------------------------------------------------------
     const ob = $('ccOriginBody');
@@ -609,7 +626,7 @@ function renderCreation() {
     const originRow = (label, list, key, stepId) => {
         const wrap = document.createElement('div');
         wrap.innerHTML = `<label>${label}</label>`;
-        wrap.appendChild(ccSelect(list, st.selections[key], (ref) => creation.choose(stepId, { ref })));
+        wrap.appendChild(ccSelect(list, st.selections[key], (ref) => creation.choose(stepId, { ref }, { override: ccOverride() })));
         ob.appendChild(wrap);
     };
     originRow('Home world', ccPack.homeworlds, 'homeworldRef', 'homeWorld');
@@ -631,7 +648,7 @@ function renderCreation() {
             for (const o of cp.options) sel.add(new Option(o, o));
             if (cp.value) sel.value = cp.value;
             sel.addEventListener('change', ccAct(() =>
-                sel.value && creation.choose(step, { choices: { [cp.key]: sel.value } })));
+                sel.value && creation.choose(step, { choices: { [cp.key]: sel.value } }, { override: ccOverride() })));
             row.appendChild(sel);
         } else {
             // write-in specialization ("Enemy (chosen group)", "one weapon group")
@@ -644,7 +661,7 @@ function renderCreation() {
             ok.textContent = '✓';
             ok.addEventListener('click', ccAct(() => {
                 if (!input.value.trim()) throw new Error('a specialization is required');
-                return creation.choose(step, { choices: { [cp.key]: input.value.trim() } });
+                return creation.choose(step, { choices: { [cp.key]: input.value.trim() } }, { override: ccOverride() });
             }));
             input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') ok.click(); });
             row.append(input, ok);
@@ -686,7 +703,7 @@ function renderCreation() {
             const input = document.createElement('input');
             input.type = 'number'; input.min = 0; input.max = 100;
             input.value = values[k] ?? '';
-            input.addEventListener('change', ccAct(() => creation.setCharacteristic(k, Number(input.value) || 0)));
+            input.addEventListener('change', ccAct(() => creation.setCharacteristic(k, Number(input.value) || 0, { override: ccOverride() })));
             cell.appendChild(input);
             grid.appendChild(cell);
         }
@@ -697,14 +714,14 @@ function renderCreation() {
             const rollBtn = document.createElement('button');
             rollBtn.className = 'minibtn';
             rollBtn.textContent = st.characteristics ? 'Re-roll all (RAW)' : 'Roll (RAW 2d10+25, home-world dice kept high/low)';
-            rollBtn.addEventListener('click', ccAct(() => creation.rollCharacteristics({ method: 'raw' })));
+            rollBtn.addEventListener('click', ccAct(() => creation.rollCharacteristics({ method: 'raw', override: ccOverride() })));
             row.appendChild(rollBtn);
             if (st.characteristics?.method === 'raw' && !st.characteristics.rerolled) {
                 const sel = document.createElement('select');
                 sel.add(new Option('— reroll ONE characteristic (kept) —', ''));
                 for (const k of [...WIZ_CHAR_KEYS, 'influence']) sel.add(new Option(k.toUpperCase(), k));
                 sel.addEventListener('change', ccAct(() =>
-                    sel.value && creation.rollCharacteristics({ method: 'raw', rerollIndex: sel.value })));
+                    sel.value && creation.rollCharacteristics({ method: 'raw', rerollIndex: sel.value, override: ccOverride() })));
                 row.appendChild(sel);
             }
         }
@@ -728,7 +745,7 @@ function renderCreation() {
             const b = document.createElement('button');
             b.className = 'minibtn';
             b.textContent = st.woundsFate ? "Re-roll wounds & Blessing" : "Roll wounds & the Emperor's Blessing";
-            b.addEventListener('click', ccAct(() => creation.choose('woundsFate')));
+            b.addEventListener('click', ccAct(() => creation.choose('woundsFate', {}, { override: ccOverride() })));
             wb.appendChild(b);
         }
     }
@@ -746,7 +763,7 @@ function renderCreation() {
         const b = document.createElement('button');
         b.className = 'minibtn';
         b.textContent = 'Record';
-        b.addEventListener('click', ccAct(() => creation.setDivination(input.value || '—')));
+        b.addEventListener('click', ccAct(() => creation.setDivination(input.value || '—', { override: ccOverride() })));
         db.appendChild(b);
     }
 

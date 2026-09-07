@@ -176,6 +176,7 @@ const recipeOfState = (state) => ({
     woundsFate: state.woundsFate ? structuredClone(state.woundsFate) : null,
     divination: state.divination,
     equipment: state.equipment ? structuredClone(state.equipment) : null,
+    completed: !!state.completed,
 });
 
 export function createWizard({ pack, api, rng = Math.random, doc = null } = {}) {
@@ -194,6 +195,7 @@ export function createWizard({ pack, api, rng = Math.random, doc = null } = {}) 
         doc: null,
         conflicts: [],                // replay conflicts from the last rebuild
         hasRecipe: true,              // false = extant doc without a creation recipe
+        completed: false,             // finished creations LOCK the CC steps (GM override to revise)
         finished: false,
     };
 
@@ -208,8 +210,10 @@ export function createWizard({ pack, api, rng = Math.random, doc = null } = {}) 
             state.woundsFate = rec.woundsFate ?? null;
             state.divination = rec.divination ?? '';
             state.equipment = rec.equipment ?? null;
+            state.completed = !!rec.completed;
         } else {
             state.hasRecipe = false;
+            state.completed = true;      // a played character is past creation
             const refOf = (m) => (m && typeof m === 'object' ? m.ref ?? null : null);
             state.selections.homeworldRef = refOf(doc.origin?.homeworld);
             state.selections.backgroundRef = refOf(doc.origin?.background);
@@ -236,6 +240,21 @@ export function createWizard({ pack, api, rng = Math.random, doc = null } = {}) 
         state.doc.extensions.builder = {
             ...(state.doc.extensions.builder ?? {}),
             creation: recipeOfState(state),
+        };
+    };
+
+    /** Finished creations lock the CC-specific steps. A GM override unlocks
+     *  one action AND logs it: a 0-XP ledger note sourced "manual override",
+     *  so post-completion revisions always show in the audit trail. */
+    const assertEditable = (what, override) => {
+        if (!state.completed) return () => {};
+        if (!override) throw new Error(`creation is complete — "${what}" is locked (enable the GM override to revise; the revision is logged)`);
+        return () => {
+            state.doc.xp ??= { total: 0, ledger: [] };
+            (state.doc.xp.ledger ??= []).push({
+                name: `creation revised: ${what}`, cost: 0, kind: 'other', grantKind: 'note',
+                source: 'manual override', date: new Date().toISOString().slice(0, 10),
+            });
         };
     };
 
@@ -367,7 +386,10 @@ export function createWizard({ pack, api, rng = Math.random, doc = null } = {}) 
 
         /** Origin steps pick a pack entry (+ choice-point answers) — at ANY
          *  time; the woundsFate step rolls; equipment adds gear. */
-        async choose(stepId, choice = {}) {
+        async choose(stepId, choice = {}, { override = false } = {}) {
+            const logRevision = (stepId in ORIGIN_STEP || stepId === 'woundsFate')
+                ? assertEditable(stepId, override)
+                : () => {};
             if (ORIGIN_STEP[stepId]) {
                 const memberKey = ORIGIN_STEP[stepId];
                 if (choice.ref !== undefined && choice.ref !== state.selections[memberKey]) {
@@ -405,14 +427,17 @@ export function createWizard({ pack, api, rng = Math.random, doc = null } = {}) 
             } else {
                 throw new Error(`choose() does not drive the "${stepId}" step`);
             }
+            logRevision();
+            persistRecipe();
             advanceStep();
         },
 
         /** D-K: RAW roll (one reroll, kept) or manual entry; method recorded.
          *  Callable again at any time — a re-roll-everything or a manual edit
          *  replaces the values and keeps the audit trail honest. */
-        rollCharacteristics({ method = 'raw', values, rerollIndex } = {}) {
+        rollCharacteristics({ method = 'raw', values, rerollIndex, override = false } = {}) {
             if (!state.doc) throw new Error('choose an origin first');
+            const logRevision = assertEditable('characteristics', override);
             if (method === 'manual') {
                 state.characteristics = { method, values: { ...values }, rerolled: null };
                 writeCharacteristics(state.characteristics.values);
@@ -429,23 +454,29 @@ export function createWizard({ pack, api, rng = Math.random, doc = null } = {}) 
                 state.characteristics = { method: 'raw', values: rolled, rerolled: null };
                 writeCharacteristics(rolled);
             }
+            logRevision();
             persistRecipe();
             advanceStep();
         },
 
         /** Edit one characteristic value in place (manual tweak — the method
          *  flips to 'manual' because the rolled provenance no longer holds). */
-        setCharacteristic(key, value) {
+        setCharacteristic(key, value, { override = false } = {}) {
+            const logRevision = assertEditable(`characteristic ${key}`, override);
+            logRevision._pending = true;
             if (!state.characteristics) state.characteristics = { method: 'manual', values: {}, rerolled: null };
             state.characteristics.values[key] = value;
             if (state.characteristics.method === 'raw') state.characteristics.method = 'manual';
             writeCharacteristics(state.characteristics.values);
+            logRevision();
             persistRecipe();
         },
 
-        setDivination(text) {
+        setDivination(text, { override = false } = {}) {
+            const logRevision = assertEditable('divination', override);
             state.divination = text ?? '';
             state.doc.tarot = text ? { text } : {};
+            logRevision();
             persistRecipe();
             advanceStep();
         },
@@ -491,6 +522,7 @@ export function createWizard({ pack, api, rng = Math.random, doc = null } = {}) 
 
         /** Validate (build + creation findings) and close the session. */
         async finish() {
+            state.completed = true;
             persistRecipe();
             const build = await api('POST', '/api/chargen/validate', { doc: state.doc });
             const character = await api('POST', '/api/character/validate', { character: state.doc });

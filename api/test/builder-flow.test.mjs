@@ -213,11 +213,14 @@ test('edit mode: an extant doc WITHOUT a recipe shows its creation state; origin
     assert.ok(edit.state.characteristics.values.ws > 0, 'characteristics read from the doc');
 
     const before = structuredClone(edit.state.doc.xp.ledger);
-    await edit.choose('homeWorld', { ref: 'dh2:home_world:hive_world' });
+    // a played character is past creation → the delta needs the GM override
+    await edit.choose('homeWorld', { ref: 'dh2:home_world:hive_world' }, { override: true });
     const d = edit.state.doc;
     assert.equal(d.origin.homeworld.name, 'Hive World');
     assert.ok(d.aptitudes.some((a) => a.name === 'Perception' && a.source === 'homeworld'));
-    assert.deepEqual(d.xp.ledger, before, 'delta mode never rewrites the ledger');
+    // delta mode never rewrites the ledger — the ONLY addition is the logged revision
+    assert.deepEqual(d.xp.ledger.slice(0, before.length), before);
+    assert.match(d.xp.ledger.at(-1).name, /creation revised/);
     assert.ok(d.characteristics.ws.advances !== undefined, 'existing stats untouched');
 });
 
@@ -341,4 +344,47 @@ test('choice points PERSIST with their values, and changing the member rescinds 
     assert.equal(w.state.selections.choices.roleTalent, undefined, 'stale role choice not cleared');
     assert.ok(!w.state.doc.talents.some((t) => t.name === 'Catfall'), 'previous role talent rescinded');
     assert.ok(!w.choicePoints().some((p) => p.key === 'roleTalent' && p.value), 'no stale value shown');
+});
+
+test('a finished creation LOCKS the CC steps; the GM override unlocks and is ledger-logged', async () => {
+    const w = wizard(seqRng([9, 10]));
+    await chooseOrigin(w);
+    w.rollCharacteristics({ method: 'manual', values: { ...EXPECTED.characteristics, influence: EXPECTED.influence } });
+    await w.choose('woundsFate');
+    w.setDivination('Locked in.');
+    await w.choose('equipment', { gear: [] });
+    w.setDetails({ name: 'Sealed Acolyte' });
+    const { doc } = await w.finish();
+    assert.equal(w.state.completed, true);
+    assert.equal(doc.extensions.builder.creation.completed, true, 'completion persists in the recipe');
+
+    // locked: every CC-specific mutation refuses without the override
+    await assert.rejects(() => w.choose('homeWorld', { ref: 'dh2:home_world:voidborn' }), /GM override/i);
+    assert.throws(() => w.rollCharacteristics({ method: 'raw' }), /GM override/i);
+    assert.throws(() => w.setCharacteristic('ws', 40), /GM override/i);
+    assert.throws(() => w.setDivination('rewrite'), /GM override/i);
+    await assert.rejects(() => w.choose('woundsFate'), /GM override/i);
+
+    // the override unlocks — and the revision is LOGGED in the ledger
+    await w.choose('homeWorld', { ref: 'dh2:home_world:voidborn' }, { override: true });
+    assert.equal(w.state.doc.origin.homeworld.name, 'Voidborn');
+    const note = w.state.doc.xp.ledger.find((e) => /creation revised/.test(e.name));
+    assert.ok(note, 'no revision log entry');
+    assert.equal(note.cost, 0);
+    assert.equal(note.source, 'manual override');
+
+    // a reloaded finished character stays locked
+    const re = (await import('../../ui/builder-core.mjs')).createWizard({ pack: CHARGEN_PACK, api, doc: structuredClone(w.state.doc) });
+    assert.equal(re.state.completed, true);
+    await assert.rejects(() => re.choose('role', { ref: 'dh2:role:chirurgeon' }), /GM override/i);
+});
+
+test('extant no-recipe docs count as completed: CC edits need the override (and log it)', async () => {
+    const roster = migrateCharacter(structuredClone(CHARACTER_ROSTER.find((c) => c.id.includes('gnaeus')).doc));
+    const edit = (await import('../../ui/builder-core.mjs')).createWizard({ pack: CHARGEN_PACK, api, doc: roster });
+    assert.equal(edit.state.completed, true, 'a played character is past creation');
+    await assert.rejects(() => edit.choose('homeWorld', { ref: 'dh2:home_world:hive_world' }), /GM override/i);
+    await edit.choose('homeWorld', { ref: 'dh2:home_world:hive_world' }, { override: true });
+    assert.equal(edit.state.doc.origin.homeworld.name, 'Hive World');
+    assert.ok(edit.state.doc.xp.ledger.some((e) => /creation revised/.test(e.name) && e.source === 'manual override'));
 });
