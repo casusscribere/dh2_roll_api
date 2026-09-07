@@ -98,9 +98,27 @@
       </div>
     </fieldset>
 
+    <fieldset id="overrideBox" hidden>
+      <legend>GM override</legend>
+      <div class="hint">Adds content with <b>all prerequisites ignored</b>, at 0 XP. The ledger
+        records the entry with source <code>manual override</code> — the audit trail always
+        shows how it got there.</div>
+      <div style="display:flex; gap:.5rem; align-items:end; flex-wrap:wrap">
+        <div><label for="ovKind">Kind</label>
+          <select id="ovKind">
+            <option value="talent">Talent</option><option value="trait">Trait</option>
+            <option value="skill">Skill rank</option><option value="psy_rating">Psy rating</option>
+          </select></div>
+        <div style="flex:1; min-width:10rem"><label for="ovName">Entry</label><select id="ovName"></select></div>
+        <div id="ovRankBox"><label for="ovRank">Rank</label><input id="ovRank" type="number" min="1" max="4" value="1" style="width:4.5rem"></div>
+        <div id="ovSpecBox" hidden><label for="ovSpec">Speciality</label><input id="ovSpec" placeholder="(specialist only)" style="width:9rem"></div>
+        <button id="ovBtn" class="minibtn" style="margin:0 0 .1rem">Add (override)</button>
+      </div>
+    </fieldset>
+
     <fieldset id="ledgerBox" hidden>
       <legend>Experience ledger</legend>
-      <table class="ledger"><thead><tr><th>Purchase</th><th>Kind</th><th style="text-align:right">Cost</th></tr></thead>
+      <table class="ledger"><thead><tr><th>Purchase</th><th>Kind</th><th>Source</th><th style="text-align:right">Cost</th></tr></thead>
       <tbody id="ledgerRows"></tbody></table>
     </fieldset>
   </div>
@@ -183,6 +201,7 @@ function render() {
     $('xpstrip').hidden = false;
     $('traitBox').hidden = false;
     $('ledgerBox').hidden = false;
+    renderOverride();
     $('xpTotal').textContent = session.xp.total;
     $('xpSpent').textContent = session.xp.spent;
     $('xpRemaining').textContent = session.xp.remaining;
@@ -226,7 +245,7 @@ function render() {
     rows.innerHTML = '';
     for (const e of session.doc.xp?.ledger ?? []) {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${esc(e.name)}</td><td class="dim">${esc(e.kind ?? '')}</td><td class="c">${e.cost}</td>`;
+        tr.innerHTML = `<td>${esc(e.name)}</td><td class="dim">${esc(e.kind ?? '')}</td><td class="dim">${esc(e.source ?? '')}</td><td class="c">${e.cost}</td>`;
         rows.appendChild(tr);
     }
 }
@@ -253,6 +272,42 @@ $('traitBtn').addEventListener('click', async () => {
     await session.grantTrait({ name: sel.options[sel.selectedIndex].text, ref: sel.value });
     persist();
     render();
+});
+
+// ---- GM override door ------------------------------------------------------
+
+function renderOverride() {
+    $('overrideBox').hidden = false;
+    const kind = $('ovKind').value;
+    const sel = $('ovName');
+    sel.innerHTML = '';
+    if (kind === 'talent') for (const t of session.pack?.talents ?? []) sel.add(new Option(`${t.name} (T${t.tier})`, t.ref));
+    if (kind === 'trait') for (const t of session.pack?.traits ?? []) sel.add(new Option(t.name, t.ref));
+    if (kind === 'skill') for (const t of session.pack?.skills ?? []) sel.add(new Option(t.name, t.ref));
+    $('ovRankBox').hidden = kind !== 'skill' && kind !== 'psy_rating';
+    $('ovSpecBox').hidden = kind !== 'skill';
+    sel.parentElement.hidden = kind === 'psy_rating';
+}
+
+$('ovKind').addEventListener('change', renderOverride);
+
+$('ovBtn').addEventListener('click', async () => {
+    try {
+        const kind = $('ovKind').value;
+        const sel = $('ovName');
+        const name = sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex].text.replace(/ \(T\d\)$/, '') : '';
+        const grant = kind === 'psy_rating'
+            ? { kind, rating: Number($('ovRank').value) || 1 }
+            : { kind, name, ref: sel.value,
+                ...(kind === 'skill' && { rank: Number($('ovRank').value) || 1 }),
+                ...(kind === 'skill' && $('ovSpec').value.trim() && { speciality: $('ovSpec').value.trim() }) };
+        await session.grantOverride(grant);
+        persist();
+        render();
+        renderOverride();
+    } catch (e) {
+        window.alert(`Override failed: ${e.message}`);
+    }
 });
 
 function persist() {
@@ -369,14 +424,36 @@ function renderWizard() {
     } else if (st.step === 'startingXp') {
         const hint = document.createElement('div');
         hint.className = 'hint';
-        hint.textContent = `Spend the ${wizPack.startingXp} starting XP in the advancement panel (now loaded with this character), then come back and continue.`;
+        hint.textContent = `Spend the ${wizPack.startingXp} starting XP in the advancement panel (now loaded with this character) — elite advances bought here apply their instant changes automatically. Then continue to equipment.`;
         add(hint);
         add(button('Open in the advancement panel', async () => { await openDoc(wiz.state.doc, null); }));
+        add(button('Continue to equipment', () => {
+            if (session) wiz.state.doc = session.doc;      // pull purchases back from the panel
+            wiz.state.equipment = null;
+            return wiz.choose('equipment', { gear: [] }).then(() => { wiz.state.equipment.pending = true; });
+        }));
+    } else if (st.step === 'equipment' || wiz.state.equipment?.pending) {
+        const info = wiz.equipmentInfo();
+        const hint = document.createElement('div');
+        hint.className = 'hint';
+        hint.innerHTML = `Equip Acolyte (core stage 4): background kit class <b class="gold">${esc(info.startingEquipmentClass || '—')}</b>; plus up to <b class="gold">${info.acquisitions}</b> acquisitions of Scarce (–10) or better (one per point of Influence bonus). Add items below (name — optional notes), then continue.`;
+        add(hint);
+        const nameIn = document.createElement('input'); nameIn.placeholder = 'Item name';
+        const noteIn = document.createElement('input'); noteIn.placeholder = 'Notes (optional)';
+        add(nameIn); add(noteIn);
+        add(button('Add item', () => {
+            if (!nameIn.value.trim()) throw new Error('item needs a name');
+            return wiz.choose('equipment', { gear: [{ name: nameIn.value.trim(), notes: noteIn.value.trim() || undefined }] })
+                .then(() => { wiz.state.equipment.pending = true; });
+        }));
+        const listed = document.createElement('div'); listed.className = 'hint';
+        listed.textContent = 'Carried: ' + ((wiz.state.doc.gear ?? []).map((g) => g.name).join(', ') || '(nothing yet)');
+        add(listed);
         const nameInput = document.createElement('input');
         nameInput.placeholder = 'Character name';
         add(nameInput);
-        add(button('Continue with this name', () => {
-            if (session) wiz.state.doc = session.doc;      // pull purchases back from the panel
+        add(button('Done — continue with this name', () => {
+            delete wiz.state.equipment.pending;
             if (!nameInput.value.trim()) throw new Error('a name is required');
             wiz.setDetails({ name: nameInput.value.trim() });
         }));

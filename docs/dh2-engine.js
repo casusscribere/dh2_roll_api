@@ -10500,10 +10500,10 @@ roll_table "Power Field Destruction" {
   // api/data/chargen/pack.mjs
   var CHARGEN_PACK = {
     "packVersion": 1,
-    "generatedAt": "2026-08-16T14:29:19.853Z",
+    "generatedAt": "2026-09-07T16:14:43.783Z",
     "corpus": {
       "system": "dark_heresy_2e",
-      "commit": "733d2ab7d3aba97129d61f75a8a0609e1239eee6"
+      "commit": "9d602967c123677fe5589b044ea027a514ee9243"
     },
     "startingXp": 1e3,
     "aptitudes": [
@@ -13426,6 +13426,307 @@ roll_table "Power Field Destruction" {
           "page": 133,
           "source": "src_dh2_core_p134"
         }
+      },
+      {
+        "id": "blessed_martyrdom",
+        "ref": "dh2:talent:blessed_martyrdom",
+        "name": "Blessed Martyrdom",
+        "tier": 2,
+        "aptitudes": [
+          "Leadership",
+          "Willpower"
+        ],
+        "prerequisites": [
+          "Ceaseless Crusader",
+          "Shielding Faith"
+        ],
+        "specialist": false,
+        "eliteAdvance": "sister_of_battle",
+        "_source": "src_dh2_within_p38",
+        "citation": {
+          "book": "Enemies Within",
+          "page": 38,
+          "source": "src_dh2_within_p39"
+        }
+      },
+      {
+        "id": "ceaseless_crusader",
+        "ref": "dh2:talent:ceaseless_crusader",
+        "name": "Ceaseless Crusader",
+        "tier": 1,
+        "aptitudes": [
+          "Leadership",
+          "Willpower"
+        ],
+        "prerequisites": [
+          "Willpower 45"
+        ],
+        "specialist": false,
+        "eliteAdvance": "sister_of_battle",
+        "_source": "src_dh2_within_p38",
+        "citation": {
+          "book": "Enemies Within",
+          "page": 38,
+          "source": "src_dh2_within_p39"
+        }
+      },
+      {
+        "id": "cleanse_with_fire",
+        "ref": "dh2:talent:cleanse_with_fire",
+        "name": "Cleanse with Fire",
+        "tier": 2,
+        "aptitudes": [
+          "Willpower",
+          "Offence"
+        ],
+        "prerequisites": [
+          "Ballistic Skill 40"
+        ],
+        "specialist": false,
+        "eliteAdvance": "sister_of_battle",
+        "_source": "src_dh2_within_p38",
+        "citation": {
+          "book": "Enemies Within",
+          "page": 38,
+          "source": "src_dh2_within_p39"
+        }
+      },
+      {
+        "id": "divine_vengeance",
+        "ref": "dh2:talent:divine_vengeance",
+        "name": "Divine Vengeance",
+        "tier": 2,
+        "aptitudes": [
+          "Ballistic Skill",
+          "Offence"
+        ],
+        "prerequisites": [
+          "Cleanse with Fire",
+          "Ballistic Skill 45"
+        ],
+        "specialist": false,
+        "eliteAdvance": "sister_of_battle",
+        "_source": "src_dh2_within_p38",
+        "citation": {
+          "book": "Enemies Within",
+          "page": 38,
+          "source": "src_dh2_within_p39"
+        }
+      },
+      {
+        "id": "emperors_guidance",
+        "ref": "dh2:talent:emperors_guidance",
+        "name": "Emperor's Guidance",
+        "tier": 2,
+        "aptitudes": [
+          "Willpower",
+          "Offence"
+        ],
+        "prerequisites": [
+          "Insanity 25",
+          "Furious Zeal"
+        ],
+        "specialist": false,
+        "eliteAdvance": "sister_of_battle",
+        "_source": "src_dh2_within_p39",
+        "citation": {
+          "book": "Enemies Within",
+          "page": 39,
+          "source": "src_dh2_within_p40"
+        }
+      },
+      {
+        "id": "furious_zeal",
+        "ref": "dh2:talent:furious_zeal",
+        "name": "Furious Zeal",
+        "tier": 1,
+        "aptitudes": [
+          "Weapon Skill",
+          "Offence"
+        ],
+        "prerequisites": [
+          "Insanity 10",
+          "Hatred (Any One)"
+        ],
+        "specialist": false,
+        "eliteAdvance": "sister_of_battle",
+        "_source": "src_dh2_within_p39",
+        "citation": {
+          "book": "Enemies Within",
+          "page": 39,
+          "source": "src_dh2_within_p40"
+        }
+      },
+      {
+        "id": "spirit_of_the_martyr",
+        "ref": "dh2:talent:spirit_of_the_martyr",
+        "name": "Spirit of the Martyr",
+        "tier": 2,
+        "aptitudes": [
+          "Willpower",
+          "Defence"
+        ],
+        "prerequisites": [
+          "Insanity 20",
+          "Furious Zeal"
+        ],
+        "specialist": false,
+        "eliteAdvance": "sister_of_battle",
+        "_source": "src_dh2_within_p39",
+        "citation": {
+          "book": "Enemies Within",
+          "page": 39,
+          "source": "src_dh2_within_p40"
+        }
+      },
+      {
+        "id": "shielding_faith",
+        "ref": "dh2:talent:shielding_faith",
+        "name": "Shielding Faith",
+        "tier": 1,
+        "aptitudes": [
+          "Willpower",
+          "Defence"
+        ],
+        "prerequisites": [
+          "Deny the Witch"
+        ],
+        "specialist": false,
+        "eliteAdvance": "sister_of_battle",
+        "_source": "src_dh2_within_p39",
+        "citation": {
+          "book": "Enemies Within",
+          "page": 39,
+          "source": "src_dh2_within_p40"
+        }
+      },
+      {
+        "id": "zealots_passion",
+        "ref": "dh2:talent:zealots_passion",
+        "name": "Zealot's Passion",
+        "tier": 3,
+        "aptitudes": [
+          "Fellowship",
+          "Offence"
+        ],
+        "prerequisites": [
+          "Fellowship 35",
+          "Spirit of the Martyr"
+        ],
+        "specialist": false,
+        "eliteAdvance": "sister_of_battle",
+        "_source": "src_dh2_within_p39",
+        "citation": {
+          "book": "Enemies Within",
+          "page": 39,
+          "source": "src_dh2_within_p40"
+        }
+      },
+      {
+        "id": "bound_to_the_highest_power",
+        "ref": "dh2:talent:bound_to_the_highest_power",
+        "name": "Bound to the Highest Power",
+        "tier": 3,
+        "aptitudes": [
+          "Willpower",
+          "Defence"
+        ],
+        "prerequisites": [
+          "Warp Lock"
+        ],
+        "specialist": false,
+        "eliteAdvance": "astropath",
+        "_source": "src_dh2_beyond_p36",
+        "citation": {
+          "book": "Enemies Beyond",
+          "page": 36,
+          "source": "src_dh2_beyond_p37"
+        }
+      },
+      {
+        "id": "supreme_telepath",
+        "ref": "dh2:talent:supreme_telepath",
+        "name": "Supreme Telepath",
+        "tier": 3,
+        "aptitudes": [
+          "Fellowship"
+        ],
+        "prerequisites": [
+          "Fellowship 40",
+          "Willpower 50"
+        ],
+        "specialist": false,
+        "eliteAdvance": "astropath",
+        "_source": "src_dh2_beyond_p36",
+        "citation": {
+          "book": "Enemies Beyond",
+          "page": 36,
+          "source": "src_dh2_beyond_p37"
+        }
+      },
+      {
+        "id": "second_sight",
+        "ref": "dh2:talent:second_sight",
+        "name": "Second Sight",
+        "tier": 2,
+        "aptitudes": [
+          "Perception",
+          "Willpower"
+        ],
+        "prerequisites": [
+          "Perception 35"
+        ],
+        "specialist": false,
+        "eliteAdvance": "astropath",
+        "_source": "src_dh2_beyond_p36",
+        "citation": {
+          "book": "Enemies Beyond",
+          "page": 36,
+          "source": "src_dh2_beyond_p37"
+        }
+      },
+      {
+        "id": "soul_ward",
+        "ref": "dh2:talent:soul_ward",
+        "name": "Soul Ward",
+        "tier": 3,
+        "aptitudes": [
+          "Defence",
+          "Willpower"
+        ],
+        "prerequisites": [
+          "Strong Minded",
+          "Willpower 50"
+        ],
+        "specialist": false,
+        "eliteAdvance": "astropath",
+        "_source": "src_dh2_beyond_p36",
+        "citation": {
+          "book": "Enemies Beyond",
+          "page": 36,
+          "source": "src_dh2_beyond_p37"
+        }
+      },
+      {
+        "id": "warp_awareness",
+        "ref": "dh2:talent:warp_awareness",
+        "name": "Warp Awareness",
+        "tier": 2,
+        "aptitudes": [
+          "Perception",
+          "Psyker"
+        ],
+        "prerequisites": [
+          "Warp Sense"
+        ],
+        "specialist": false,
+        "eliteAdvance": "astropath",
+        "_source": "src_dh2_beyond_p36",
+        "citation": {
+          "book": "Enemies Beyond",
+          "page": 37,
+          "source": "src_dh2_beyond_p38"
+        }
       }
     ],
     "traits": [
@@ -14516,6 +14817,30 @@ roll_table "Power Field Destruction" {
     ],
     "eliteAdvances": [
       {
+        "id": "psyker",
+        "ref": "dh2:elite_advance:psyker",
+        "name": "Psyker",
+        "xpCost": 300,
+        "prerequisites": [
+          "Willpower 40",
+          "No Untouchable elite advance (A Void in the Warp, p.90)"
+        ],
+        "instantChanges": [
+          "Gain Psyker trait",
+          "Gain Psyker aptitude",
+          "Gain psy rating 1",
+          "Can no longer gain the Untouchable elite advance for any reason",
+          "No Adeptus Astra Telepathica background: rogue psyker \u2014 no Sanctioned trait; gains 1d10+3 Corruption points"
+        ],
+        "_source": "src_dh2_core_p91",
+        "_book_page": 90,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 90,
+          "source": "src_dh2_core_p91"
+        }
+      },
+      {
         "id": "sister_of_battle",
         "ref": "dh2:elite_advance:sister_of_battle",
         "name": "Sister of Battle",
@@ -14525,6 +14850,17 @@ roll_table "Power Field Destruction" {
           "Willpower 40",
           "Adepta Sororitas Background"
         ],
+        "instantChanges": [
+          "Gain Peer (Adepta Sororitas) talent",
+          "Gain Weapon Training (Bolt) talent",
+          "Gain Scholastic Lore (Tactica Imperialis) skill",
+          "Gain Willpower aptitude"
+        ],
+        "equipmentGrant": [
+          "Adepta Sororitas power armour",
+          "Godwyn-De'az bolt pistol or flamer"
+        ],
+        "unlockedTalentsSection": "supplement_within_sob_elite_advance",
         "_source": "src_dh2_within_p39",
         "_book_page": 38,
         "citation": {
@@ -14542,6 +14878,11 @@ roll_table "Power Field Destruction" {
           "Psyker elite advance",
           "Adeptus Astra Telepathica background"
         ],
+        "instantChanges": [
+          "Gain Soul Bound trait (permanently loses sight; no side-effect choice)",
+          "Gain Unnatural Senses (X) trait where X = Willpower characteristic"
+        ],
+        "unlockedTalentsSection": "supplement_beyond_astropath_elite_advance",
         "_source": "src_dh2_beyond_p36",
         "citation": {
           "book": "Enemies Beyond",
@@ -15316,6 +15657,15 @@ roll_table "Power Field Destruction" {
       }
       const psy = s.match(/^psy rating (\d+)$/i);
       if (psy) return (doc.psy?.rating ?? 0) >= Number(psy[1]);
+      const inf = s.match(/^influence\s+(\d+)$/i);
+      if (inf) return (doc.influence ?? 0) >= Number(inf[1]);
+      const heldEa = (name) => (doc.origin?.eliteAdvances ?? []).some((e) => norm2(entryName2(e)) === norm2(name));
+      const noEa = s.match(/^no\s+(.+?)\s+elite advance\b/i);
+      if (noEa) return !heldEa(noEa[1]);
+      const ea = s.match(/^(.+?)\s+elite advance$/i);
+      if (ea) return heldEa(ea[1]);
+      const bg = s.match(/^(.+?)\s+background$/i);
+      if (bg) return norm2(entryName2(doc.origin?.background ?? "")) === norm2(bg[1]);
       const base = norm2(s).replace(/\s*\(.*\)$/, "");
       if (talentNames.some((n) => n === norm2(s) || n.replace(/\s*\(.*\)$/, "") === base)) return true;
       return null;
@@ -15394,8 +15744,13 @@ roll_table "Power Field Destruction" {
         nextFor(entry?.advances ?? 0, null);
       }
     }
+    const heldEAs = new Set((doc.origin?.eliteAdvances ?? []).map((e) => norm2(entryName2(e))));
     const held = new Set((doc.talents ?? []).map((t) => norm2(entryName2(t)).replace(/\s*\(.*\)$/, "")));
     for (const t of pack.talents) {
+      if (t.eliteAdvance) {
+        const gate = pack.eliteAdvances.find((e) => e.id === t.eliteAdvance);
+        if (!gate || !heldEAs.has(norm2(gate.name))) continue;
+      }
       if (!t.specialist && held.has(norm2(t.name))) continue;
       const matches = aptitudeMatches(doc, t.aptitudes);
       const { met, problems } = checkPrerequisites(doc, t.prerequisites);
@@ -15424,9 +15779,8 @@ roll_table "Power Field Destruction" {
         prereqProblems: []
       });
     }
-    const taken = new Set((doc.origin?.eliteAdvances ?? []).map((e) => norm2(entryName2(e))));
     for (const e of pack.eliteAdvances) {
-      if (taken.has(norm2(e.name)) || e.xpCost == null) continue;
+      if (heldEAs.has(norm2(e.name)) || e.xpCost == null) continue;
       const { met, problems } = checkPrerequisites(
         doc,
         typeof e.prerequisites === "string" ? [e.prerequisites] : e.prerequisites
@@ -15444,10 +15798,99 @@ roll_table "Power Field Destruction" {
     return out;
   }
   var today = () => (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-  function applyAdvance(doc, pack, advance, { confirmed = false } = {}) {
+  function eliteGrants(ea) {
+    const grants = [];
+    for (const raw of ea?.instantChanges ?? []) {
+      const s = String(raw).trim();
+      let m;
+      if (m = s.match(/^gains?\s+(?:the\s+)?(.+?)\s+trait\b/i)) grants.push({ kind: "trait", name: m[1], raw: s });
+      else if (m = s.match(/^gains?\s+(?:the\s+)?(.+?)\s+talent\b/i)) grants.push({ kind: "talent", name: m[1], raw: s });
+      else if (m = s.match(/^gains?\s+(?:the\s+)?(.+?)\s+aptitude\b/i)) grants.push({ kind: "aptitude", name: m[1], raw: s });
+      else if (m = s.match(/^gains?\s+(?:a\s+|the\s+)?psy rating\s+(?:of\s+)?(\d+)/i)) grants.push({ kind: "psy_rating", rating: Number(m[1]), raw: s });
+      else if (m = s.match(/^gains?\s+(?:the\s+)?(.+?)\s+skill\b(?:.*?\brank\s+(\d+))?/i)) {
+        const spec = m[1].match(/^(.+?)\s*\(([^)]+)\)\s*$/);
+        grants.push({
+          kind: "skill",
+          name: spec ? spec[1] : m[1],
+          ...spec && { speciality: spec[2] },
+          rank: m[2] ? Number(m[2]) : 1,
+          raw: s
+        });
+      } else grants.push({ kind: "note", text: s, raw: s });
+    }
+    return grants;
+  }
+  function applyGrantTo(d2, pack, grant, source) {
+    var _a, _b, _c, _d, _e;
+    const aptSource = /^elite advance/i.test(source) ? "elite_advance" : "extra";
+    let label = grant.name ?? grant.text ?? "";
+    let ledgerKind = "other";
+    switch (grant.kind) {
+      case "talent":
+        if (!(d2.talents ?? []).some((t) => norm2(entryName2(t)) === norm2(grant.name)))
+          (d2.talents ?? (d2.talents = [])).push({ name: grant.name, ...grant.ref && { ref: grant.ref } });
+        ledgerKind = "talent";
+        break;
+      case "trait":
+        if (!(d2.traits ?? []).some((t) => norm2(entryName2(t)) === norm2(grant.name)))
+          (d2.traits ?? (d2.traits = [])).push({ name: grant.name, ...grant.ref && { ref: grant.ref } });
+        break;
+      case "aptitude":
+        if (!(d2.aptitudes ?? []).some((a) => norm2(entryName2(a)) === norm2(grant.name)))
+          (d2.aptitudes ?? (d2.aptitudes = [])).push({ name: grant.name, source: aptSource });
+        break;
+      case "skill": {
+        const canonical = canonicalSkillName(grant.name);
+        if (!canonical) throw new Error(`unknown skill "${grant.name}"`);
+        d2.skills ?? (d2.skills = {});
+        const rank = grant.rank ?? 1;
+        if (grant.speciality) {
+          const entry2 = (_a = d2.skills)[canonical] ?? (_a[canonical] = { specialities: {} });
+          entry2.specialities ?? (entry2.specialities = {});
+          const sv = (_b = entry2.specialities)[_c = grant.speciality] ?? (_b[_c] = { advances: 0 });
+          sv.advances = Math.max(sv.advances ?? 0, rank);
+        } else {
+          const entry2 = (_d = d2.skills)[canonical] ?? (_d[canonical] = { advances: 0 });
+          entry2.advances = Math.max(entry2.advances ?? 0, rank);
+        }
+        label = grant.speciality ? `${canonical} (${grant.speciality})` : canonical;
+        ledgerKind = "skill";
+        break;
+      }
+      case "psy_rating":
+        d2.psy ?? (d2.psy = { rating: 0, class: "none", sustained: 0 });
+        d2.psy.rating = Math.max(d2.psy.rating ?? 0, grant.rating ?? 1);
+        if (d2.psy.class === "none") d2.psy.class = "bound";
+        label = `Psy Rating ${d2.psy.rating}`;
+        ledgerKind = "psy_rating";
+        break;
+      case "note":
+        break;
+      default:
+        throw new Error(`unknown grant kind "${grant.kind}"`);
+    }
+    const entry = {
+      name: label,
+      cost: 0,
+      kind: ledgerKind,
+      ...grant.ref && { ref: grant.ref },
+      ...grant.rank !== void 0 && { rank: grant.rank },
+      source,
+      date: today()
+    };
+    d2.xp ?? (d2.xp = { total: 0, ledger: [] });
+    ((_e = d2.xp).ledger ?? (_e.ledger = [])).push(entry);
+    return entry;
+  }
+  function applyGrant(doc, pack, grant, { source = "grant" } = {}) {
+    const d2 = structuredClone(doc);
+    const entry = applyGrantTo(d2, pack, grant, source);
+    return { doc: d2, entry };
+  }
+  function applyAdvance(doc, pack, advance, { confirmed = false, override = false, source } = {}) {
     var _a, _b, _c, _d, _e, _f;
     const d2 = structuredClone(doc);
-    if (advance.prereqsMet === false && !confirmed) throw new Error(`prerequisites unmet: ${(advance.prereqProblems ?? []).join("; ")} (pass confirmed:true to override)`);
+    if (advance.prereqsMet === false && !confirmed && !override) throw new Error(`prerequisites unmet: ${(advance.prereqProblems ?? []).join("; ")} (pass confirmed:true to override)`);
     const purchasedName = advance.speciality ? `${String(advance.name ?? "").replace(/\s*\([^)]*\)\s*$/, "")} (${advance.speciality})` : advance.name;
     switch (advance.kind) {
       case "characteristic": {
@@ -15511,10 +15954,22 @@ roll_table "Power Field Destruction" {
       ref: advance.ref,
       ...advance.rank !== void 0 && { rank: advance.rank },
       ...advance.matches !== void 0 && { matches: advance.matches },
+      // every purchase carries a source note; an override says so loudly
+      source: override ? `${source ?? "Advancement"} [manual override \u2014 prerequisites bypassed]` : source ?? "Advancement",
       date: today()
     };
     d2.xp ?? (d2.xp = { total: 0, ledger: [] });
     ((_f = d2.xp).ledger ?? (_f.ledger = [])).push(entry);
+    if (advance.kind === "elite_advance") {
+      const packEa = pack.eliteAdvances.find((e) => e.ref === advance.ref);
+      for (const g of eliteGrants(packEa)) {
+        try {
+          applyGrantTo(d2, pack, g, `Elite Advance: ${advance.name}`);
+        } catch {
+          applyGrantTo(d2, pack, { kind: "note", text: g.raw ?? g.name }, `Elite Advance: ${advance.name}`);
+        }
+      }
+    }
     return { doc: d2, entry };
   }
   function applyOrigin(doc, pack, { homeworldRef, backgroundRef, roleRef, choices = {} } = {}) {
@@ -16034,7 +16489,19 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
     },
     "/api/chargen/advance": (body) => {
       const doc = migrateCharacter(body.doc ?? {});
-      const { doc: next, entry } = applyAdvance(doc, CHARGEN_PACK, body.advance ?? {}, { confirmed: !!body.confirmed });
+      const { doc: next, entry } = applyAdvance(
+        doc,
+        CHARGEN_PACK,
+        body.advance ?? {},
+        { confirmed: !!body.confirmed, override: !!body.override, source: body.source }
+      );
+      return { doc: next, entry, xp: xpSummary(next) };
+    },
+    // 0-XP additions outside the purchase rules (EA instant changes come via
+    // /advance; this is the GM/override door): ledger records the source note.
+    "/api/chargen/grant": (body) => {
+      const doc = migrateCharacter(body.doc ?? {});
+      const { doc: next, entry } = applyGrant(doc, CHARGEN_PACK, body.grant ?? {}, { source: body.source ?? "grant" });
       return { doc: next, entry, xp: xpSummary(next) };
     },
     "/api/chargen/origin": (body) => {

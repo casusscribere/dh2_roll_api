@@ -45,7 +45,9 @@ test('pack: catalog dimensions and required fields', () => {
     assert.equal(CHARGEN_PACK.aptitudes.length, 19);            // 10 named + 9 characteristic-based
     assert.equal(Object.keys(CHARGEN_PACK.characteristicAptitudes).length, 9);
     for (const pair of Object.values(CHARGEN_PACK.characteristicAptitudes)) assert.equal(pair.length, 2);
-    assert.equal(CHARGEN_PACK.talents.length, 85);
+    // 85 core-tier talents + 14 elite-advance-gated (SoB 9, Astropath 5; 2026-08-26)
+    assert.equal(CHARGEN_PACK.talents.length, 99);
+    assert.equal(CHARGEN_PACK.talents.filter((t) => t.eliteAdvance).length, 14);
     assert.ok(CHARGEN_PACK.talents.every((t) => [1, 2, 3].includes(t.tier) && Array.isArray(t.aptitudes) && t.ref.startsWith('dh2:talent:')));
     assert.equal(CHARGEN_PACK.skills.length, 28);
     assert.ok(CHARGEN_PACK.skills.every((s) => s.characteristic && Array.isArray(s.aptitudes)));
@@ -54,7 +56,11 @@ test('pack: catalog dimensions and required fields', () => {
     assert.equal(CHARGEN_PACK.backgrounds.length, 13);
     assert.equal(CHARGEN_PACK.roles.length, 11);
     assert.equal(CHARGEN_PACK.traits.length, 41);
-    assert.ok(CHARGEN_PACK.eliteAdvances.length >= 4);
+    assert.equal(CHARGEN_PACK.eliteAdvances.length, 5);        // + core Psyker (2026-08-26)
+    const psyker = CHARGEN_PACK.eliteAdvances.find((e) => e.id === 'psyker');
+    assert.equal(psyker.xpCost, 300);
+    assert.deepEqual(psyker.prerequisites, ['Willpower 40', 'No Untouchable elite advance (A Void in the Warp, p.90)']);
+    assert.ok(psyker.instantChanges.length >= 3);
 });
 
 test('pack: cost matrices have the rulebook dimensions', () => {
@@ -90,7 +96,7 @@ test('GET /api/chargen/pack serves the pack through dispatch', async () => {
     const res = await dispatch('GET', '/api/chargen/pack');
     assert.equal(res.status, 200);
     assert.equal(res.body.packVersion, 1);
-    assert.equal(res.body.talents.length, 85);
+    assert.equal(res.body.talents.length, 99);
 });
 
 // ── ST-1 (decision D-N): citations are public, prose is not ────────────────

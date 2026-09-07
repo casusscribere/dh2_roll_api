@@ -55,7 +55,7 @@ async function chooseOrigin(w, roleChoices = { roleTalent: 'Quick Draw' }) {
 test('the wizard declares the D-K / CB-4.1 step order', () => {
     assert.deepEqual(WIZARD_STEPS, [
         'homeWorld', 'background', 'role', 'characteristics', 'woundsFate',
-        'divination', 'startingXp', 'details', 'validate', 'done',
+        'divination', 'startingXp', 'equipment', 'details', 'validate', 'done',
     ]);
     assert.deepEqual(wizard().steps, WIZARD_STEPS);
 });
@@ -186,6 +186,13 @@ test('full flow: one legal character; XP spend equals the fixture; validators cl
     assert.equal(w.state.xp.spent, EXPECTED.spent);
     assert.equal(w.state.xp.remaining, EXPECTED.remaining);
 
+    // Equip Acolyte (core stage 4): kit-class guidance + RAW acquisition count
+    const info = w.equipmentInfo();
+    assert.equal(info.startingEquipmentClass, 'Outcast');
+    assert.equal(info.acquisitions, 2);            // influence 22 → bonus 2
+    await w.choose('equipment', { gear: [{ name: 'Rope', notes: '10m coil' }, { name: 'Glow-globe' }] });
+    assert.deepEqual(w.state.doc.gear.map((g) => g.name), ['Rope', 'Glow-globe']);
+
     w.setDetails({ name: 'Fixture Acolyte' });
     const { doc, validation } = await w.finish();
 
@@ -197,6 +204,10 @@ test('full flow: one legal character; XP spend equals the fixture; validators cl
     const audit = doc.extensions.builder.wizard;
     assert.equal(audit.characteristics.method, 'manual');
     assert.equal(audit.selections.homeworldRef, 'dh2:home_world:feral_world');
+
+    // every creation purchase carries its source note
+    assert.ok(doc.xp.ledger.length >= 3);
+    assert.ok(doc.xp.ledger.every((e) => e.source === 'Creation'), JSON.stringify(doc.xp.ledger));
 
     // validators: character 0 errors; build reconciliation 0 errors
     const vc = validateCharacter(migrateCharacter(structuredClone(doc)));
@@ -210,4 +221,31 @@ test('full flow: one legal character; XP spend equals the fixture; validators cl
         normalizeForRoundTrip(foundryActorToCharacter(characterToFoundryActor(m))),
         normalizeForRoundTrip(m),
         'wizard output does not survive the Foundry round trip');
+});
+
+test('wizard: buying the Psyker elite advance at creation applies its instant changes at 0 XP', async () => {
+    const w = wizard(seqRng([9, 10]));
+    await chooseOrigin(w);
+    w.rollCharacteristics({ method: 'manual', values: { ...EXPECTED.characteristics, influence: EXPECTED.influence } });
+    await w.choose('woundsFate');
+    w.setDivination('The Warp whispers.');
+
+    const advances = await w.advances();
+    const psyker = advances.find((a) => a.kind === 'elite_advance' && a.name === 'Psyker');
+    assert.ok(psyker, 'Psyker EA not offered');
+    assert.equal(psyker.prereqsMet, true, 'WP 40 fixture meets the prerequisite');
+    await w.buy(psyker);
+
+    const d = w.state.doc;
+    assert.equal(d.psy.rating, 1);
+    assert.ok(d.traits.some((t) => (t.name ?? t) === 'Psyker'));
+    assert.ok(d.aptitudes.some((a) => (a.name ?? a) === 'Psyker'));
+    const grants = d.xp.ledger.filter((e) => e.source === 'Elite Advance: Psyker');
+    assert.ok(grants.length >= 4, JSON.stringify(d.xp.ledger));
+    assert.ok(grants.every((e) => e.cost === 0));
+    assert.equal(d.xp.ledger.find((e) => e.name === 'Psyker' && e.kind === 'elite_advance').source, 'Creation');
+
+    // …and the psyker-gated growth path is now open
+    const after = await w.advances();
+    assert.ok(after.some((a) => a.kind === 'psy_rating' && a.rank === 2 && a.cost === 400));
 });

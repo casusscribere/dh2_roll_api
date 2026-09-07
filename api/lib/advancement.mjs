@@ -141,6 +141,18 @@ export function checkPrerequisites(doc, prerequisites) {
         }
         const psy = s.match(/^psy rating (\d+)$/i);
         if (psy) return (doc.psy?.rating ?? 0) >= Number(psy[1]);
+        // EA-entry vocabularies (2026-08-26): Influence thresholds, elite-
+        // advance gates (both directions), and background requirements.
+        const inf = s.match(/^influence\s+(\d+)$/i);
+        if (inf) return (doc.influence ?? 0) >= Number(inf[1]);
+        const heldEa = (name) => (doc.origin?.eliteAdvances ?? [])
+            .some((e) => norm(entryName(e)) === norm(name));
+        const noEa = s.match(/^no\s+(.+?)\s+elite advance\b/i);
+        if (noEa) return !heldEa(noEa[1]);
+        const ea = s.match(/^(.+?)\s+elite advance$/i);
+        if (ea) return heldEa(ea[1]);
+        const bg = s.match(/^(.+?)\s+background$/i);
+        if (bg) return norm(entryName(doc.origin?.background ?? '')) === norm(bg[1]);
         const base = norm(s).replace(/\s*\(.*\)$/, '');
         if (talentNames.some((n) => n === norm(s) || n.replace(/\s*\(.*\)$/, '') === base)) return true;
         return null;                                        // unparseable / not held
@@ -221,9 +233,16 @@ export function listAvailableAdvances(doc, pack) {
         }
     }
 
-    // talents — not already held (non-specialist), prereq-checked
+    // talents — not already held (non-specialist), prereq-checked. Talents
+    // carrying `eliteAdvance` are UNLOCKED ADVANCES (core p.86): hidden until
+    // the gating elite advance is held.
+    const heldEAs = new Set((doc.origin?.eliteAdvances ?? []).map((e) => norm(entryName(e))));
     const held = new Set((doc.talents ?? []).map((t) => norm(entryName(t)).replace(/\s*\(.*\)$/, '')));
     for (const t of pack.talents) {
+        if (t.eliteAdvance) {
+            const gate = pack.eliteAdvances.find((e) => e.id === t.eliteAdvance);
+            if (!gate || !heldEAs.has(norm(gate.name))) continue;
+        }
         if (!t.specialist && held.has(norm(t.name))) continue;
         const matches = aptitudeMatches(doc, t.aptitudes);
         const { met, problems } = checkPrerequisites(doc, t.prerequisites);
@@ -248,9 +267,8 @@ export function listAvailableAdvances(doc, pack) {
     }
 
     // elite advances — not already taken
-    const taken = new Set((doc.origin?.eliteAdvances ?? []).map((e) => norm(entryName(e))));
     for (const e of pack.eliteAdvances) {
-        if (taken.has(norm(e.name)) || e.xpCost == null) continue;
+        if (heldEAs.has(norm(e.name)) || e.xpCost == null) continue;
         const { met, problems } = checkPrerequisites(doc,
             typeof e.prerequisites === 'string' ? [e.prerequisites] : e.prerequisites);
         push({
@@ -265,6 +283,108 @@ export function listAvailableAdvances(doc, pack) {
 const today = () => new Date().toISOString().slice(0, 10);
 
 /**
+ * Parse an elite advance's `instantChanges` bullets (short mechanical
+ * paraphrases, the corpus convention) into structured grants. Anything the
+ * patterns cannot claim becomes a `note` grant — recorded in the ledger, never
+ * silently dropped (e.g. the Psyker↔Untouchable exclusion clauses).
+ */
+export function eliteGrants(ea) {
+    const grants = [];
+    for (const raw of ea?.instantChanges ?? []) {
+        const s = String(raw).trim();
+        let m;
+        if ((m = s.match(/^gains?\s+(?:the\s+)?(.+?)\s+trait\b/i))) grants.push({ kind: 'trait', name: m[1], raw: s });
+        else if ((m = s.match(/^gains?\s+(?:the\s+)?(.+?)\s+talent\b/i))) grants.push({ kind: 'talent', name: m[1], raw: s });
+        else if ((m = s.match(/^gains?\s+(?:the\s+)?(.+?)\s+aptitude\b/i))) grants.push({ kind: 'aptitude', name: m[1], raw: s });
+        else if ((m = s.match(/^gains?\s+(?:a\s+|the\s+)?psy rating\s+(?:of\s+)?(\d+)/i))) grants.push({ kind: 'psy_rating', rating: Number(m[1]), raw: s });
+        else if ((m = s.match(/^gains?\s+(?:the\s+)?(.+?)\s+skill\b(?:.*?\brank\s+(\d+))?/i))) {
+            // "Scholastic Lore (Tactica Imperialis)" → specialist skill + speciality
+            const spec = m[1].match(/^(.+?)\s*\(([^)]+)\)\s*$/);
+            grants.push({
+                kind: 'skill', name: spec ? spec[1] : m[1],
+                ...(spec && { speciality: spec[2] }),
+                rank: m[2] ? Number(m[2]) : 1, raw: s,
+            });
+        } else grants.push({ kind: 'note', text: s, raw: s });
+    }
+    return grants;
+}
+
+/** Mutating core of applyGrant — shared with the elite-advance purchase path. */
+function applyGrantTo(d, pack, grant, source) {
+    const aptSource = /^elite advance/i.test(source) ? 'elite_advance' : 'extra';
+    let label = grant.name ?? grant.text ?? '';
+    let ledgerKind = 'other';
+    switch (grant.kind) {
+        case 'talent':
+            if (!(d.talents ?? []).some((t) => norm(entryName(t)) === norm(grant.name)))
+                (d.talents ??= []).push({ name: grant.name, ...(grant.ref && { ref: grant.ref }) });
+            ledgerKind = 'talent';
+            break;
+        case 'trait':
+            if (!(d.traits ?? []).some((t) => norm(entryName(t)) === norm(grant.name)))
+                (d.traits ??= []).push({ name: grant.name, ...(grant.ref && { ref: grant.ref }) });
+            break;
+        case 'aptitude':
+            if (!(d.aptitudes ?? []).some((a) => norm(entryName(a)) === norm(grant.name)))
+                (d.aptitudes ??= []).push({ name: grant.name, source: aptSource });
+            break;
+        case 'skill': {
+            const canonical = canonicalSkillName(grant.name);
+            if (!canonical) throw new Error(`unknown skill "${grant.name}"`);
+            d.skills ??= {};
+            const rank = grant.rank ?? 1;
+            if (grant.speciality) {
+                const entry = (d.skills[canonical] ??= { specialities: {} });
+                entry.specialities ??= {};
+                const sv = (entry.specialities[grant.speciality] ??= { advances: 0 });
+                sv.advances = Math.max(sv.advances ?? 0, rank);
+            } else {
+                const entry = (d.skills[canonical] ??= { advances: 0 });
+                entry.advances = Math.max(entry.advances ?? 0, rank);
+            }
+            label = grant.speciality ? `${canonical} (${grant.speciality})` : canonical;
+            ledgerKind = 'skill';
+            break;
+        }
+        case 'psy_rating':
+            d.psy ??= { rating: 0, class: 'none', sustained: 0 };
+            d.psy.rating = Math.max(d.psy.rating ?? 0, grant.rating ?? 1);
+            if (d.psy.class === 'none') d.psy.class = 'bound';
+            label = `Psy Rating ${d.psy.rating}`;
+            ledgerKind = 'psy_rating';
+            break;
+        case 'note':
+            break;
+        default:
+            throw new Error(`unknown grant kind "${grant.kind}"`);
+    }
+    const entry = {
+        name: label, cost: 0, kind: ledgerKind,
+        ...(grant.ref && { ref: grant.ref }),
+        ...(grant.rank !== undefined && { rank: grant.rank }),
+        source, date: today(),
+    };
+    d.xp ??= { total: 0, ledger: [] };
+    (d.xp.ledger ??= []).push(entry);
+    return entry;
+}
+
+/**
+ * Add content OUTSIDE the purchase rules: elite-advance instant changes, GM
+ * gifts, and the manual override door. No XP is spent, no prerequisite is
+ * checked — the ledger records the addition at 0 XP with the caller's source
+ * note, so the audit trail says exactly how it got there.
+ * grant: { kind: 'talent'|'trait'|'aptitude'|'skill'|'psy_rating'|'note',
+ *          name?, ref?, rank?, speciality?, rating?, text? }
+ */
+export function applyGrant(doc, pack, grant, { source = 'grant' } = {}) {
+    const d = structuredClone(doc);
+    const entry = applyGrantTo(d, pack, grant, source);
+    return { doc: d, entry };
+}
+
+/**
  * Buy one advance: returns { doc, entry } where doc is a DEEP COPY with the
  * mechanical change applied and the typed ledger entry appended atomically.
  * `advance` is an element of listAvailableAdvances (or the same shape).
@@ -272,9 +392,9 @@ const today = () => new Date().toISOString().slice(0, 10);
  * psy purchase. Unmet PARSED prerequisites throw unless `confirmed: true`
  * (unverifiable prose prerequisites never block — warn-and-confirm).
  */
-export function applyAdvance(doc, pack, advance, { confirmed = false } = {}) {
+export function applyAdvance(doc, pack, advance, { confirmed = false, override = false, source } = {}) {
     const d = structuredClone(doc);
-    if (advance.prereqsMet === false && !confirmed) throw new Error(`prerequisites unmet: ${(advance.prereqProblems ?? []).join('; ')} (pass confirmed:true to override)`);
+    if (advance.prereqsMet === false && !confirmed && !override) throw new Error(`prerequisites unmet: ${(advance.prereqProblems ?? []).join('; ')} (pass confirmed:true to override)`);
     // ONE name for the mechanical write and the ledger entry (finding D-3): a
     // speciality purchase is recorded as "Skill (Speciality)". The listing's
     // "(new speciality)" placeholder is replaced by the speciality actually
@@ -351,10 +471,27 @@ export function applyAdvance(doc, pack, advance, { confirmed = false } = {}) {
         ref: advance.ref,
         ...(advance.rank !== undefined && { rank: advance.rank }),
         ...(advance.matches !== undefined && { matches: advance.matches }),
+        // every purchase carries a source note; an override says so loudly
+        source: override
+            ? `${source ?? 'Advancement'} [manual override — prerequisites bypassed]`
+            : (source ?? 'Advancement'),
         date: today(),
     };
     d.xp ??= { total: 0, ledger: [] };
     (d.xp.ledger ??= []).push(entry);
+
+    // Elite advances apply their INSTANT CHANGES (core p.86) on purchase —
+    // each lands as a 0-XP ledger grant sourced to the advance.
+    if (advance.kind === 'elite_advance') {
+        const packEa = pack.eliteAdvances.find((e) => e.ref === advance.ref);
+        for (const g of eliteGrants(packEa)) {
+            // a grant the doc cannot take mechanically (unknown skill name,
+            // future grant kinds) degrades to a ledger NOTE — the purchase
+            // never aborts, and the audit trail still shows the clause
+            try { applyGrantTo(d, pack, g, `Elite Advance: ${advance.name}`); }
+            catch { applyGrantTo(d, pack, { kind: 'note', text: g.raw ?? g.name }, `Elite Advance: ${advance.name}`); }
+        }
+    }
     return { doc: d, entry };
 }
 

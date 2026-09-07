@@ -80,7 +80,11 @@ const prov = (e) => ({
 const projectTalent = (tier) => (e) => ({
     id: e.id, ref: ref('talent', e.id), name: e.name, tier,
     aptitudes: e.aptitudes ?? [], prerequisites: e.prerequisites ?? [],
-    specialist: !!e.specialist, ...prov(e),
+    specialist: !!e.specialist,
+    // Talents unlocked by an elite advance are hidden from the advance list
+    // until that EA is held (advancement.mjs gates on this field).
+    ...(e.elite_advance && { eliteAdvance: e.elite_advance }),
+    ...prov(e),
 });
 const projectSkill = (e) => ({
     id: e.id, ref: ref('skill', e.id), name: e.name,
@@ -119,6 +123,11 @@ const projectElite = (e) => ({
     id: e.id, ref: ref('elite_advance', e.id), name: e.name,
     xpCost: e.xp_cost ?? null,
     ...(e.prerequisites !== undefined && { prerequisites: e.prerequisites }),
+    // Instant changes are the EA's grants — short mechanical bullets the
+    // engine parses into 0-XP ledger entries (advancement.mjs eliteGrants).
+    ...(e.instant_changes?.length && { instantChanges: e.instant_changes }),
+    ...(e.equipment_grant?.length && { equipmentGrant: e.equipment_grant }),
+    ...(e.unlocked_talents_section && { unlockedTalentsSection: e.unlocked_talents_section }),
     ...prov(e),
 });
 
@@ -163,6 +172,11 @@ const pack = {
         ...talentsSrc.tier_1.map(projectTalent(1)),
         ...talentsSrc.tier_2.map(projectTalent(2)),
         ...talentsSrc.tier_3.map(projectTalent(3)),
+        // Elite-advance talent sections (supplement_*_elite_advance): entries
+        // carry their own tier and an elite_advance gate field.
+        ...Object.entries(talentsSrc)
+            .filter(([k, v]) => /_elite_advance$/.test(k) && Array.isArray(v))
+            .flatMap(([, v]) => v.map((e) => projectTalent(e.tier ?? 1)(e))),
     ],
     traits: traitsSrc.map(projectTrait),
     skills: skillsSrc.map(projectSkill),

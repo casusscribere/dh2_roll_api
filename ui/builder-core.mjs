@@ -92,6 +92,21 @@ export class BuilderSession {
         await this.refresh();
     }
 
+    /**
+     * The GM/override door: add ANY content with prerequisites ignored, at
+     * 0 XP — the ledger entry's source says "manual override" so the audit
+     * trail is honest. grant: { kind, name, ref?, rank?, speciality?, rating? }
+     */
+    async grantOverride(grant) {
+        const snapshot = JSON.stringify(this.doc);
+        const r = await this.api('POST', '/api/chargen/grant',
+            { doc: this.doc, grant, source: 'manual override' });
+        this._undo.push(snapshot);
+        this.doc = r.doc;
+        await this.refresh();
+        return r.entry;
+    }
+
     /** Ledger↔stats reconciliation report (validateBuild engine-side). */
     async validate() {
         return await this.api('POST', '/api/chargen/validate', { doc: this.doc });
@@ -119,7 +134,7 @@ export class BuilderSession {
 
 export const WIZARD_STEPS = [
     'homeWorld', 'background', 'role', 'characteristics', 'woundsFate',
-    'divination', 'startingXp', 'details', 'validate', 'done',
+    'divination', 'startingXp', 'equipment', 'details', 'validate', 'done',
 ];
 
 const WIZ_CHAR_KEYS = ['ws', 'bs', 's', 't', 'ag', 'int', 'per', 'wp', 'fel'];
@@ -141,6 +156,7 @@ export function createWizard({ pack, api, rng = Math.random }) {
         characteristics: null,        // { method, values, rerolled }
         woundsFate: null,             // { woundsRoll, blessingRoll, blessed }
         divination: '',
+        equipment: null,              // { added: [...] } once the step is visited
         details: { name: '' },
         doc: null,
         finished: false,
@@ -155,7 +171,8 @@ export function createWizard({ pack, api, rng = Math.random }) {
             : !s.characteristics ? 'characteristics'
             : !s.woundsFate ? 'woundsFate'
             : !s.divination ? 'divination'
-            : !s.details.name ? 'startingXp'   // XP + details close out together
+            : !s.equipment ? 'startingXp'      // XP spend, then Equip Acolyte (core stage 4)
+            : !s.details.name ? 'details'
             : s.finished ? 'done' : 'validate';
     };
 
@@ -214,6 +231,23 @@ export function createWizard({ pack, api, rng = Math.random }) {
                 state.selections[ORIGIN_STEP[stepId]] = choice.ref ?? state.selections[ORIGIN_STEP[stepId]];
                 Object.assign(state.selections.choices, choice.choices ?? {});
                 await applyOrigin();
+            } else if (stepId === 'equipment') {
+                // Equip Acolyte (core stage 4): the background's kit class is
+                // guidance (equipment lists are not yet corpus-extracted), and
+                // the RAW allowance is one Scarce-or-better acquisition per
+                // point of Influence bonus. Items land as gear entries.
+                const added = [];
+                for (const g of choice.gear ?? []) {
+                    if (!g?.name) continue;
+                    (state.doc.gear ??= []).push({
+                        name: g.name,
+                        ...(g.notes && { notes: g.notes }),
+                        ...(g.weight !== undefined && { weight: g.weight }),
+                        equipped: g.equipped !== false,
+                    });
+                    added.push(g.name);
+                }
+                state.equipment = { added };
             } else if (stepId === 'woundsFate') {
                 const m = /^(\d+)\+1d5$/.exec(state.originInfo?.woundsFormula ?? '');
                 if (!m) throw new Error(`unrecognised wounds formula "${state.originInfo?.woundsFormula}"`);
@@ -265,11 +299,22 @@ export function createWizard({ pack, api, rng = Math.random }) {
             state.xp = r.xp;
             return r.advances;
         },
-        async buy(advance, { confirmed = false } = {}) {
-            const r = await api('POST', '/api/chargen/advance', { doc: state.doc, advance, confirmed });
+        async buy(advance, { confirmed = false, override = false } = {}) {
+            const r = await api('POST', '/api/chargen/advance',
+                { doc: state.doc, advance, confirmed, override, source: 'Creation' });
             state.doc = r.doc;
             state.xp = r.xp;
             return r.entry;
+        },
+
+        /** The Equip Acolyte guidance: background kit class + RAW acquisition
+         *  allowance (one Scarce-or-better item per point of Influence bonus). */
+        equipmentInfo() {
+            const bg = pack.backgrounds.find((b) => b.ref === state.selections.backgroundRef);
+            return {
+                startingEquipmentClass: bg?.startingEquipmentClass ?? '',
+                acquisitions: Math.floor((state.doc?.influence ?? 0) / 10),
+            };
         },
 
         setDetails({ name } = {}) {

@@ -29,7 +29,7 @@ import { CHARACTER_ROSTER } from '../data/characters/roster.mjs';
 import { CHARGEN_PACK } from '../data/chargen/pack.mjs';
 import { loadProseOverlay } from './prose.mjs';
 import {
-    listAvailableAdvances, applyAdvance, applyOrigin, validateBuild, xpSummary,
+    listAvailableAdvances, applyAdvance, applyGrant, applyOrigin, validateBuild, xpSummary,
 } from './advancement.mjs';
 import { compile } from './dsl/compiler.mjs';
 import { DslError } from './dsl/tokenizer.mjs';
@@ -104,7 +104,15 @@ const POST = {
     },
     '/api/chargen/advance': (body) => {
         const doc = migrateCharacter(body.doc ?? {});
-        const { doc: next, entry } = applyAdvance(doc, CHARGEN_PACK, body.advance ?? {}, { confirmed: !!body.confirmed });
+        const { doc: next, entry } = applyAdvance(doc, CHARGEN_PACK, body.advance ?? {},
+            { confirmed: !!body.confirmed, override: !!body.override, source: body.source });
+        return { doc: next, entry, xp: xpSummary(next) };
+    },
+    // 0-XP additions outside the purchase rules (EA instant changes come via
+    // /advance; this is the GM/override door): ledger records the source note.
+    '/api/chargen/grant': (body) => {
+        const doc = migrateCharacter(body.doc ?? {});
+        const { doc: next, entry } = applyGrant(doc, CHARGEN_PACK, body.grant ?? {}, { source: body.source ?? 'grant' });
         return { doc: next, entry, xp: xpSummary(next) };
     },
     '/api/chargen/origin': (body) => {
