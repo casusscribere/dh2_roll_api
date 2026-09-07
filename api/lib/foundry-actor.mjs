@@ -36,7 +36,9 @@ import {
 } from './character-schema.mjs';
 import { entryName } from './rules/_util.mjs';
 
-const CHAR_KEY_MAP = {
+/** doc characteristic key → DH3 characteristic key (7.1.1: exported so the
+ *  reverse adapter inverts THIS table, never a second hand-written one). */
+export const CHAR_KEY_MAP = {
     ws: 'weaponSkill', bs: 'ballisticSkill', s: 'strength', t: 'toughness',
     ag: 'agility', int: 'intelligence', per: 'perception', wp: 'willpower', fel: 'fellowship',
 };
@@ -46,6 +48,21 @@ export const camelKey = (name) => String(name ?? '')
     .split(/[^A-Za-z0-9]+/).filter(Boolean)
     .map((w, i) => (i === 0 ? w.toLowerCase() : w[0].toUpperCase() + w.slice(1).toLowerCase()))
     .join('');
+
+/** Canonical skill name → DH3 camelCase key, derived from SKILL_DEFS (7.1.1). */
+export const SKILL_KEY_MAP = Object.fromEntries(
+    Object.keys(SKILL_DEFS).map((name) => [name, camelKey(name)]));
+
+/** Embedded-item type → the doc list it came from (7.1.1; dotted paths are
+ *  nested). weaponTrainings is deliberately absent: its talent stubs fold into
+ *  `talents` on the way out (dedupe, D-9) and back (see foundryActorToCharacter). */
+export const ITEM_TYPE_TO_LIST = {
+    weapon: 'weapons', armour: 'armourItems', gear: 'gear', aptitude: 'aptitudes',
+    talent: 'talents', trait: 'traits', psychicPower: 'psychicPowers',
+    cybernetic: 'cybernetics', mentalDisorder: 'insanity.disorders',
+    malignancy: 'corruption.malignancies', mutation: 'corruption.mutations',
+    criticalInjury: 'criticalInjuries', forceField: 'field',
+};
 
 const asEntry = (x) => (x && typeof x === 'object') ? x : { name: String(x ?? '') };
 
@@ -131,7 +148,7 @@ export function characterToFoundryActor(doc) {
     for (const [rawName, s] of Object.entries(doc.skills ?? {})) {
         const canonical = canonicalSkillName(rawName);
         if (!canonical) continue;                       // unknown skills stay doc-only
-        const key = camelKey(canonical);
+        const key = SKILL_KEY_MAP[canonical];
         const def = SKILL_DEFS[canonical];
         const entry = { advance: s.advances ?? 0, isSpecialist: !!def.specialist };
         if (def.specialist && s.specialities) {
