@@ -263,6 +263,20 @@ everything and normalizes legacy shapes.
   have **5 ranks** (Simple→Expert; matches the schema's `advances 0–5`), skills 4; there are
   **19 aptitudes** (10 named + 9 characteristic-based).
 
+## 6e. Task 7.1 (SHIPPED 2026-08-26) — the mapper is BIDIRECTIONAL
+
+`foundryActorToCharacter(actor)` (api/lib/foundry-actor.mjs) inverts
+`characterToFoundryActor` by inverting its exported tables (`CHAR_KEY_MAP`,
+`SKILL_KEY_MAP`, `ITEM_TYPE_TO_LIST`) — never a second hand-written mapping.
+Round-trip contract proven over the whole campaign roster via the exported
+`normalizeForRoundTrip` (foundry-actor-roundtrip.test.mjs). Fields with no
+Foundry home ride `flags['dh2-roll-vm']`: modifierSources (incl. speciality
+modifiers), skillCharacteristics (R-8 overrides), the flat `armour` block,
+sbMultiplier, xpLedger, origin, extensions, amputations. Task 7.1.4 (an
+in-Foundry export command) is MOOT as originally scoped — OD-1 retired the
+dh2-roll-vm module (2026-08-25); an export surface, if wanted, now belongs to
+the rogue-trader-2e system via its vendored engine bundle.
+
 ## 6d. ST-4 addendum (SHIPPED 2026-08-25) — description/citation on entry objects
 
 Optional author-owned text on the seven content lists' entry objects — no version bump
