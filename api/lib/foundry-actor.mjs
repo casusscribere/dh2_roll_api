@@ -145,9 +145,11 @@ export function characterToFoundryActor(doc) {
 
     // --- skills: DH3 camel keys, specialities preserved -----------------------
     const skills = {};
+    const skillCharacteristics = {};                    // R-8 overrides — no DH3 field, flags-carried
     for (const [rawName, s] of Object.entries(doc.skills ?? {})) {
         const canonical = canonicalSkillName(rawName);
         if (!canonical) continue;                       // unknown skills stay doc-only
+        if (s.characteristic) skillCharacteristics[canonical] = s.characteristic;
         const key = SKILL_KEY_MAP[canonical];
         const def = SKILL_DEFS[canonical];
         const entry = { advance: s.advances ?? 0, isSpecialist: !!def.specialist };
@@ -157,6 +159,10 @@ export function characterToFoundryActor(doc) {
                 entry.specialities[camelKey(spec)] = {
                     label: spec, advance: sv.advances ?? 0, cost: 0, taken: (sv.advances ?? 0) > 0,
                 };
+                // speciality-level modifiers have no DH3 field either (7.1.3)
+                if ((sv.modifiers ?? []).length) {
+                    ((modifierSources.specialities ??= {})[canonical] ??= {})[spec] = sv.modifiers;
+                }
             }
         }
         skills[key] = entry;
@@ -214,7 +220,10 @@ export function characterToFoundryActor(doc) {
                 rateOfFire: { single: w.rof?.single === false ? 0 : 1, burst: w.rof?.burst ?? 0, full: w.rof?.full ?? 0 },
                 description: (w.qualities ?? []).length ? `Qualities: ${w.qualities.map(entryName).join(', ')}` : '',
             },
-            flags: { 'dh2-roll-vm': { qualities: (w.qualities ?? []).map(entryName) } },
+            flags: { 'dh2-roll-vm': {
+                qualities: (w.qualities ?? []).map(entryName),
+                ...(w.sbMultiplier != null && { sbMultiplier: w.sbMultiplier }),   // engine-only field (7.1.3)
+            } },
         });
     }
     for (const a of doc.armourItems ?? []) {
@@ -299,8 +308,303 @@ export function characterToFoundryActor(doc) {
             source: doc.source ?? null,
             origin: doc.origin ?? null,              // verbatim (refs incl.) for lossless round-trip
             extensions: doc.extensions ?? {},
+            // Two more no-DH3-field carries (added with 7.1.3 so the reverse
+            // adapter is lossless; both follow the modifierSources pattern):
+            // the R-8 skill-characteristic overrides and the flat manual-AP
+            // armour block (4 of 10 campaign PCs carry one).
+            ...(Object.keys(skillCharacteristics).length && { skillCharacteristics }),
+            ...(Object.values(doc.armour ?? {}).some((v) => v) && { armour: doc.armour }),
         },
     };
 
     return { name: doc.name, type: 'acolyte', system, flags, items: dedupeItems(items) };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * 7.1.3 — the reverse adapter: Foundry Actor data → character document.
+ * Inverts the exported tables above programmatically; the round-trip contract
+ * (foundry-actor-roundtrip.test.mjs) is
+ *   normalize(reverse(forward(doc))) ≡ normalize(doc)
+ * over the whole campaign roster.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+const INV_CHAR_KEY = Object.fromEntries(Object.entries(CHAR_KEY_MAP).map(([d, f]) => [f, d]));
+const INV_SKILL_KEY = Object.fromEntries(Object.entries(SKILL_KEY_MAP).map(([d, f]) => [f, d]));
+const UNNATURAL_DOC_KEYS = ['ws', 'bs', 's', 't', 'ag'];
+const tierCase = (s) => (s ? s[0].toUpperCase() + s.slice(1).toLowerCase() : s);
+const itemNs = (item) => item.flags?.['dh2-roll-vm'] ?? {};
+const refDslOf = (item) => {
+    const ns = itemNs(item);
+    return { ...(ns.ref !== undefined && { ref: ns.ref }), ...(ns.dsl !== undefined && { dsl: ns.dsl }) };
+};
+
+/** A talent Item indistinguishable from a synthesized weaponTrainings stub. */
+const isTrainingStub = (item) =>
+    /^Weapon Training \(.+\)$/.test(item.name)
+    && (item.system?.tier ?? 0) === 1 && !item.system?.benefit && !item.system?.description
+    && Object.keys(itemNs(item)).length === 0;
+
+/**
+ * Map Foundry Actor data ({ name, type, system, flags, items }) back to a
+ * schema-v4 character document. Field-for-field inverse of
+ * characterToFoundryActor, with the documented one-way joins recovered in
+ * their display form (tarot ← bio.divination; criticalInjury source stays
+ * inside the effect text) — normalizeForRoundTrip compares in that form.
+ */
+export function foundryActorToCharacter(actor) {
+    const sys = actor.system ?? {};
+    const ns = actor.flags?.['dh2-roll-vm'] ?? {};
+    const modSrc = ns.modifierSources ?? { characteristics: {}, skills: {} };
+
+    // --- characteristics + unnatural (inverted table) -------------------------
+    const characteristics = {};
+    const unnatural = {};
+    for (const [docKey, foundryKey] of Object.entries(CHAR_KEY_MAP)) {
+        const c = sys.characteristics?.[foundryKey] ?? {};
+        characteristics[docKey] = {
+            base: c.base ?? 0,
+            advances: c.advance ?? 0,
+            modifiers: modSrc.characteristics?.[docKey]
+                ?? (c.modifier ? [{ value: c.modifier, source: 'foundry' }] : []),
+        };
+        if (UNNATURAL_DOC_KEYS.includes(docKey)) unnatural[docKey] = c.unnatural ?? 0;
+    }
+
+    // --- skills (inverted key map; overrides + modifiers from flags) ----------
+    const skills = {};
+    for (const [foundryKey, entry] of Object.entries(sys.skills ?? {})) {
+        const canonical = INV_SKILL_KEY[foundryKey];
+        if (!canonical) continue;
+        const s = { advances: entry.advance ?? 0, modifiers: modSrc.skills?.[canonical] ?? [] };
+        if (ns.skillCharacteristics?.[canonical]) s.characteristic = ns.skillCharacteristics[canonical];
+        if (entry.specialities) {
+            s.specialities = {};
+            for (const sv of Object.values(entry.specialities)) {
+                s.specialities[sv.label] = {
+                    advances: sv.advance ?? 0,
+                    modifiers: modSrc.specialities?.[canonical]?.[sv.label] ?? [],
+                };
+            }
+        }
+        skills[canonical] = s;
+    }
+
+    // --- embedded items → the doc lists (ITEM_TYPE_TO_LIST semantics) ---------
+    const weapons = [], armourItems = [], gear = [], aptitudes = [], talents = [];
+    const weaponTrainings = [], traits = [], psychicPowers = [], cybernetics = [];
+    const disorders = [], malignancies = [], mutations = [], criticalInjuries = [];
+    let field = { rating: 0, overloadMax: 0 };
+    for (const item of actor.items ?? []) {
+        const s = item.system ?? {};
+        const flagsNs = itemNs(item);
+        switch (item.type) {
+            case 'weapon':
+                weapons.push({
+                    name: item.name, class: s.class, damage: s.damage, pen: s.penetration ?? 0,
+                    damageType: s.damageType, craftsmanship: tierCase(s.craftsmanship ?? 'common'),
+                    equipped: s.equipped !== false, weight: s.weight ?? 0,
+                    clip: { max: s.clip?.max ?? 0, value: s.clip?.value ?? 0 },
+                    rof: { single: (s.rateOfFire?.single ?? 1) !== 0, burst: s.rateOfFire?.burst ?? 0, full: s.rateOfFire?.full ?? 0 },
+                    qualities: flagsNs.qualities ?? [],
+                    ...(flagsNs.sbMultiplier != null && { sbMultiplier: flagsNs.sbMultiplier }),
+                });
+                break;
+            case 'armour':
+                armourItems.push({
+                    name: item.name, ap: flagsNs.ap ?? 0, locations: flagsNs.locations ?? ['all'],
+                    weight: s.weight ?? 0, equipped: s.equipped !== false,
+                    maxAgility: s.maxAgility || null,
+                });
+                break;
+            case 'gear':
+                gear.push({
+                    name: item.name, weight: s.weight ?? 0, equipped: s.equipped !== false,
+                    quantity: flagsNs.quantity ?? 1,
+                    ...(s.description && { notes: s.description }),
+                });
+                break;
+            case 'aptitude': {
+                const m = /^Source: (.*)$/.exec(s.description ?? '');
+                aptitudes.push(m ? { name: item.name, source: m[1] } : { name: item.name });
+                break;
+            }
+            case 'talent': {
+                if (isTrainingStub(item)) { weaponTrainings.push(item.name.slice('Weapon Training ('.length, -1)); break; }
+                const src = /^Source: (.*)$/.exec(s.description ?? '');
+                talents.push({
+                    name: item.name,
+                    ...(s.tier && { tier: s.tier }), ...(s.benefit && { notes: s.benefit }),
+                    ...(src && { source: src[1] }), ...refDslOf(item),
+                });
+                break;
+            }
+            case 'trait':
+                traits.push({ name: item.name, ...(s.level != null && { level: s.level }), ...refDslOf(item) });
+                break;
+            case 'psychicPower':
+                psychicPowers.push({
+                    name: item.name,
+                    ...(s.discipline && { discipline: s.discipline }), ...(s.cost && { cost: s.cost }),
+                    ...(s.description && { notes: s.description }),
+                    ...(flagsNs.equipped === false && { equipped: false }), ...refDslOf(item),
+                });
+                break;
+            case 'cybernetic': {
+                const m = /^Location: (.*?)(?: — ([^]*))?$/.exec(s.description ?? '');
+                cybernetics.push({
+                    name: item.name,
+                    ...(m && { location: m[1] }),
+                    ...(m ? (m[2] && { notes: m[2] }) : (s.description && { notes: s.description })),
+                    ...refDslOf(item),
+                });
+                break;
+            }
+            case 'mentalDisorder': disorders.push(item.name); break;
+            case 'malignancy': malignancies.push(item.name); break;
+            case 'mutation': mutations.push(item.name); break;
+            case 'criticalInjury':
+                criticalInjuries.push({
+                    ...(s.part && s.part !== 'body' && { location: s.part }),
+                    effect: s.description ?? item.name,
+                });
+                break;
+            case 'forceField':
+                field = { rating: s.protectionRating ?? 0, overloadMax: 0 };
+                break;
+            /* unknown types are module content, not doc content — dropped */
+        }
+    }
+
+    const emptyArmour = { head: 0, body: 0, leftArm: 0, rightArm: 0, leftLeg: 0, rightLeg: 0 };
+    return {
+        schemaVersion: ns.schemaVersion ?? 4,
+        kind: 'dh2.character',
+        name: actor.name,
+        system: 'dh2',
+        characteristics, unnatural, skills,
+        armour: ns.armour ?? emptyArmour,
+        wounds: { max: sys.wounds?.max ?? 10, current: sys.wounds?.value ?? sys.wounds?.max ?? 10, critical: sys.wounds?.critical ?? 0 },
+        fate: { max: sys.fate?.max ?? 0, current: sys.fate?.value ?? sys.fate?.max ?? 0 },
+        fatigue: { current: sys.fatigue?.value ?? 0 },
+        psy: {
+            rating: sys.psy?.rating ?? 0,
+            class: (sys.psy?.rating ?? 0) > 0 ? (sys.psy?.class ?? 'bound') : 'none',
+            sustained: sys.psy?.sustained ?? 0,
+        },
+        insanity: { points: sys.insanity ?? 0, disorders },
+        corruption: { points: sys.corruption ?? 0, malignancies, mutations },
+        influence: sys.characteristics?.influence?.base ?? 0,
+        xp: { total: sys.experience?.total ?? 0, spent: sys.experience?.used ?? 0, ledger: ns.xpLedger ?? [] },
+        tarot: sys.bio?.divination ? { text: sys.bio.divination } : {},
+        origin: ns.origin ?? { homeworld: null, background: null, role: null, eliteAdvances: [] },
+        extensions: ns.extensions ?? {},
+        amputations: ns.amputations ?? [],
+        ...(ns.source != null && { source: ns.source }),
+        weapons, armourItems, gear, aptitudes, talents, weaponTrainings, traits,
+        psychicPowers, cybernetics, criticalInjuries, field,
+        conditions: [], circumstances: [],
+    };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * normalizeForRoundTrip — canonical comparison form for the contract above.
+ * Exported: CB-4 reuses it to assert wizard output survives the Foundry trip.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+const asName = (x) => ((x && typeof x === 'object') ? { ...x } : { name: String(x ?? '') });
+
+/** Drop empty leaves (undefined/null/''/0/[]/{}). `false` is KEPT — an
+ *  equipped:false is exactly the value the R-4 work exists to preserve. */
+function clean(v) {
+    if (Array.isArray(v)) {
+        const out = v.map(clean).filter((x) => x !== undefined);
+        return out.length ? out : undefined;
+    }
+    if (v && typeof v === 'object') {
+        const out = {};
+        for (const [k, x] of Object.entries(v)) {
+            const c = clean(x);
+            if (c !== undefined) out[k] = c;
+        }
+        return Object.keys(out).length ? out : undefined;
+    }
+    if (v === undefined || v === null || v === '' || v === 0) return undefined;
+    return v;
+}
+
+/**
+ * Canonicalize a character document for round-trip comparison:
+ * - string entries ≡ { name } objects across every entry list;
+ * - weaponTrainings fold into `Weapon Training (X)` talent entries (deduped,
+ *   talents first — the forward map's own D-9 collapse);
+ * - tarot collapses to its joined display string (bio.divination is a join);
+ * - criticalInjuries collapse to display form (source inside the effect);
+ * - craftsmanship case-folds; rof.single becomes boolean; clip.value defaults
+ *   to max; wounds/fate current default to max; xp.spent becomes effective;
+ * - psychicPowers drop equipped:true (the default);
+ * - `system` drops when it is the default 'dh2';
+ * - then every empty-default leaf is dropped (see clean()).
+ */
+export function normalizeForRoundTrip(doc) {
+    const d = structuredClone(doc);
+
+    const tarotBits = [d.tarot?.card, d.tarot?.text, d.tarot?.effect].filter(Boolean);
+    d.tarot = tarotBits.length ? tarotBits.join(' — ') : undefined;
+
+    const talents = (d.talents ?? []).map(asName);
+    const seen = new Set(talents.map((t) => t.name.toLowerCase().replace(/\s+/g, ' ').trim()));
+    for (const w of d.weaponTrainings ?? []) {
+        const name = `Weapon Training (${w})`;
+        if (!seen.has(name.toLowerCase())) { talents.push({ name }); seen.add(name.toLowerCase()); }
+    }
+    d.talents = talents.map((t) => { delete t.tier; return t; });   // stub tier-1 vs unrecorded 0 is dedupe noise
+    delete d.weaponTrainings;
+
+    for (const list of ['traits', 'aptitudes', 'cybernetics', 'psychicPowers']) {
+        d[list] = (d[list] ?? []).map(asName);
+    }
+    d.psychicPowers = d.psychicPowers.map((p) => {
+        if (p.equipped !== false) delete p.equipped;
+        return p;
+    });
+    if (d.insanity) d.insanity.disorders = (d.insanity.disorders ?? []).map((x) => asName(x).name);
+    if (d.corruption) {
+        d.corruption.malignancies = (d.corruption.malignancies ?? []).map((x) => asName(x).name);
+        d.corruption.mutations = (d.corruption.mutations ?? []).map((x) => asName(x).name);
+    }
+
+    for (const list of ['weapons', 'armourItems', 'gear']) {
+        d[list] = (d[list] ?? []).map((it) => {
+            const e = { ...it };
+            if (e.equipped !== false) delete e.equipped;       // absent means carried
+            if (list === 'gear' && (e.quantity ?? 1) === 1) delete e.quantity;
+            return e;
+        });
+    }
+    d.weapons = (d.weapons ?? []).map((w) => ({
+        ...w,
+        craftsmanship: (w.craftsmanship ?? 'common').toLowerCase(),
+        qualities: (w.qualities ?? []).map((q) => asName(q).name),
+        rof: w.rof && { ...w.rof, single: w.rof.single !== false && w.rof.single !== 0 },
+        clip: w.clip && { max: w.clip.max ?? 0, value: w.clip.value ?? w.clip.max ?? 0 },
+    }));
+    d.criticalInjuries = (d.criticalInjuries ?? []).map((c) => {
+        const e = (c && typeof c === 'object') ? c : { effect: String(c) };
+        return {
+            ...(e.location && e.location !== 'body' && { location: e.location }),
+            effect: (e.effect ?? '') + (e.source ? ` (${e.source})` : ''),
+        };
+    });
+
+    if (d.wounds) d.wounds = { ...d.wounds, current: d.wounds.current ?? d.wounds.max };
+    if (d.fate) d.fate = { ...d.fate, current: d.fate.current ?? d.fate.max };
+    if (d.xp) {
+        d.xp = {
+            ...d.xp,
+            spent: d.xp.spent ?? (d.xp.ledger ?? []).reduce((a, e) => a + (e.cost || 0), 0),
+        };
+    }
+    if (d.system === 'dh2') delete d.system;
+
+    return clean(d) ?? {};
 }
