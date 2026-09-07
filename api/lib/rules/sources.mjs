@@ -19,7 +19,7 @@ const read = (rel) => readFileSync(join(dataDir, rel), 'utf8');
 export const RULE_FILES = [
     'weapon-qualities.dsl', 'talents.dsl', 'traits.dsl', 'conditions.dsl',
     'circumstances.dsl', 'configurations.dsl', 'mechanics.dsl', 'roll-tables.dsl',
-    'actions.dsl',
+    'actions.dsl', 'spec-lists.dsl',
 ];
 
 /** filename → raw DSL source text. */

@@ -207,7 +207,18 @@ async function loadRoster() {
     } catch (e) {
         $('charStatus').textContent = `Roster unavailable: ${e.message}`;
     }
+    for (const c of CharStore.customList()) {
+        ROSTER[c.id] = { id: c.id, name: c.name, doc: CharStore.get(c.id) };
+        $('preset').add(new Option(`${c.name} ★`, c.id));
+    }
 }
+
+// live propagation: another tab saved this character → reload it
+CharStore.onChange(async () => {
+    if (currentId && CharStore.edited(currentId)) {
+        await openDoc(CharStore.effective(currentId, ROSTER[currentId]?.doc), currentId);
+    }
+});
 
 async function openDoc(doc, id) {
     currentId = id ?? null;
@@ -355,29 +366,49 @@ function heldSpecs(a) {
 function specBuy(row, btn, advance) {
     if (row.querySelector('.specin')) return;
     btn.hidden = true;
-    const input = document.createElement('input');
-    input.className = 'specin';
-    input.placeholder = 'specialization…';
-    input.style.width = '9rem';
-    const listId = `specs-${Math.random().toString(36).slice(2, 8)}`;
-    const dl = document.createElement('datalist');
-    dl.id = listId;
-    for (const sp of heldSpecs(advance)) dl.appendChild(new Option(sp));
-    input.setAttribute('list', listId);
+    const parts = [];
+    let getSpec;
+    if (advance.specOptions) {
+        // system-defined set (spec_list): a dropdown of the legal options;
+        // open sets (RAW "Other…") add a write-in choice at the end
+        const sel = document.createElement('select');
+        sel.className = 'specin';
+        sel.add(new Option('— specialization —', ''));
+        for (const o of advance.specOptions) sel.add(new Option(o, o));
+        if (advance.specOpen) sel.add(new Option('Other…', '__other__'));
+        const other = document.createElement('input');
+        other.placeholder = 'custom…';
+        other.style.width = '8rem';
+        other.hidden = true;
+        sel.addEventListener('change', () => { other.hidden = sel.value !== '__other__'; if (!other.hidden) other.focus(); });
+        parts.push(sel, other);
+        getSpec = () => sel.value === '__other__' ? other.value.trim() : sel.value;
+    } else {
+        // user-supplied specialization: write-in with held specs as suggestions
+        const input = document.createElement('input');
+        input.className = 'specin';
+        input.placeholder = 'specialization…';
+        input.style.width = '9rem';
+        const listId = `specs-${Math.random().toString(36).slice(2, 8)}`;
+        const dl = document.createElement('datalist');
+        dl.id = listId;
+        for (const sp of heldSpecs(advance)) dl.appendChild(new Option(sp));
+        input.setAttribute('list', listId);
+        parts.push(input, dl);
+        getSpec = () => input.value.trim();
+    }
     const ok = document.createElement('button');
     ok.textContent = '✓';
     ok.addEventListener('click', async () => {
-        const spec = input.value.trim();
-        if (!spec) { input.focus(); return; }
+        const spec = getSpec();
+        if (!spec) return;
         await buy({ ...advance, speciality: spec });
     });
     const cancel = document.createElement('button');
     cancel.className = 'ghost';
     cancel.textContent = '✕';
-    cancel.addEventListener('click', () => { input.remove(); dl.remove(); ok.remove(); cancel.remove(); btn.hidden = false; });
-    input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') ok.click(); });
-    row.append(input, dl, ok, cancel);
-    input.focus();
+    cancel.addEventListener('click', () => { for (const el of [...parts, ok, cancel]) el.remove(); btn.hidden = false; });
+    row.append(...parts, ok, cancel);
 }
 
 async function buy(advance) {

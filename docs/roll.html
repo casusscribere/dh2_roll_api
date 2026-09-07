@@ -551,6 +551,14 @@ async function loadPresets() {
       sel.add(new Option(c.name + (CharStore.edited(c.id) ? ' ✎' : ''), c.id));
     }
   } catch { /* offline/static without roster — dropdown stays empty */ }
+  // custom characters (wizard-built / uploaded via the Builder) — the SAME
+  // entities the Builder and Characters pages hold, one identity everywhere
+  for (const c of CharStore.customList()) {
+    PRESET_RAW[c.id] = CharStore.get(c.id);
+    sel.add(new Option(`${c.name} ★`, c.id));
+  }
+  // live propagation: edits saved from another tab re-apply the open preset
+  CharStore.onChange(() => { if (sel.value) sel.onchange(); });
   sel.onchange = () => {
     if (sel.value) {
       $('char-file').value = '';

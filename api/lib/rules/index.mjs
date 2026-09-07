@@ -14,7 +14,7 @@
  * freely; user-supplied DSL can later be compiled and merged the same way.
  */
 import { Registry } from '../pipeline.mjs';
-import { compile, compileTables, compileActions, referencedNames, valuedNames, programInfo } from '../dsl/compiler.mjs';
+import { compile, compileTables, compileSpecLists, compileActions, referencedNames, valuedNames, programInfo } from '../dsl/compiler.mjs';
 import { combatActionEffects, COMBAT_ACTIONS, RANGE_BANDS, AIM_MODES, canonicalAction } from './combat-actions.mjs';
 import { qualityConflictEffects } from './quality-conflicts.mjs';
 import { registerActions, availableActions } from '../actions.mjs';
@@ -30,6 +30,7 @@ const circumstancesSrc = readRule('circumstances.dsl');
 const configurationsSrc = readRule('configurations.dsl');
 const mechanicsSrc = readRule('mechanics.dsl');
 const rollTablesSrc = readRule('roll-tables.dsl');
+const specListsSrc = readRule('spec-lists.dsl');
 const actionsSrc = readRule('actions.dsl');
 
 // Compile the Action declarations once at load and register them into the actions
@@ -50,6 +51,9 @@ export const actionRuleEffects = compile(actionsSrc);   // action legality + Sup
 
 /** Built-in roll tables (Scatter Diagram, Haywire, Hallucinogenic), for roll_on. */
 export const rollTables = compileTables(rollTablesSrc);
+/** Specialization sets for specialist talents (spec_list declarations) —
+ *  built-ins; campaign layers merge via compileSpecLists(custom, specLists). */
+export const specLists = compileSpecLists(specListsSrc);
 export const availableTables = rollTables.map((t) => ({ name: t.name, die: `${t.die.count}d${t.die.sides}`, rows: t.rows.length }));
 
 /** Player-facing names the rule set understands (for the UI / /api/rules).

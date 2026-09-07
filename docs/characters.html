@@ -90,6 +90,9 @@ async function init() {
     const d = await fetch('/api/characters').then((r) => r.json());
     ROSTER = d.characters ?? [];
   } catch { ROSTER = []; }
+  // custom characters share the ONE store the Builder writes
+  for (const c of CharStore.customList()) ROSTER.push({ id: c.id, name: `${c.name} ★`, doc: CharStore.get(c.id) });
+  CharStore.onChange(() => location.reload());
   renderRoster();
   // deep link: characters.html?c=<id>
   const want = new URLSearchParams(location.search).get('c');

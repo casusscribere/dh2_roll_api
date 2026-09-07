@@ -56,7 +56,7 @@ class Parser {
 
     // --- program / rule ------------------------------------------------------
     parseProgram() {
-        const rules = [], tables = [], actions = [], packages = [];
+        const rules = [], tables = [], actions = [], packages = [], specLists = [];
         let dslVersion = null;
         // `dsl <N>` pragmas and `package` blocks may appear at any top level
         // position (the FIRST of each wins) — several sources are routinely
@@ -76,11 +76,12 @@ class Parser {
                 if (dslVersion === null) dslVersion = v;
             }
             else if (this.isKw('roll_table')) tables.push(this.parseTable());
+            else if (this.isKw('spec_list')) specLists.push(this.parseSpecList());
             else if (this.isKw('action')) actions.push(this.parseActionDecl());
             else if (this.isKw('package')) packages.push(this.parsePackage());
             else rules.push(this.parseRule());
         }
-        return { type: 'Program', rules, tables, actions, dslVersion: dslVersion ?? CURRENT_DSL_VERSION, package: packages[0] ?? null, packages };
+        return { type: 'Program', rules, tables, actions, specLists, dslVersion: dslVersion ?? CURRENT_DSL_VERSION, package: packages[0] ?? null, packages };
     }
 
     // package "dh2.core.weapon-qualities" { system "dh2"  source "Book"  [requires "pkg"]* }
@@ -136,6 +137,28 @@ class Parser {
         this.expectPunct('}');
         if (!actionType) throw new DslError(`Action "${name}" is missing a 'type' clause`, kw.line, kw.col);
         return { type: 'ActionDecl', name, actionType, subtypes, line: kw.line, col: kw.col };
+    }
+
+    // spec_list "Name" [open] { "A", "B", … } — a SPECIALIZATION SET for a
+    // specialist talent/skill (e.g. Weapon Training's weapon groups). `open`
+    // marks lists the rulebook leaves extensible ("Other…", GM's discretion):
+    // consumers offer the options AND a write-in. Same-named declarations
+    // MERGE (union) across rule layers, so campaign DSL can add a new weapon
+    // group without restating the core list.
+    parseSpecList() {
+        const kw = this.expectKw('spec_list');
+        const name = this.expectString('a quoted specialization-set name');
+        const open = this.isKw('open') ? (this.next(), true) : false;
+        this.expectPunct('{');
+        const options = [];
+        while (!this.isPunct('}')) {
+            if (this.atEof()) throw this.err("Unterminated spec_list (expected '}')");
+            options.push(this.expectString('a quoted specialization option'));
+            if (this.isPunct(',')) this.next();
+        }
+        this.expectPunct('}');
+        if (!options.length && !open) throw this.err(`spec_list "${name}" is empty and not open — it can never be satisfied`);
+        return { type: 'SpecList', name, options, open, line: kw.line, col: kw.col };
     }
 
     // roll_table "Name" { die 1d10  <lo>[-<hi>]: "text" [=> "Status", …]  … }

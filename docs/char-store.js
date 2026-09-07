@@ -25,5 +25,31 @@ const CharStore = (() => {
             const stored = this.get(id);
             return structuredClone(stored ?? baseline);
         },
+        /* ── custom characters (2026-08-27): ONE identity across pages ──────
+         * Wizard-built / uploaded characters live in the same store under
+         * 'custom:' ids, so Builder, Characters and Roll all list and edit
+         * the SAME entity. Edits propagate: same-tab via the shared store,
+         * cross-tab via the browser's storage event (see onChange). */
+        isCustom(id) { return typeof id === 'string' && id.startsWith('custom:'); },
+        /** Persist a NEW custom character; returns its id. */
+        saveNew(doc) {
+            const slug = String(doc?.name ?? 'character').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'character';
+            let id = `custom:${slug}`;
+            const m = loadAll();
+            for (let n = 2; m[id]; n++) id = `custom:${slug}-${n}`;
+            m[id] = doc;
+            saveAll(m);
+            return id;
+        },
+        /** Every stored custom character: [{ id, name }]. */
+        customList() {
+            return Object.entries(loadAll())
+                .filter(([id]) => this.isCustom(id))
+                .map(([id, doc]) => ({ id, name: doc?.name ?? id }));
+        },
+        /** Fire cb when ANOTHER tab writes the store (live propagation). */
+        onChange(cb) {
+            window.addEventListener('storage', (ev) => { if (ev.key === KEY) cb(); });
+        },
     };
 })();

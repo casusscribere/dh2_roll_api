@@ -21,8 +21,9 @@ import { rollScript } from './dice.mjs';
 import {
     availableTalents, availableTraits, availableConditions, availableCircumstances,
     availableConfigurations, availableQualities, availableActionNames, availableValued, FIRING_MODES,
-    buildRegistry, builtinSources, builtinRules,
+    buildRegistry, builtinSources, builtinRules, specLists,
 } from './rules/index.mjs';
+import { compileSpecLists } from './dsl/compiler.mjs';
 import { weaponsJson } from './rules/sources.mjs';
 import { checkDependencies } from './rules/dependencies.mjs';
 import { CHARACTER_ROSTER } from '../data/characters/roster.mjs';
@@ -41,6 +42,14 @@ import {
 import {
     emptyEncounter, encounterActor, tickEncounter, mergeActorState, harvestEngagement,
 } from './encounter.mjs';
+
+/** Built-in spec lists merged with any spec_list declarations the caller's
+ *  campaign DSL carries (customRules — the D-L layer authors new weapon
+ *  groups this way). A broken custom layer falls back to built-ins alone. */
+function specListsFor(body) {
+    if (typeof body?.customRules !== 'string' || !body.customRules.trim()) return specLists;
+    try { return compileSpecLists(body.customRules, specLists); } catch { return specLists; }
+}
 
 /** GET endpoints — pure reads of the engine's static, load-time data. */
 const GET = {
@@ -65,6 +74,7 @@ const GET = {
         statuses: availableConditions,   // back-compat alias
         qualities: availableQualities,
         valued: availableValued,         // names that take a numeric severity/level variable
+        specLists,                       // specialization sets (spec_list declarations)
     }),
     '/api/dsl-docs': () => DSL_DOCS,
     '/api/rules/source': () => ({ builtins: builtinSources, rules: builtinRules }),
@@ -100,7 +110,11 @@ const POST = {
     // Foundry sheet's XP-spend will call through the VM bundle.
     '/api/chargen/advances': (body) => {
         const doc = migrateCharacter(body.doc ?? body.character ?? {});
-        return { advances: listAvailableAdvances(doc, CHARGEN_PACK, { includeHeld: !!body.includeHeld }), xp: xpSummary(doc) };
+        return {
+            advances: listAvailableAdvances(doc, CHARGEN_PACK,
+                { includeHeld: !!body.includeHeld, specLists: specListsFor(body) }),
+            xp: xpSummary(doc),
+        };
     },
     '/api/chargen/advance': (body) => {
         const doc = migrateCharacter(body.doc ?? {});
@@ -124,7 +138,7 @@ const POST = {
     },
     '/api/chargen/origin': (body) => {
         const doc = migrateCharacter(body.doc ?? {});
-        return applyOrigin(doc, CHARGEN_PACK, body);
+        return applyOrigin(doc, CHARGEN_PACK, { ...body, specLists: specListsFor(body) });
     },
     '/api/chargen/validate': (body) => {
         const doc = migrateCharacter(body.doc ?? {});

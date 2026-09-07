@@ -185,7 +185,11 @@ const skillEntryFor = (doc, canonical) => {
  * Skills: known specialities advance individually; specialist skills also
  * offer a "new speciality" template entry (rank 1, speciality: null).
  */
-export function listAvailableAdvances(doc, pack, { includeHeld = false } = {}) {
+/** The spec_list matching a specialist entry's base name, if any. */
+const specListFor = (lists, base) =>
+    (lists ?? []).find((l) => norm(l.name) === norm(String(base ?? '')));
+
+export function listAvailableAdvances(doc, pack, { includeHeld = false, specLists = [] } = {}) {
     const { remaining } = xpSummary(doc);
     const out = [];
     const push = (a) => out.push({ ...a, affordable: a.cost <= remaining });
@@ -251,6 +255,12 @@ export function listAvailableAdvances(doc, pack, { includeHeld = false } = {}) {
             kind: 'talent', ref: t.ref, name: t.name, tier: t.tier, matches,
             ...(isHeld && { held: true }),               // already on the sheet — display-only row
             ...(t.specialist && { specialist: true }),   // needs a sub-selection to buy
+            // system-defined specialization set (spec_list) → dropdown; open
+            // lists (RAW "Other…") also accept a write-in; no list → write-in
+            ...(t.specialist && specListFor(specLists, t.name) && {
+                specOptions: specListFor(specLists, t.name).options,
+                specOpen: !!specListFor(specLists, t.name).open,
+            }),
             cost: advanceCost(pack, { kind: 'talent', matches, tier: t.tier }),
             prereqsMet: met, prereqProblems: problems,
         });
@@ -556,7 +566,7 @@ export function expandGrant(text) {
     return { grants, choices };
 }
 
-export function applyOrigin(doc, pack, { homeworldRef, backgroundRef, roleRef, choices = {} } = {}) {
+export function applyOrigin(doc, pack, { homeworldRef, backgroundRef, roleRef, choices = {}, specLists = [] } = {}) {
     const d = structuredClone(doc);
     const find = (list, r) => list.find((e) => e.ref === r) ?? null;
     const hw = homeworldRef ? find(pack.homeworlds, homeworldRef) : null;
@@ -614,9 +624,17 @@ export function applyOrigin(doc, pack, { homeworldRef, backgroundRef, roleRef, c
     const resolveGrant = (text, source, kind, applyFn) => {
         const { grants, choices: points } = expandGrant(text);
         for (const c of points) {
+            // a write-in whose base has a system spec_list becomes a dropdown
+            // of "Base (Option)" names (open lists keep the write-in too)
+            const list = !c.options ? specListFor(specLists, c.base) : null;
+            const options = c.options ?? (list ? list.options.map((o) => `${c.base} (${o})`) : null);
             const pick = choices[c.key];
-            if (!pick) { choicesNeeded.push({ kind, options: c.options, key: c.key, source, ...(c.options ? {} : { writeIn: true, base: c.base }) }); continue; }
-            grants.push(c.options ? pick : `${c.base} (${pick})`);
+            if (!pick) {
+                choicesNeeded.push({ kind, options, key: c.key, source,
+                    ...(!options || list?.open ? { writeIn: true, base: c.base } : {}) });
+                continue;
+            }
+            grants.push(options?.includes(pick) || c.options ? pick : `${c.base} (${pick})`);
         }
         for (const name of grants) applyFn(name);
     };
@@ -683,8 +701,11 @@ export function applyOrigin(doc, pack, { homeworldRef, backgroundRef, roleRef, c
     const choicePoints = [];
     const addPoints = (member, text, label) => {
         for (const c of expandGrant(text ?? '').choices) {
-            choicePoints.push({ member, key: c.key, options: c.options, label,
-                value: choices[c.key] ?? null, ...(c.options ? {} : { writeIn: true, base: c.base }) });
+            const list = !c.options ? specListFor(specLists, c.base) : null;
+            const options = c.options ?? (list ? list.options.map((o) => `${c.base} (${o})`) : null);
+            choicePoints.push({ member, key: c.key, options, label,
+                value: choices[c.key] ?? null,
+                ...(!options || list?.open ? { writeIn: true, base: c.base } : {}) });
         }
     };
     if (hw) addPoints('homeworldRef', hw.aptitude, 'home-world aptitude');

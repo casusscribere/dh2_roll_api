@@ -181,6 +181,21 @@ export function compileTables(src) {
     return (program.tables ?? []).map(compileTable);
 }
 
+/** Compile spec_list declarations, MERGING same-named lists (union of
+ *  options; open if any layer says open) — campaign DSL extends core lists. */
+export function compileSpecLists(src, base = []) {
+    const program = typeof src === 'string' ? parse(src) : src;
+    const merged = new Map(base.map((l) => [l.name.toLowerCase(), { name: l.name, options: [...l.options], open: !!l.open }]));
+    for (const sl of program.specLists ?? []) {
+        const key = sl.name.toLowerCase();
+        const prev = merged.get(key);
+        if (!prev) { merged.set(key, { name: sl.name, options: [...sl.options], open: !!sl.open }); continue; }
+        for (const o of sl.options) if (!prev.options.some((x) => x.toLowerCase() === o.toLowerCase())) prev.options.push(o);
+        prev.open = prev.open || !!sl.open;
+    }
+    return [...merged.values()];
+}
+
 /** Compile the action declarations: [{ name, type, attack }]. These are the
  *  Actions taxonomy (hooked via is_action()/action_type()), compiled once at load. */
 export function compileActions(src) {
