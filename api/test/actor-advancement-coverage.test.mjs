@@ -19,7 +19,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 
 import { characterToFoundryActor } from '../lib/foundry-actor.mjs';
 import { emptyCharacter, migrateCharacter } from '../lib/character-schema.mjs';
@@ -30,6 +30,12 @@ import {
 } from '../lib/advancement.mjs';
 
 const CAMPAIGN_DIR = new URL('../../campaign/characters/', import.meta.url);
+// The campaign docs are git-ignored (they never leave this machine), so any
+// test that reads them SKIPS on CI — the merged-roster gate pattern. Missing
+// this guard kept the Pages deploy red from 2026-08-16 to 2026-09-07: npm
+// test failed on the runner, so the build job never reached build:static.
+const HAVE_CAMPAIGN = existsSync(CAMPAIGN_DIR);
+const NO_CAMPAIGN = !HAVE_CAMPAIGN && 'campaign docs absent (git-ignored; local-only)';
 const campaignDoc = (file) =>
     migrateCharacter(JSON.parse(readFileSync(new URL(file, CAMPAIGN_DIR), 'utf8')));
 
@@ -37,7 +43,7 @@ const campaignDoc = (file) =>
 // foundry-actor.mjs
 // ---------------------------------------------------------------------------
 
-test('armour items become DH3 armour Items; AP + locations survive in flags', () => {
+test('armour items become DH3 armour Items; AP + locations survive in flags', { skip: NO_CAMPAIGN }, () => {
     // No campaign character carries armourItems (their AP is the flat `armour`
     // block), so this mapping is only reachable synthetically.
     const doc = campaignDoc('rex-hellerand.json');
@@ -59,7 +65,7 @@ test('armour items become DH3 armour Items; AP + locations survive in flags', ()
     assert.deepEqual(armour[1].flags['dh2-roll-vm'], { ap: 3, locations: ['all'] });
 });
 
-test('traits map with and without a level; ref/dsl ride the item flags', () => {
+test('traits map with and without a level; ref/dsl ride the item flags', { skip: NO_CAMPAIGN }, () => {
     const doc = campaignDoc('ogg.json');
     doc.traits = [
         { name: 'Sturdy', level: 2, ref: 'dh2:trait:sturdy' },
@@ -202,7 +208,7 @@ test('long critical-injury text is truncated to a 60-char item name', () => {
     assert.equal(crit.system.description, effect);                    // no source → no suffix
 });
 
-test('every on-disk campaign character maps, and origin strings/objects both reach bio', () => {
+test('every on-disk campaign character maps, and origin strings/objects both reach bio', { skip: NO_CAMPAIGN }, () => {
     const files = readdirSync(CAMPAIGN_DIR).filter((f) => f.endsWith('.json'));
     assert.equal(files.length, 10, 'the merged campaign roster');
     for (const f of files) {
