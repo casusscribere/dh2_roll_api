@@ -1,0 +1,28 @@
+{
+  "_comment": [
+    "CB-4 acceptance oracle — HAND-COMPUTED from the CHARGEN_PACK cost matrix",
+    "(api/data/chargen/pack.mjs), then the engine is asserted to agree.",
+    "Build: Feral World / Outcast / Desperado (roleTalent choice: Quick Draw).",
+    "Aptitudes held after origin: General (always) + Toughness (home world) +",
+    "Knowledge (background) + Agility, Ballistic Skill, Defence, Fellowship,",
+    "Finesse (role).",
+    "Purchases: AG advance 1 — char aptitudes [Agility, Finesse], both held,",
+    "matches 2, rank 1 => 100. Dodge rank 1 — [Agility, Defence], both held,",
+    "matches 2, rank 1 => 100. Jaded — tier 1, [Willpower, Defence], Defence",
+    "only, matches 1 => 300; prerequisite 'WP 40' satisfied by the manual",
+    "characteristic entry below. Total 500 of the 1000 starting XP."
+  ],
+  "origin": { "homeworld": "Feral World", "background": "Outcast", "role": "Desperado" },
+  "aptitudes": ["Toughness", "Knowledge", "Agility", "Ballistic Skill", "Defence", "Fellowship", "Finesse"],
+  "startingXp": 1000,
+  "characteristics": { "ws": 30, "bs": 38, "s": 32, "t": 35, "ag": 40, "int": 30, "per": 33, "wp": 40, "fel": 35 },
+  "influence": 22,
+  "purchases": [
+    { "kind": "characteristic", "ref": "ag", "rank": 1, "matches": 2, "cost": 100 },
+    { "kind": "skill", "name": "Dodge", "rank": 1, "matches": 2, "cost": 100 },
+    { "kind": "talent", "ref": "dh2:talent:jaded", "tier": 1, "matches": 1, "cost": 300 }
+  ],
+  "spent": 500,
+  "remaining": 500,
+  "homeworld": { "fateThreshold": 2, "emperorsBlessing": 3, "woundsFormula": "9+1d5" }
+}

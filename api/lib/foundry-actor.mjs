@@ -605,6 +605,8 @@ export function normalizeForRoundTrip(doc) {
         };
     }
     if (d.system === 'dh2') delete d.system;
+    // a non-psyker's class 'none' is the migrated default, not content
+    if (d.psy && d.psy.class === 'none' && !(d.psy.rating > 0)) delete d.psy.class;
 
     return clean(d) ?? {};
 }

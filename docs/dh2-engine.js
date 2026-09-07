@@ -14595,6 +14595,20 @@ roll_table "Power Field Destruction" {
     return canon ? { ...a, source: canon } : a;
   }
   var REF_PATTERN = /^[a-z0-9_]+:[a-z0-9_]+:[a-z0-9_]+$/;
+  var PACK_REFS = (() => {
+    const refs = /* @__PURE__ */ new Set();
+    (function walk(v) {
+      if (Array.isArray(v)) {
+        v.forEach(walk);
+        return;
+      }
+      if (v && typeof v === "object") {
+        if (typeof v.ref === "string") refs.add(v.ref);
+        Object.values(v).forEach(walk);
+      }
+    })(CHARGEN_PACK);
+    return refs;
+  })();
   var CHARACTERISTIC_KEYS = ["ws", "bs", "s", "t", "ag", "int", "per", "wp", "fel"];
   var UNNATURAL_KEYS = ["ws", "bs", "s", "t", "ag"];
   var ARMOUR_KEYS = ["head", "body", "leftArm", "rightArm", "leftLeg", "rightLeg"];
@@ -14668,6 +14682,8 @@ roll_table "Power Field Destruction" {
     { path: "pools.profitFactor", type: "(reserved)", required: false, summary: "Reserved for Rogue Trader \u2014 not populated by any current adapter." },
     { path: "<talents|traits|psychicPowers>[].ref", type: 'string "dh2:<type>:<snake_id>"', required: false, summary: "Corpus ref \u2014 resolves mechanically to compendium UUIDs (deterministic slug ids; no name-matching)." },
     { path: "<talents|traits|psychicPowers>[].dsl", type: "string (DSL source)", required: false, summary: "Entry-granted rules in the DSL (custom talents/traits/powers) \u2014 compiled into the customRules layer at roll time; portable between the Pages UI and Foundry." },
+    { path: "<talents|traits|psychicPowers|cybernetics>[].description", type: "string", required: false, summary: "Author-owned prose for a CUSTOM entry (ST-4) \u2014 travels in the doc like dsl. Canon entries resolve text by ref; the validator warns when both are present (drift guard)." },
+    { path: "<talents|traits|psychicPowers|weapons|armourItems|gear|cybernetics>[].citation", type: "{ book?, page?, source? }", required: false, summary: `Provenance for author-owned text (ST-4): book (string), page (int | null), source (string, e.g. "homebrew"). Mirrors the pack's public citation shape (ST-1).` },
     { path: "tarot", type: "{ card?, text?, effect? }", required: false, summary: "The Emperor's Tarot / divination drawn at creation (\u21C4 Foundry bio.divination)." },
     { path: "weapons[].weight", type: "number \u2265 0 (kg)", required: false, summary: "Weapon weight \u2014 counts toward encumbrance while equipped." },
     { path: "weapons[].equipped", type: "bool (default true)", required: false, summary: "On the character (counts weight; available in combat). false = stored." },
@@ -14773,6 +14789,22 @@ roll_table "Power Field Destruction" {
         else if (!REF_PATTERN.test(entry.ref)) warn(`${path}.ref`, `Ref "${entry.ref}" does not match <system>:<type>:<snake_id>`);
       }
       if (entry.dsl !== void 0 && typeof entry.dsl !== "string") err(`${path}.dsl`, "String (DSL source) required");
+    };
+    const checkProse = (entry, path) => {
+      if (!entry || typeof entry !== "object") return;
+      if (entry.description !== void 0 && typeof entry.description !== "string") err(`${path}.description`, "String required");
+      if (entry.citation !== void 0) {
+        const c = entry.citation;
+        if (!c || typeof c !== "object" || Array.isArray(c)) err(`${path}.citation`, "Object { book?, page?, source? } required");
+        else {
+          if (c.book !== void 0 && typeof c.book !== "string") err(`${path}.citation.book`, "String required");
+          if (c.page !== void 0 && c.page !== null && !isInt(c.page)) err(`${path}.citation.page`, "Integer or null required");
+          if (c.source !== void 0 && typeof c.source !== "string") err(`${path}.citation.source`, "String required");
+        }
+      }
+      if (typeof entry.description === "string" && typeof entry.ref === "string" && PACK_REFS.has(entry.ref)) {
+        warn(path, `description present but ref '${entry.ref}' resolves in the pack \u2014 canon text is resolved by ref`);
+      }
     };
     if (!doc || typeof doc !== "object") return { ok: false, errors: [{ path: "", message: "Not an object" }], warnings };
     if (!isInt(doc.schemaVersion)) err("schemaVersion", "Required integer");
@@ -14933,6 +14965,7 @@ roll_table "Power Field Destruction" {
         }
         if (p && typeof p === "object") {
           checkRefDsl(p, `psychicPowers[${i}]`);
+          checkProse(p, `psychicPowers[${i}]`);
           if (p.equipped !== void 0 && typeof p.equipped !== "boolean") err(`psychicPowers[${i}].equipped`, "Boolean required");
           if (p.cost !== void 0 && !isNonNegInt(p.cost)) err(`psychicPowers[${i}].cost`, "Non-negative integer required");
           for (const f of ["discipline", "notes"]) if (p[f] !== void 0 && typeof p[f] !== "string") err(`psychicPowers[${i}].${f}`, "String required");
@@ -14978,7 +15011,7 @@ roll_table "Power Field Destruction" {
     for (const listName of ["weapons", "armourItems", "gear"]) {
       (Array.isArray(doc[listName]) ? doc[listName] : []).forEach((item, i) => {
         if (item && typeof item === "object") {
-          if (item.description !== void 0 && typeof item.description !== "string") err(`${listName}[${i}].description`, "String required");
+          checkProse(item, `${listName}[${i}]`);
           if (item.dsl !== void 0 && typeof item.dsl !== "string") err(`${listName}[${i}].dsl`, "String (DSL source) required");
         }
       });
@@ -15018,7 +15051,10 @@ roll_table "Power Field Destruction" {
           err(`${listName}[${i}]`, "Must be a string or { name, \u2026 } object");
           return;
         }
-        if (listName === "talents" || listName === "traits") checkRefDsl(entry, `${listName}[${i}]`);
+        if (listName === "talents" || listName === "traits") {
+          checkRefDsl(entry, `${listName}[${i}]`);
+          checkProse(entry, `${listName}[${i}]`);
+        }
       });
     }
     if (doc.weapons !== void 0) {
@@ -15096,6 +15132,7 @@ roll_table "Power Field Destruction" {
         }
         if (c && typeof c === "object") {
           checkRefDsl(c, `cybernetics[${i}]`);
+          checkProse(c, `cybernetics[${i}]`);
           for (const f of ["location", "notes"]) if (c[f] !== void 0 && typeof c[f] !== "string") err(`cybernetics[${i}].${f}`, "String required");
         }
       });

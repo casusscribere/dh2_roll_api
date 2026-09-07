@@ -49,7 +49,7 @@
 </nav>
 
 <h1>Character Builder</h1>
-<div class="sub">Advancement mode — spend XP on aptitude-costed advances straight from the rulebook tables (Tables 2-2/2-4/2-6). Pick a roster character or upload a character JSON; every purchase is applied and audited by the rules engine. Guided creation (the full wizard) arrives next phase.</div>
+<div class="sub">Spend XP on aptitude-costed advances straight from the rulebook tables (Tables 2-2/2-4/2-6), or create a new Acolyte with the guided wizard — every step is applied and audited by the rules engine.</div>
 
 <div class="grid" style="grid-template-columns:290px 1fr; align-items:start">
   <fieldset>
@@ -64,6 +64,19 @@
     <button id="validateBtn" class="minibtn ghost" disabled>Validate build</button>
     <div id="vreport" class="vreport"></div>
     <div id="handoff" class="hint" style="margin-top:.6rem"></div>
+  </fieldset>
+
+  <fieldset id="wizardBox" style="grid-column:1">
+    <legend>Creation wizard</legend>
+    <div class="hint">Guided RAW creation (core p.30–35): origin → characteristics (2d10+25,
+      one reroll — or manual entry, method recorded) → wounds &amp; fate → divination →
+      starting XP → details.</div>
+    <button id="wizStart" class="minibtn">Start a new Acolyte</button>
+    <div id="wizPanel" hidden>
+      <div id="wizStep" class="hint" style="margin:.4rem 0"></div>
+      <div id="wizBody"></div>
+      <div id="wizMsg" class="vreport"></div>
+    </div>
   </fieldset>
 
   <div>
@@ -95,7 +108,7 @@
 
 <script src="char-store.js"></script>
 <script type="module">
-import { BuilderSession, groupAdvances } from './builder-core.mjs';
+import { BuilderSession, groupAdvances, createWizard, WIZARD_STEPS } from './builder-core.mjs';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -266,6 +279,133 @@ function showReport(report) {
 }
 
 $('validateBtn').addEventListener('click', async () => showReport(await session.validate()));
+
+// ---- creation wizard (CB-4) — rendering only; every action calls the core --
+
+let wiz = null;
+let wizPack = null;
+
+$('wizStart').addEventListener('click', async () => {
+    wizPack = wizPack ?? await api('GET', '/api/chargen/pack');
+    wiz = createWizard({ pack: wizPack, api });
+    $('wizPanel').hidden = false;
+    renderWizard();
+});
+
+const wizAct = (fn) => async (...args) => {
+    try { await fn(...args); $('wizMsg').innerHTML = ''; }
+    catch (e) { $('wizMsg').innerHTML = `<div class="err">✖ ${esc(e.message)}</div>`; }
+    renderWizard();
+};
+
+function originPicker(stepId, list, currentRef) {
+    const sel = document.createElement('select');
+    sel.add(new Option('— choose —', ''));
+    for (const e of list) sel.add(new Option(e.name, e.ref));
+    if (currentRef) sel.value = currentRef;
+    sel.addEventListener('change', wizAct(() => sel.value && wiz.choose(stepId, { ref: sel.value })));
+    return sel;
+}
+
+function renderWizard() {
+    const st = wiz.state;
+    $('wizStep').innerHTML = WIZARD_STEPS.map((s) =>
+        s === st.step ? `<b class="gold">${s}</b>` : `<span class="dim">${s}</span>`).join(' → ');
+    const body = $('wizBody');
+    body.innerHTML = '';
+    const add = (el) => body.appendChild(el);
+    const button = (label, onclick) => {
+        const b = document.createElement('button');
+        b.className = 'minibtn'; b.textContent = label;
+        b.addEventListener('click', wizAct(onclick));
+        return b;
+    };
+
+    if (st.step === 'homeWorld' || st.step === 'background' || st.step === 'role') {
+        const lists = { homeWorld: wizPack.homeworlds, background: wizPack.backgrounds, role: wizPack.roles };
+        add(originPicker(st.step, lists[st.step], null));
+        for (const c of st.pendingChoices) {
+            if (!c.options) continue;
+            const label = document.createElement('div');
+            label.className = 'hint';
+            label.textContent = `Choice (${c.source ?? c.kind}): ${c.key}`;
+            add(label);
+            const sel = document.createElement('select');
+            sel.add(new Option('— choose —', ''));
+            for (const o of c.options) sel.add(new Option(o, o));
+            sel.addEventListener('change', wizAct(() =>
+                sel.value && wiz.choose('role', { choices: { [c.key]: sel.value } })));
+            add(sel);
+        }
+    } else if (st.step === 'characteristics') {
+        add(button('Roll (RAW 2d10+25, home-world dice kept high/low)', () => wiz.rollCharacteristics({ method: 'raw' })));
+        const manual = button('Enter manually…', () => {
+            const values = {};
+            for (const k of ['ws', 'bs', 's', 't', 'ag', 'int', 'per', 'wp', 'fel', 'influence']) {
+                const v = Number(window.prompt(`${k.toUpperCase()} value:`, '30'));
+                if (!Number.isFinite(v)) throw new Error('manual entry cancelled');
+                values[k] = v;
+            }
+            wiz.rollCharacteristics({ method: 'manual', values });
+        });
+        manual.classList.add('ghost');
+        add(manual);
+    } else if (st.step === 'woundsFate') {
+        showRolled(add);
+        if (st.characteristics?.method === 'raw' && !st.characteristics.rerolled) {
+            const sel = document.createElement('select');
+            sel.add(new Option('— reroll one characteristic (optional, kept) —', ''));
+            for (const k of ['ws', 'bs', 's', 't', 'ag', 'int', 'per', 'wp', 'fel', 'influence']) sel.add(new Option(k.toUpperCase(), k));
+            sel.addEventListener('change', wizAct(() =>
+                sel.value && wiz.rollCharacteristics({ method: 'raw', rerollIndex: sel.value })));
+            add(sel);
+        }
+        add(button(`Roll wounds (${st.originInfo.woundsFormula}) & the Emperor's Blessing`, () => wiz.choose('woundsFate')));
+    } else if (st.step === 'divination') {
+        const input = document.createElement('input');
+        input.placeholder = 'Emperor\'s Tarot / divination text';
+        add(input);
+        add(button('Record divination', () => wiz.setDivination(input.value || '—')));
+    } else if (st.step === 'startingXp') {
+        const hint = document.createElement('div');
+        hint.className = 'hint';
+        hint.textContent = `Spend the ${wizPack.startingXp} starting XP in the advancement panel (now loaded with this character), then come back and continue.`;
+        add(hint);
+        add(button('Open in the advancement panel', async () => { await openDoc(wiz.state.doc, null); }));
+        const nameInput = document.createElement('input');
+        nameInput.placeholder = 'Character name';
+        add(nameInput);
+        add(button('Continue with this name', () => {
+            if (session) wiz.state.doc = session.doc;      // pull purchases back from the panel
+            if (!nameInput.value.trim()) throw new Error('a name is required');
+            wiz.setDetails({ name: nameInput.value.trim() });
+        }));
+    } else if (st.step === 'validate') {
+        add(button('Validate & finish', async () => {
+            const { validation } = await wiz.finish();
+            const ok = !(validation.build.errors ?? []).length && !(validation.character.errors ?? []).length;
+            $('wizMsg').innerHTML = ok ? '<span class="gold">Character valid ✓ — loaded below; download or keep spending.</span>'
+                : [...(validation.build.errors ?? []), ...(validation.character.errors ?? [])]
+                    .map((e) => `<div class="err">✖ ${esc(e.message ?? e)}</div>`).join('');
+            await openDoc(wiz.state.doc, null);
+        }));
+    } else if (st.step === 'done') {
+        const donemsg = document.createElement('div');
+        donemsg.className = 'hint';
+        donemsg.textContent = 'Wizard complete — the character is loaded in the panel. Download JSON to keep it.';
+        add(donemsg);
+    }
+}
+
+function showRolled(add) {
+    if (!wiz.state.characteristics) return;
+    const t = document.createElement('div');
+    t.className = 'hint';
+    const v = wiz.state.characteristics.values;
+    t.textContent = 'Rolled: ' + Object.entries(v).map(([k, x]) => `${k.toUpperCase()} ${x}`).join(' · ')
+        + (wiz.state.characteristics.rerolled ? ` (rerolled ${wiz.state.characteristics.rerolled})` : '');
+    add(t);
+}
 
 loadRoster();
 </script>
