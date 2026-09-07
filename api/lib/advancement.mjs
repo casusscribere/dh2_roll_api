@@ -248,6 +248,7 @@ export function listAvailableAdvances(doc, pack) {
         const { met, problems } = checkPrerequisites(doc, t.prerequisites);
         push({
             kind: 'talent', ref: t.ref, name: t.name, tier: t.tier, matches,
+            ...(t.specialist && { specialist: true }),   // needs a sub-selection to buy
             cost: advanceCost(pack, { kind: 'talent', matches, tier: t.tier }),
             prereqsMet: met, prereqProblems: problems,
         });
@@ -442,6 +443,14 @@ export function applyAdvance(doc, pack, advance, { confirmed = false, override =
             break;
         }
         case 'talent': {
+            // Specialist talents (Weapon Training, Peer, Hatred, …) need a
+            // sub-selection, exactly like specialist skills — the spec rides
+            // the NAME ("Weapon Training (Las)"), which is also what the
+            // DSL's prefix matching keys on.
+            const packTalent = pack.talents.find((t) => t.ref === advance.ref);
+            if (packTalent?.specialist && !advance.speciality && !/\(.+\)\s*$/.test(String(advance.name ?? ''))) {
+                throw new Error('specialist talent needs a specialization');
+            }
             const name = purchasedName;
             const held = (d.talents ?? []).some((t) => norm(entryName(t)) === norm(name));
             if (held) throw new Error(`talent already held: ${name}`);

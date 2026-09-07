@@ -1373,7 +1373,7 @@
       weapon: (c, [n, d2]) => qualityLevel(c.qualities, String(n), d2),
       opposing_weapon: (c, [n, d2]) => qualityLevel(c.opposingQualities, String(n), d2)
     } },
-    { name: "has_talent", params: [str("Name")], returns: "bool", summary: "Character has the named talent (from the attack's talents[] list). Prefix match.", scopes: {
+    { name: "has_talent", params: [str("Name")], returns: "bool", summary: `Character has the named talent (from the attack's talents[] list). Prefix match \u2014 the sub-specialty mechanism: has_talent("Weapon Training") matches every specialization (built-in keywords and user-entered text alike), while has_talent("Weapon Training (Las)") or has_talent("Peer (Occult Scholars)") gates on that one spec.`, scopes: {
       attacker: (c, [n]) => hasNamed(c.talents ?? c.actor?.talents, n)
     } },
     { name: "has_trait", params: [str("Name")], returns: "bool", summary: 'Character/creature has the named DH2.0 trait (from traits[]). Prefix match \u2014 "Brutal Charge (3)" matches has_trait("Brutal Charge"). Scopes: attacker (default) or target (e.g. target.has_trait("Daemonic") \u2014 Sanctified).', scopes: {
@@ -15760,6 +15760,8 @@ roll_table "Power Field Destruction" {
         name: t.name,
         tier: t.tier,
         matches,
+        ...t.specialist && { specialist: true },
+        // needs a sub-selection to buy
         cost: advanceCost(pack, { kind: "talent", matches, tier: t.tier }),
         prereqsMet: met,
         prereqProblems: problems
@@ -15928,6 +15930,10 @@ roll_table "Power Field Destruction" {
         break;
       }
       case "talent": {
+        const packTalent = pack.talents.find((t) => t.ref === advance.ref);
+        if (packTalent?.specialist && !advance.speciality && !/\(.+\)\s*$/.test(String(advance.name ?? ""))) {
+          throw new Error("specialist talent needs a specialization");
+        }
         const name = purchasedName;
         const held = (d2.talents ?? []).some((t) => norm2(entryName2(t)) === norm2(name));
         if (held) throw new Error(`talent already held: ${name}`);

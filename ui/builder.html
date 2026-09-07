@@ -22,6 +22,12 @@
 .advrow .cost { color:var(--gold); min-width:4.2rem; text-align:right; font-family:var(--mono); }
 .badge { border:1px solid var(--border); border-radius:3px; padding:0 .35rem; font-size:.68rem; color:var(--dim); white-space:nowrap; }
 .badge.match2 { color:#7ec07e; border-color:#3c5a3c; }
+.badge.match1 { color:#b3ab63; border-color:#5a5533; }   /* halfway brown→green: one matching aptitude */
+.badge.rankpips { letter-spacing:2px; font-family:var(--mono); }
+.badge.rankpips .on { color:var(--gold); }
+.badge.rankpips .off { color:#3a3226; }
+.advrow button.gmwarn { background:#4a3a1a; color:#e0b050; border:1px solid #8a6a20; }
+#gmUnlockRow { margin-bottom:.5rem; }
 .badge.warn { color:var(--red); border-color:var(--red); cursor:help; }
 .advrow button { width:auto; margin:0; padding:.15rem .7rem; font-size:.78rem; }
 .advrow button:disabled { background:#3a3226; color:#6b5f4a; cursor:not-allowed; }
@@ -128,8 +134,11 @@
 
     <fieldset id="overrideBox" hidden>
       <legend>GM override</legend>
-      <div class="hint">Adds content with <b>all prerequisites ignored</b>, at 0 XP. The ledger
-        records the entry with source <code>manual override</code> — the audit trail always
+      <div id="gmUnlockRow"><label><input type="checkbox" id="gmUnlock">
+        <b>Unlock prerequisite-locked purchases</b> — locked 🔒 rows become buyable and every such
+        buy is ledgered as <code>[manual override — prerequisites bypassed]</code>.</label></div>
+      <div class="hint">The panel below instead ADDS content with all prerequisites ignored, at 0 XP.
+        The ledger records the entry with source <code>manual override</code> — the audit trail always
         shows how it got there.</div>
       <div style="display:flex; gap:.5rem; align-items:end; flex-wrap:wrap">
         <div><label for="ovKind">Kind</label>
@@ -255,15 +264,22 @@ function render() {
             row.className = 'advrow' + (a.affordable ? '' : ' unaffordable');
             if (a.ref && a.ref.includes(':')) row.dataset.ref = a.ref;
             const badges = [];
-            if (a.matches !== undefined) badges.push(`<span class="badge${a.matches === 2 ? ' match2' : ''}">${a.matches} apt</span>`);
-            if (a.rank) badges.push(`<span class="badge">rank ${a.rank}</span>`);
-            if (a.prereqProblems?.length) badges.push(`<span class="badge warn" title="${esc(a.prereqProblems.join('; '))}">prereq?</span>`);
-            row.innerHTML = `<span class="aname">${esc(a.name)}${a.speciality ? ` <span class="dim">(${esc(a.speciality)})</span>` : ''}</span>`
+            if (a.matches !== undefined) badges.push(`<span class="badge${a.matches === 2 ? ' match2' : a.matches === 1 ? ' match1' : ''}">${a.matches} apt</span>`);
+            // ONE rank schema across the board: filled/empty pips out of the
+            // track length (characteristics 5, skills 4, talent tiers 3).
+            if (a.rank) badges.push(rankPips(a.rank, a.kind === 'characteristic' ? 5 : 4, `rank ${a.rank}`));
+            if (a.tier) badges.push(rankPips(a.tier, 3, `tier ${a.tier}`));
+            if (a.prereqProblems?.length) badges.push(`<span class="badge warn" data-tip-text="${esc(a.prereqProblems.join('; '))}" data-tip-cite="prerequisites" title="${esc(a.prereqProblems.join('; '))}">prereq?</span>`);
+            row.innerHTML = `<span class="aname">${esc(a.name)}${a.speciality ? ` <span class="dim">(${esc(a.speciality)})</span>` : ''}${a.specialist ? ' <span class="dim">(pick a specialization)</span>' : ''}</span>`
                 + badges.join('') + `<span class="cost">${a.cost} xp</span>`;
             const btn = document.createElement('button');
-            btn.textContent = 'Buy';
-            btn.disabled = !a.affordable;
-            btn.addEventListener('click', () => buy(a));
+            const locked = a.prereqsMet === false && !gmUnlocked();
+            const overriding = a.prereqsMet === false && gmUnlocked();
+            btn.textContent = locked ? '🔒' : overriding ? 'Buy ⚠' : 'Buy';
+            if (overriding) btn.className = 'gmwarn';
+            if (locked) btn.title = 'Prerequisites unmet — enable the GM override below to unlock (buys are logged as manual override).';
+            btn.disabled = !a.affordable || locked;
+            btn.addEventListener('click', () => needsSpec(a) ? specBuy(row, btn, a) : buy(a));
             row.appendChild(btn);
             rows.appendChild(row);
         }
@@ -287,11 +303,69 @@ function render() {
 
 // ---- actions ---------------------------------------------------------------
 
+const gmUnlocked = () => $('gmUnlock')?.checked ?? false;
+
+/** Common rank badge: filled/empty pips out of the track length. */
+function rankPips(n, max, label) {
+    const pips = Array.from({ length: max }, (_, i) =>
+        `<span class="${i < n ? 'on' : 'off'}">${i < n ? '●' : '○'}</span>`).join('');
+    return `<span class="badge rankpips" title="${esc(label)} of ${max}">${pips}</span>`;
+}
+
+/** Advances that need a sub-selection before they can be bought. */
+const needsSpec = (a) => (a.kind === 'skill' && a.speciality === null) || (a.kind === 'talent' && a.specialist);
+
+/** Held specializations of the same base entry — the dropdown suggestions. */
+function heldSpecs(a) {
+    if (a.kind === 'skill') {
+        const skill = Object.entries(session.doc.skills ?? {}).find(([n]) => n === a.name.replace(/\s*\(.*\)$/, ''));
+        return Object.keys(skill?.[1]?.specialities ?? {});
+    }
+    const base = a.name.toLowerCase();
+    return (session.doc.talents ?? [])
+        .map((t) => (t.name ?? t))
+        .filter((n) => n.toLowerCase().startsWith(base))
+        .map((n) => (n.match(/\(([^)]+)\)\s*$/) ?? [])[1])
+        .filter(Boolean);
+}
+
+/** Inline write-in/dropdown for specialist purchases: the Buy button becomes
+ *  an input (with a datalist of already-held specs) + confirm. */
+function specBuy(row, btn, advance) {
+    if (row.querySelector('.specin')) return;
+    btn.hidden = true;
+    const input = document.createElement('input');
+    input.className = 'specin';
+    input.placeholder = 'specialization…';
+    input.style.width = '9rem';
+    const listId = `specs-${Math.random().toString(36).slice(2, 8)}`;
+    const dl = document.createElement('datalist');
+    dl.id = listId;
+    for (const sp of heldSpecs(advance)) dl.appendChild(new Option(sp));
+    input.setAttribute('list', listId);
+    const ok = document.createElement('button');
+    ok.textContent = '✓';
+    ok.addEventListener('click', async () => {
+        const spec = input.value.trim();
+        if (!spec) { input.focus(); return; }
+        await buy({ ...advance, speciality: spec });
+    });
+    const cancel = document.createElement('button');
+    cancel.className = 'ghost';
+    cancel.textContent = '✕';
+    cancel.addEventListener('click', () => { input.remove(); dl.remove(); ok.remove(); cancel.remove(); btn.hidden = false; });
+    input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') ok.click(); });
+    row.append(input, dl, ok, cancel);
+    input.focus();
+}
+
 async function buy(advance) {
     try {
-        if (advance.prereqsMet === false
-            && !window.confirm(`Prerequisites could not be verified:\n${(advance.prereqProblems ?? []).join('\n')}\n\nBuy anyway?`)) return;
-        await session.buy(advance, { confirmed: advance.prereqsMet === false });
+        const override = advance.prereqsMet === false;         // locked rows only reach here in GM-override mode
+        if (override && !gmUnlocked()) return;                 // belt and braces: never silent-bypass
+        if (advance.prereqsMet !== false && (advance.prereqProblems ?? []).length
+            && !window.confirm(`Prerequisites could not be verified:\n${advance.prereqProblems.join('\n')}\n\nBuy anyway?`)) return;
+        await session.buy(advance, { confirmed: (advance.prereqProblems ?? []).length > 0, override });
         persist();
         render();
         syncToCreation();
@@ -327,6 +401,7 @@ function renderOverride() {
 }
 
 $('ovKind').addEventListener('change', renderOverride);
+$('overrideBox').addEventListener('change', (ev) => { if (ev.target.id === 'gmUnlock') render(); });
 
 $('ovBtn').addEventListener('click', async () => {
     try {
@@ -465,8 +540,27 @@ function renderCreation() {
     originRow('Role', ccPack.roles, 'roleRef', 'role');
     const pend = $('ccPending');
     pend.innerHTML = '';
+    // Choice points PERSIST with their value — they reset only when their
+    // origin member changes (the core rescinds their keys then).
+    const MEMBER_STEP = { homeworldRef: 'homeWorld', backgroundRef: 'background', roleRef: 'role' };
+    const shown = new Set();
+    for (const cp of creation.choicePoints()) {
+        shown.add(cp.key);
+        const row = document.createElement('div');
+        row.className = 'ccrow';
+        row.innerHTML = `<div class="hint" style="flex:0 1 auto">${esc(cp.label)}:</div>`;
+        const sel = document.createElement('select');
+        sel.add(new Option('— choose —', ''));
+        for (const o of cp.options) sel.add(new Option(o, o));
+        if (cp.value) sel.value = cp.value;
+        sel.addEventListener('change', ccAct(() =>
+            sel.value && creation.choose(MEMBER_STEP[cp.member], { choices: { [cp.key]: sel.value } })));
+        row.appendChild(sel);
+        pend.appendChild(row);
+    }
+    // anything else the engine surfaced (duplicate aptitudes, unresolved grants)
     for (const c of st.pendingChoices) {
-        if (!c.options) continue;
+        if (!c.options || shown.has(c.key)) continue;
         const row = document.createElement('div');
         row.className = 'ccrow';
         row.innerHTML = `<div class="hint" style="flex:0 1 auto">Choice (${esc(c.source ?? c.kind)}): ${esc(c.key ?? '')}</div>`;

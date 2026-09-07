@@ -309,3 +309,28 @@ test('wizard: buying the Psyker elite advance at creation applies its instant ch
     const after = await w.advances();
     assert.ok(after.some((a) => a.kind === 'psy_rating' && a.rank === 2 && a.cost === 400));
 });
+
+test('choice points PERSIST with their values, and changing the member rescinds its choices', async () => {
+    const w = wizard();
+    await chooseOrigin(w);                                   // roleTalent: Quick Draw
+
+    // the resolved choice point is still listed, carrying its value
+    const points = w.choicePoints();
+    const rt = points.find((p) => p.key === 'roleTalent');
+    assert.ok(rt, 'resolved choice point disappeared');
+    assert.deepEqual(rt.options, ['Catfall', 'Quick Draw']);
+    assert.equal(rt.value, 'Quick Draw');
+    assert.equal(rt.member, 'roleRef');
+    assert.ok(w.state.doc.talents.some((t) => t.name === 'Quick Draw'));
+
+    // re-picking the SAME role's choice swaps the grant
+    await w.choose('role', { choices: { roleTalent: 'Catfall' } });
+    assert.ok(w.state.doc.talents.some((t) => t.name === 'Catfall'));
+    assert.ok(!w.state.doc.talents.some((t) => t.name === 'Quick Draw'), 'old pick rescinded on re-choice');
+
+    // changing the ROLE nullifies every choice attached to the previous role
+    await w.choose('role', { ref: 'dh2:role:chirurgeon' });
+    assert.equal(w.state.selections.choices.roleTalent, undefined, 'stale role choice not cleared');
+    assert.ok(!w.state.doc.talents.some((t) => t.name === 'Catfall'), 'previous role talent rescinded');
+    assert.ok(!w.choicePoints().some((p) => p.key === 'roleTalent' && p.value), 'no stale value shown');
+});

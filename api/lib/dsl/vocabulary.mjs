@@ -163,7 +163,7 @@ const FUNCTION_DEFS_RAW = [
         attacker: (c, [n, d]) => qualityLevel(c.qualities, String(n), d),
         weapon: (c, [n, d]) => qualityLevel(c.qualities, String(n), d),
         opposing_weapon: (c, [n, d]) => qualityLevel(c.opposingQualities, String(n), d) } },
-    { name: 'has_talent', params: [str('Name')], returns: 'bool', summary: 'Character has the named talent (from the attack\'s talents[] list). Prefix match.', scopes: {
+    { name: 'has_talent', params: [str('Name')], returns: 'bool', summary: 'Character has the named talent (from the attack\'s talents[] list). Prefix match — the sub-specialty mechanism: has_talent("Weapon Training") matches every specialization (built-in keywords and user-entered text alike), while has_talent("Weapon Training (Las)") or has_talent("Peer (Occult Scholars)") gates on that one spec.', scopes: {
         attacker: (c, [n]) => hasNamed(c.talents ?? c.actor?.talents, n) } },
     { name: 'has_trait', params: [str('Name')], returns: 'bool', summary: 'Character/creature has the named DH2.0 trait (from traits[]). Prefix match — "Brutal Charge (3)" matches has_trait("Brutal Charge"). Scopes: attacker (default) or target (e.g. target.has_trait("Daemonic") — Sanctified).', scopes: {
         attacker: (c, [n]) => hasNamed(c.traits ?? c.actor?.traits, n),
