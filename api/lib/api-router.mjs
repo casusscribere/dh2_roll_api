@@ -29,7 +29,7 @@ import { CHARACTER_ROSTER } from '../data/characters/roster.mjs';
 import { CHARGEN_PACK } from '../data/chargen/pack.mjs';
 import { loadProseOverlay } from './prose.mjs';
 import {
-    listAvailableAdvances, applyAdvance, applyGrant, applyOrigin, validateBuild, xpSummary,
+    listAvailableAdvances, applyAdvance, applyGrant, applyOrigin, replayPurchases, validateBuild, validateCreation, xpSummary,
 } from './advancement.mjs';
 import { compile } from './dsl/compiler.mjs';
 import { DslError } from './dsl/tokenizer.mjs';
@@ -115,13 +115,26 @@ const POST = {
         const { doc: next, entry } = applyGrant(doc, CHARGEN_PACK, body.grant ?? {}, { source: body.source ?? 'grant' });
         return { doc: next, entry, xp: xpSummary(next) };
     },
+    // Re-buy a recorded ledger against a re-derived doc at current prices —
+    // the Builder's propagation path when an earlier creation step changes.
+    '/api/chargen/replay': (body) => {
+        const doc = migrateCharacter(body.doc ?? {});
+        const { doc: next, conflicts } = replayPurchases(doc, CHARGEN_PACK, body.entries ?? []);
+        return { doc: next, conflicts, xp: xpSummary(next) };
+    },
     '/api/chargen/origin': (body) => {
         const doc = migrateCharacter(body.doc ?? {});
         return applyOrigin(doc, CHARGEN_PACK, body);
     },
     '/api/chargen/validate': (body) => {
         const doc = migrateCharacter(body.doc ?? {});
-        return { ...validateBuild(doc, CHARGEN_PACK), xp: xpSummary(doc) };
+        // `creation` merges at the ROUTE so validateBuild's report contract
+        // stays stable for its many consumers; the Builder renders both.
+        return {
+            ...validateBuild(doc, CHARGEN_PACK),
+            creation: validateCreation(doc, CHARGEN_PACK),
+            xp: xpSummary(doc),
+        };
     },
     // forcedRolls: caller-supplied die results (Foundry rolls its own dice for
     // the table UX; the engine judges them — the dh2-roll-vm pattern).

@@ -15873,8 +15873,12 @@ roll_table "Power Field Destruction" {
       name: label,
       cost: 0,
       kind: ledgerKind,
+      grantKind: grant.kind,
+      // what to re-apply on replay
       ...grant.ref && { ref: grant.ref },
       ...grant.rank !== void 0 && { rank: grant.rank },
+      ...grant.kind === "psy_rating" && grant.rating !== void 0 && { rank: grant.rating },
+      ...grant.speciality && { speciality: grant.speciality },
       source,
       date: today()
     };
@@ -16161,6 +16165,203 @@ roll_table "Power Field Destruction" {
       }
     }
     return { ok: errors.length === 0, errors, warnings };
+  }
+  var originEntryFor = (pack, list, member) => {
+    if (!member) return null;
+    const ref = typeof member === "object" ? member.ref : null;
+    const name = norm2(entryName2(member));
+    return pack[list].find((e) => ref && e.ref === ref || norm2(e.name) === name) ?? null;
+  };
+  var orChoiceSatisfied = (options, satisfied) => options.split(/\s+or\s+/i).some((o) => satisfied(o.trim()));
+  function validateCreation(doc, pack) {
+    const findings = [];
+    const origin = doc.origin ?? {};
+    const hw = originEntryFor(pack, "homeworlds", origin.homeworld);
+    const bg = originEntryFor(pack, "backgrounds", origin.background);
+    const role = originEntryFor(pack, "roles", origin.role);
+    for (const [member, entry, label] of [
+      [origin.homeworld, hw, "home world"],
+      [origin.background, bg, "background"],
+      [origin.role, role, "role"]
+    ]) {
+      if (!member) findings.push(`${label} not selected`);
+      else if (!entry) findings.push(`${label} "${entryName2(member)}" is not a pack entry`);
+    }
+    const talentHeld = (name) => (doc.talents ?? []).some((t) => norm2(entryName2(t)) === norm2(name));
+    const aptitudeHeld = (name) => (doc.aptitudes ?? []).some((a) => norm2(entryName2(a)) === norm2(name));
+    const skillTrained = (grant) => {
+      const m = grant.match(/^([^(]+?)\s*\(([^)]+)\)\s*$/);
+      const canonical = canonicalSkillName(m ? m[1] : grant);
+      if (!canonical) return false;
+      const s = skillEntryFor(doc, canonical);
+      if (!s) return false;
+      if (m) return (s.specialities?.[m[2]]?.advances ?? 0) >= 1;
+      return (s.advances ?? 0) >= 1;
+    };
+    if (role?.roleTalentChoice?.length && !role.roleTalentChoice.some(talentHeld)) {
+      findings.push(`role talent choice unresolved: ${role.roleTalentChoice.join(" or ")}`);
+    }
+    for (const [entry, kind] of [[hw?.aptitude, "home world aptitude"], [bg?.startingAptitude, "background aptitude"]]) {
+      if (entry && /\s+or\s+/i.test(entry) && !orChoiceSatisfied(entry, aptitudeHeld)) {
+        findings.push(`${kind} choice unresolved: ${entry}`);
+      }
+    }
+    for (const grant of bg?.skillsGranted ?? []) {
+      if (/\s+or\s+/i.test(grant) && !orChoiceSatisfied(grant, skillTrained)) {
+        findings.push(`background skill choice unresolved: ${grant}`);
+      }
+    }
+    for (const grant of bg?.talentsGranted ?? []) {
+      if (/\s+or\s+/i.test(grant) && !orChoiceSatisfied(grant, talentHeld)) {
+        findings.push(`background talent choice unresolved: ${grant}`);
+      }
+    }
+    const method = doc.extensions?.builder?.creation?.characteristics?.method ?? doc.extensions?.builder?.wizard?.characteristics?.method ?? null;
+    const CHAR_KEYS = ["ws", "bs", "s", "t", "ag", "int", "per", "wp", "fel"];
+    const ungenerated = CHAR_KEYS.filter((k) => {
+      const c = doc.characteristics?.[k];
+      return !((typeof c === "number" ? c : c?.base) > 0);
+    });
+    if (ungenerated.length) findings.push(`characteristics not yet generated: ${ungenerated.join(", ")}`);
+    else if (method === "raw") {
+      for (const k of CHAR_KEYS) {
+        const base = doc.characteristics[k].base ?? doc.characteristics[k];
+        if (base < 27 || base > 45) findings.push(`characteristic ${k} value ${base} is outside the RAW 27\u201345 range`);
+      }
+    }
+    if (hw && !(doc.influence > 0)) findings.push("influence not generated");
+    if (!(doc.wounds?.max > 0)) findings.push("wounds not rolled/set");
+    if (!(doc.fate?.max > 0)) findings.push("fate not set");
+    else if (hw && doc.fate.max < hw.fateThreshold) {
+      findings.push(`fate max ${doc.fate.max} is below the ${hw.name} threshold ${hw.fateThreshold}`);
+    }
+    if (!doc.tarot?.card && !doc.tarot?.text && !doc.tarot?.effect) findings.push("divination not recorded");
+    const eas = new Set((doc.origin?.eliteAdvances ?? []).map((e) => norm2(entryName2(e))));
+    if (eas.has("psyker") && eas.has("untouchable")) {
+      findings.push("invalid combination: the Psyker and Untouchable elite advances are mutually exclusive");
+    }
+    return findings;
+  }
+  function replayPurchases(doc, pack, entries) {
+    var _a;
+    let d2 = structuredClone(doc);
+    const conflicts = [];
+    for (const e of entries ?? []) {
+      try {
+        if ((e.cost ?? 0) === 0 && /^Elite Advance: /.test(e.source ?? "")) continue;
+        if ((e.cost ?? 0) === 0 && e.kind !== "elite_advance") {
+          const grantKind = e.grantKind ?? (["talent", "skill", "psy_rating"].includes(e.kind) ? e.kind : "note");
+          const grant = grantKind === "note" ? { kind: "note", text: e.name } : {
+            kind: grantKind,
+            name: e.name.replace(/\s*\([^)]*\)\s*$/, grantKind === "skill" && e.speciality ? "" : "$&").trim(),
+            ...e.ref && { ref: e.ref },
+            ...e.rank !== void 0 && { rank: e.rank },
+            ...grantKind === "psy_rating" && { rating: e.rank ?? 1 },
+            ...e.speciality && { speciality: e.speciality }
+          };
+          if (grant.kind === "skill") grant.name = String(e.name).replace(/\s*\([^)]*\)\s*$/, "");
+          ({ doc: d2 } = applyGrant(d2, pack, grant, { source: e.source ?? "grant" }));
+          continue;
+        }
+        const advance = reconstructAdvance(d2, pack, e);
+        if (!advance) {
+          if (e.kind === "talent" && !(d2.talents ?? []).some((t) => norm2(entryName2(t)) === norm2(e.name))) {
+            (d2.talents ?? (d2.talents = [])).push({ name: e.name, ...e.ref && { ref: e.ref } });
+          }
+          ((_a = d2.xp).ledger ?? (_a.ledger = [])).push({ ...e });
+          continue;
+        }
+        if (advance.prereqsMet === false) {
+          conflicts.push(`"${e.name}" now fails prerequisites (${advance.prereqProblems.join("; ")}) \u2014 kept as bought`);
+        }
+        ({ doc: d2 } = applyAdvance(d2, pack, advance, { confirmed: true, source: e.source }));
+      } catch (err) {
+        conflicts.push(`"${e.name}" could not be re-applied: ${err.message}`);
+      }
+    }
+    return { doc: d2, conflicts };
+  }
+  function reconstructAdvance(doc, pack, e) {
+    switch (e.kind) {
+      case "characteristic": {
+        const packKey = Object.keys(pack.characteristicAptitudes).find((pk) => docCharKey(pk) === docCharKey(e.ref));
+        if (!packKey) return null;
+        const matches = aptitudeMatches(doc, pack.characteristicAptitudes[packKey]);
+        return {
+          kind: "characteristic",
+          ref: docCharKey(e.ref),
+          name: e.name,
+          rank: e.rank,
+          matches,
+          cost: advanceCost(pack, { kind: "characteristic", matches, rank: e.rank }),
+          prereqsMet: true,
+          prereqProblems: []
+        };
+      }
+      case "skill": {
+        const skill = pack.skills.find((s) => s.ref === e.ref);
+        if (!skill) return null;
+        const matches = aptitudeMatches(doc, skill.aptitudes);
+        const m = String(e.name).match(/\(([^)]+)\)\s*$/);
+        return {
+          kind: "skill",
+          ref: e.ref,
+          name: e.name,
+          rank: e.rank,
+          matches,
+          speciality: skill.specialist ? e.speciality ?? m?.[1] ?? null : void 0,
+          cost: advanceCost(pack, { kind: "skill", matches, rank: e.rank }),
+          prereqsMet: true,
+          prereqProblems: []
+        };
+      }
+      case "talent": {
+        const talent = pack.talents.find((t) => t.ref === e.ref) ?? pack.talents.find((t) => norm2(t.name) === norm2(String(e.name).replace(/\s*\(.*\)$/, "")));
+        if (!talent) return null;
+        const matches = aptitudeMatches(doc, talent.aptitudes);
+        const { met, problems } = checkPrerequisites(doc, talent.prerequisites);
+        return {
+          kind: "talent",
+          ref: talent.ref,
+          name: e.name,
+          tier: talent.tier,
+          matches,
+          cost: advanceCost(pack, { kind: "talent", matches, tier: talent.tier }),
+          prereqsMet: met,
+          prereqProblems: problems
+        };
+      }
+      case "psy_rating":
+        return {
+          kind: "psy_rating",
+          ref: "psy.rating",
+          name: e.name,
+          rank: e.rank,
+          matches: 0,
+          cost: advanceCost(pack, { kind: "psy_rating", rank: e.rank }),
+          prereqsMet: true,
+          prereqProblems: []
+        };
+      case "elite_advance": {
+        const ea = pack.eliteAdvances.find((x) => x.ref === e.ref);
+        if (!ea) return null;
+        const { met, problems } = checkPrerequisites(
+          doc,
+          typeof ea.prerequisites === "string" ? [ea.prerequisites] : ea.prerequisites
+        );
+        return {
+          kind: "elite_advance",
+          ref: ea.ref,
+          name: ea.name,
+          matches: 0,
+          cost: ea.xpCost,
+          prereqsMet: met,
+          prereqProblems: problems
+        };
+      }
+      default:
+        return null;
+    }
   }
 
   // api/lib/dsl/docs.mjs
@@ -16504,13 +16705,24 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
       const { doc: next, entry } = applyGrant(doc, CHARGEN_PACK, body.grant ?? {}, { source: body.source ?? "grant" });
       return { doc: next, entry, xp: xpSummary(next) };
     },
+    // Re-buy a recorded ledger against a re-derived doc at current prices —
+    // the Builder's propagation path when an earlier creation step changes.
+    "/api/chargen/replay": (body) => {
+      const doc = migrateCharacter(body.doc ?? {});
+      const { doc: next, conflicts } = replayPurchases(doc, CHARGEN_PACK, body.entries ?? []);
+      return { doc: next, conflicts, xp: xpSummary(next) };
+    },
     "/api/chargen/origin": (body) => {
       const doc = migrateCharacter(body.doc ?? {});
       return applyOrigin(doc, CHARGEN_PACK, body);
     },
     "/api/chargen/validate": (body) => {
       const doc = migrateCharacter(body.doc ?? {});
-      return { ...validateBuild(doc, CHARGEN_PACK), xp: xpSummary(doc) };
+      return {
+        ...validateBuild(doc, CHARGEN_PACK),
+        creation: validateCreation(doc, CHARGEN_PACK),
+        xp: xpSummary(doc)
+      };
     },
     // forcedRolls: caller-supplied die results (Foundry rolls its own dice for
     // the table UX; the engine judges them — the dh2-roll-vm pattern).

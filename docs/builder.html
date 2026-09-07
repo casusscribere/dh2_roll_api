@@ -34,6 +34,15 @@
 .vreport .err { color:var(--red); }
 .vreport .wrn { color:#c0a05e; }
 .hint { color:var(--dim); font-size:.8rem; font-style:italic; }
+#creation fieldset { margin-bottom:.7rem; }
+.ccrow { display:flex; gap:.6rem; flex-wrap:wrap; align-items:end; }
+.ccrow > div { min-width:9rem; flex:1; }
+.ccgrid { display:grid; grid-template-columns:repeat(5, minmax(4.5rem, 1fr)); gap:.4rem .6rem; }
+.ccgrid label { font-size:.68rem; text-transform:uppercase; letter-spacing:1px; color:var(--dim); display:block; }
+.ccgrid input { width:100%; }
+.ccstat { border:1px solid var(--border); border-radius:4px; padding:.3rem .8rem; text-align:center; background:#0e0c09; }
+.ccstat .xv { font-size:1.05rem; color:var(--gold); }
+.ccstat .xl { font-size:.62rem; color:var(--dim); text-transform:uppercase; letter-spacing:1px; }
 </style>
 </head>
 <body>
@@ -66,20 +75,40 @@
     <div id="handoff" class="hint" style="margin-top:.6rem"></div>
   </fieldset>
 
-  <fieldset id="wizardBox" style="grid-column:1">
-    <legend>Creation wizard</legend>
-    <div class="hint">Guided RAW creation (core p.30–35): origin → characteristics (2d10+25,
-      one reroll — or manual entry, method recorded) → wounds &amp; fate → divination →
-      starting XP → details.</div>
-    <button id="wizStart" class="minibtn">Start a new Acolyte</button>
-    <div id="wizPanel" hidden>
-      <div id="wizStep" class="hint" style="margin:.4rem 0"></div>
-      <div id="wizBody"></div>
-      <div id="wizMsg" class="vreport"></div>
-    </div>
+  <fieldset id="newCharBox" style="grid-column:1">
+    <legend>New character</legend>
+    <div class="hint">Guided RAW creation (core p.30–35), right in the sheet: the creation
+      blocks appear in sequence and stay editable — changing an earlier choice re-derives
+      everything after it, and purchases replay at current prices.</div>
+    <button id="newCharBtn" class="minibtn">Start a new Acolyte</button>
   </fieldset>
 
   <div>
+    <div id="creation" hidden>
+      <fieldset id="ccOrigin">
+        <legend>Origin</legend>
+        <div id="ccOriginBody" class="ccrow"></div>
+        <div id="ccPending"></div>
+      </fieldset>
+      <fieldset id="ccChars" hidden>
+        <legend>Characteristics</legend>
+        <div id="ccCharsBody"></div>
+      </fieldset>
+      <fieldset id="ccWounds" hidden>
+        <legend>Wounds &amp; Fate</legend>
+        <div id="ccWoundsBody" class="ccrow"></div>
+      </fieldset>
+      <fieldset id="ccDiv" hidden>
+        <legend>Divination</legend>
+        <div id="ccDivBody" class="ccrow"></div>
+      </fieldset>
+      <fieldset id="ccFinish" hidden>
+        <legend>Equip &amp; finish</legend>
+        <div id="ccFinishBody"></div>
+      </fieldset>
+      <div id="ccConflicts" class="vreport"></div>
+    </div>
+
     <div class="xpstrip" id="xpstrip" hidden>
       <div class="xptile"><div class="xv" id="xpTotal">0</div><div class="xl">XP total</div></div>
       <div class="xptile"><div class="xv" id="xpSpent">0</div><div class="xl">Spent</div></div>
@@ -126,7 +155,7 @@
 
 <script src="char-store.js"></script>
 <script type="module">
-import { BuilderSession, groupAdvances, createWizard, WIZARD_STEPS } from './builder-core.mjs';
+import { BuilderSession, groupAdvances, createWizard, WIZARD_STEPS, WIZ_CHAR_KEYS } from './builder-core.mjs';
 import { mount as mountProseTips } from './prose-tip.mjs';
 mountProseTips({ api: async (m, p) => { const r = await fetch(p); if (!r.ok) throw new Error(r.status); return r.json(); } });
 
@@ -174,7 +203,11 @@ async function openDoc(doc, id) {
     $('exportBtn').disabled = false;
     $('validateBtn').disabled = false;
     $('vreport').innerHTML = '';
+    ccPack = ccPack ?? session.pack;
+    creation = createWizard({ pack: ccPack, api, doc: session.doc });
+    creating = false;
     render();
+    renderCreation();
 }
 
 $('preset').addEventListener('change', async (e) => {
@@ -262,12 +295,13 @@ async function buy(advance) {
         await session.buy(advance, { confirmed: advance.prereqsMet === false });
         persist();
         render();
+        syncToCreation();
     } catch (e) {
         window.alert(`Purchase failed: ${e.message}`);
     }
 }
 
-$('undoBtn').addEventListener('click', async () => { await session.undoLast(); persist(); render(); });
+$('undoBtn').addEventListener('click', async () => { await session.undoLast(); persist(); render(); syncToCreation(); });
 
 $('traitBtn').addEventListener('click', async () => {
     const sel = $('traitSel');
@@ -275,6 +309,7 @@ $('traitBtn').addEventListener('click', async () => {
     await session.grantTrait({ name: sel.options[sel.selectedIndex].text, ref: sel.value });
     persist();
     render();
+    syncToCreation();
 });
 
 // ---- GM override door ------------------------------------------------------
@@ -308,6 +343,7 @@ $('ovBtn').addEventListener('click', async () => {
         persist();
         render();
         renderOverride();
+        syncToCreation();
     } catch (e) {
         window.alert(`Override failed: ${e.message}`);
     }
@@ -330,7 +366,10 @@ $('exportBtn').addEventListener('click', () => {
 
 function showReport(report) {
     const bits = [];
-    if (report.ok && !(report.warnings ?? []).length) bits.push('<span class="gold">Build valid ✓</span>');
+    const clean = report.ok && !(report.warnings ?? []).length && !(report.creation ?? []).length;
+    if (clean) bits.push('<span class="gold">Build valid ✓ — creation complete</span>');
+    else if (report.ok && !(report.warnings ?? []).length) bits.push('<span class="gold">Build valid ✓</span>');
+    for (const c of report.creation ?? []) bits.push(`<div class="err">✖ creation: ${esc(c)}</div>`);
     for (const e of report.errors ?? []) bits.push(`<div class="err">✖ ${esc(e.message ?? e)}</div>`);
     for (const w of report.warnings ?? []) bits.push(`<div class="wrn">⚠ ${esc(w.message ?? w)}</div>`);
     $('vreport').innerHTML = bits.join('');
@@ -338,153 +377,225 @@ function showReport(report) {
 
 $('validateBtn').addEventListener('click', async () => showReport(await session.validate()));
 
-// ---- creation wizard (CB-4) — rendering only; every action calls the core --
+// ---- integrated creation panels ---------------------------------------------
+// One creation session per loaded doc. New characters build in sequence; loaded
+// characters show every block at once (their creation choices read from the
+// doc). Changing an earlier step on a recipe doc re-derives everything after
+// it and replays the ledger at current prices (conflicts surface below).
 
-let wiz = null;
-let wizPack = null;
+let creation = null;
+let creating = false;          // new-character mode → sequenced reveal
+let ccPack = null;
 
-$('wizStart').addEventListener('click', async () => {
-    wizPack = wizPack ?? await api('GET', '/api/chargen/pack');
-    wiz = createWizard({ pack: wizPack, api });
-    $('wizPanel').hidden = false;
-    renderWizard();
-});
-
-const wizAct = (fn) => async (...args) => {
-    try { await fn(...args); $('wizMsg').innerHTML = ''; }
-    catch (e) { $('wizMsg').innerHTML = `<div class="err">✖ ${esc(e.message)}</div>`; }
-    renderWizard();
+const ccAct = (fn) => async (...args) => {
+    try {
+        await fn(...args);
+        await syncFromCreation();
+    } catch (e) {
+        window.alert(`Creation step failed: ${e.message}`);
+        renderCreation();
+    }
 };
 
-function originPicker(stepId, list, currentRef) {
+async function syncFromCreation() {
+    if (!creation?.state.doc) { renderCreation(); return; }
+    if (!session) {
+        session = new BuilderSession({ doc: creation.state.doc, api });
+        await session.load();
+        $('saveBtn').disabled = !currentId;
+        $('exportBtn').disabled = false;
+        $('validateBtn').disabled = false;
+    } else {
+        session.doc = creation.state.doc;
+        await session.refresh();
+    }
+    persist();
+    render();
+    renderCreation();
+}
+
+/** Push panel-side purchases back into the creation session. */
+function syncToCreation() {
+    if (creation && session) creation.state.doc = session.doc;
+    renderCreation();
+}
+
+$('newCharBtn').addEventListener('click', async () => {
+    ccPack = ccPack ?? await api('GET', '/api/chargen/pack');
+    creation = createWizard({ pack: ccPack, api });
+    creating = true;
+    session = null;
+    currentId = null;
+    $('charStatus').innerHTML = '<span class="gold">New Acolyte</span> <span class="dim">(creating)</span>';
+    $('xpstrip').hidden = true; $('advances').innerHTML = '';
+    $('traitBox').hidden = true; $('overrideBox').hidden = true; $('ledgerBox').hidden = true;
+    renderCreation();
+});
+
+function ccVisible(stepId) {
+    if (!creating) return true;                          // loaded docs: everything shows
+    const order = WIZARD_STEPS;
+    return order.indexOf(stepId) <= order.indexOf(creation.state.step);
+}
+
+function ccSelect(list, currentRef, onPick, placeholder) {
     const sel = document.createElement('select');
-    sel.add(new Option('— choose —', ''));
+    sel.add(new Option(placeholder ?? '— choose —', ''));
     for (const e of list) sel.add(new Option(e.name, e.ref));
     if (currentRef) sel.value = currentRef;
-    sel.addEventListener('change', wizAct(() => sel.value && wiz.choose(stepId, { ref: sel.value })));
+    sel.addEventListener('change', ccAct(() => onPick(sel.value || null)));
     return sel;
 }
 
-function renderWizard() {
-    const st = wiz.state;
-    $('wizStep').innerHTML = WIZARD_STEPS.map((s) =>
-        s === st.step ? `<b class="gold">${s}</b>` : `<span class="dim">${s}</span>`).join(' → ');
-    const body = $('wizBody');
-    body.innerHTML = '';
-    const add = (el) => body.appendChild(el);
-    const button = (label, onclick) => {
-        const b = document.createElement('button');
-        b.className = 'minibtn'; b.textContent = label;
-        b.addEventListener('click', wizAct(onclick));
-        return b;
-    };
+function renderCreation() {
+    if (!creation) { $('creation').hidden = true; return; }
+    $('creation').hidden = false;
+    const st = creation.state;
 
-    if (st.step === 'homeWorld' || st.step === 'background' || st.step === 'role') {
-        const lists = { homeWorld: wizPack.homeworlds, background: wizPack.backgrounds, role: wizPack.roles };
-        add(originPicker(st.step, lists[st.step], null));
-        for (const c of st.pendingChoices) {
-            if (!c.options) continue;
-            const label = document.createElement('div');
-            label.className = 'hint';
-            label.textContent = `Choice (${c.source ?? c.kind}): ${c.key}`;
-            add(label);
-            const sel = document.createElement('select');
-            sel.add(new Option('— choose —', ''));
-            for (const o of c.options) sel.add(new Option(o, o));
-            sel.addEventListener('change', wizAct(() =>
-                sel.value && wiz.choose('role', { choices: { [c.key]: sel.value } })));
-            add(sel);
+    // Origin -------------------------------------------------------------
+    const ob = $('ccOriginBody');
+    ob.innerHTML = '';
+    const originRow = (label, list, key, stepId) => {
+        const wrap = document.createElement('div');
+        wrap.innerHTML = `<label>${label}</label>`;
+        wrap.appendChild(ccSelect(list, st.selections[key], (ref) => creation.choose(stepId, { ref })));
+        ob.appendChild(wrap);
+    };
+    originRow('Home world', ccPack.homeworlds, 'homeworldRef', 'homeWorld');
+    originRow('Background', ccPack.backgrounds, 'backgroundRef', 'background');
+    originRow('Role', ccPack.roles, 'roleRef', 'role');
+    const pend = $('ccPending');
+    pend.innerHTML = '';
+    for (const c of st.pendingChoices) {
+        if (!c.options) continue;
+        const row = document.createElement('div');
+        row.className = 'ccrow';
+        row.innerHTML = `<div class="hint" style="flex:0 1 auto">Choice (${esc(c.source ?? c.kind)}): ${esc(c.key ?? '')}</div>`;
+        const sel = document.createElement('select');
+        sel.add(new Option('— choose —', ''));
+        for (const o of c.options) sel.add(new Option(o, o));
+        sel.addEventListener('change', ccAct(() =>
+            sel.value && creation.choose('role', { choices: { [c.key]: sel.value } })));
+        row.appendChild(sel);
+        pend.appendChild(row);
+    }
+    if (!st.hasRecipe && (st.selections.homeworldRef || st.selections.backgroundRef || st.selections.roleRef)) {
+        pend.insertAdjacentHTML('beforeend',
+            '<div class="hint">No creation recipe on this character — origin changes ADD the new grants; nothing from a previous selection is removed.</div>');
+    }
+
+    // Characteristics ------------------------------------------------------
+    $('ccChars').hidden = !ccVisible('characteristics');
+    if (!$('ccChars').hidden) {
+        const cb = $('ccCharsBody');
+        cb.innerHTML = '';
+        const grid = document.createElement('div');
+        grid.className = 'ccgrid';
+        const values = st.characteristics?.values ?? {};
+        for (const k of [...WIZ_CHAR_KEYS, 'influence']) {
+            const cell = document.createElement('div');
+            cell.innerHTML = `<label>${k === 'influence' ? 'Inf' : k.toUpperCase()}</label>`;
+            const input = document.createElement('input');
+            input.type = 'number'; input.min = 0; input.max = 100;
+            input.value = values[k] ?? '';
+            input.addEventListener('change', ccAct(() => creation.setCharacteristic(k, Number(input.value) || 0)));
+            cell.appendChild(input);
+            grid.appendChild(cell);
         }
-    } else if (st.step === 'characteristics') {
-        add(button('Roll (RAW 2d10+25, home-world dice kept high/low)', () => wiz.rollCharacteristics({ method: 'raw' })));
-        const manual = button('Enter manually…', () => {
-            const values = {};
-            for (const k of ['ws', 'bs', 's', 't', 'ag', 'int', 'per', 'wp', 'fel', 'influence']) {
-                const v = Number(window.prompt(`${k.toUpperCase()} value:`, '30'));
-                if (!Number.isFinite(v)) throw new Error('manual entry cancelled');
-                values[k] = v;
+        cb.appendChild(grid);
+        const row = document.createElement('div');
+        row.className = 'ccrow';
+        if (st.hasRecipe) {
+            const rollBtn = document.createElement('button');
+            rollBtn.className = 'minibtn';
+            rollBtn.textContent = st.characteristics ? 'Re-roll all (RAW)' : 'Roll (RAW 2d10+25, home-world dice kept high/low)';
+            rollBtn.addEventListener('click', ccAct(() => creation.rollCharacteristics({ method: 'raw' })));
+            row.appendChild(rollBtn);
+            if (st.characteristics?.method === 'raw' && !st.characteristics.rerolled) {
+                const sel = document.createElement('select');
+                sel.add(new Option('— reroll ONE characteristic (kept) —', ''));
+                for (const k of [...WIZ_CHAR_KEYS, 'influence']) sel.add(new Option(k.toUpperCase(), k));
+                sel.addEventListener('change', ccAct(() =>
+                    sel.value && creation.rollCharacteristics({ method: 'raw', rerollIndex: sel.value })));
+                row.appendChild(sel);
             }
-            wiz.rollCharacteristics({ method: 'manual', values });
-        });
-        manual.classList.add('ghost');
-        add(manual);
-    } else if (st.step === 'woundsFate') {
-        showRolled(add);
-        if (st.characteristics?.method === 'raw' && !st.characteristics.rerolled) {
-            const sel = document.createElement('select');
-            sel.add(new Option('— reroll one characteristic (optional, kept) —', ''));
-            for (const k of ['ws', 'bs', 's', 't', 'ag', 'int', 'per', 'wp', 'fel', 'influence']) sel.add(new Option(k.toUpperCase(), k));
-            sel.addEventListener('change', wizAct(() =>
-                sel.value && wiz.rollCharacteristics({ method: 'raw', rerollIndex: sel.value })));
-            add(sel);
         }
-        add(button(`Roll wounds (${st.originInfo.woundsFormula}) & the Emperor's Blessing`, () => wiz.choose('woundsFate')));
-    } else if (st.step === 'divination') {
+        const method = st.characteristics?.method;
+        row.insertAdjacentHTML('beforeend',
+            `<div class="hint" style="flex:0 1 auto">${method ? `method: ${esc(method)}${st.characteristics.rerolled ? ` · rerolled ${esc(st.characteristics.rerolled)}` : ''}` : 'edit values directly, or roll'}</div>`);
+        cb.appendChild(row);
+    }
+
+    // Wounds & Fate --------------------------------------------------------
+    $('ccWounds').hidden = !ccVisible('woundsFate');
+    if (!$('ccWounds').hidden) {
+        const wb = $('ccWoundsBody');
+        wb.innerHTML = '';
+        const doc = st.doc ?? {};
+        const stat = (label, v) => `<div class="ccstat"><div class="xv">${v ?? '—'}</div><div class="xl">${label}</div></div>`;
+        wb.innerHTML = stat('Wounds', doc.wounds?.max) + stat('Fate', doc.fate?.max)
+            + `<div class="hint" style="flex:2">${st.originInfo ? `formula ${esc(st.originInfo.woundsFormula ?? '?')} · Blessing on ${st.originInfo.emperorsBlessing}+` : ''}`
+            + `${st.woundsFate?.woundsRoll != null ? ` · rolled ${st.woundsFate.woundsRoll} / blessing d10 ${st.woundsFate.blessingRoll}${st.woundsFate.blessed ? ' ✓' : ''}` : ''}</div>`;
+        if (st.hasRecipe && st.originInfo) {
+            const b = document.createElement('button');
+            b.className = 'minibtn';
+            b.textContent = st.woundsFate ? "Re-roll wounds & Blessing" : "Roll wounds & the Emperor's Blessing";
+            b.addEventListener('click', ccAct(() => creation.choose('woundsFate')));
+            wb.appendChild(b);
+        }
+    }
+
+    // Divination -----------------------------------------------------------
+    $('ccDiv').hidden = !ccVisible('divination');
+    if (!$('ccDiv').hidden) {
+        const db = $('ccDivBody');
+        db.innerHTML = '';
         const input = document.createElement('input');
-        input.placeholder = 'Emperor\'s Tarot / divination text';
-        add(input);
-        add(button('Record divination', () => wiz.setDivination(input.value || '—')));
-    } else if (st.step === 'startingXp') {
-        const hint = document.createElement('div');
-        hint.className = 'hint';
-        hint.textContent = `Spend the ${wizPack.startingXp} starting XP in the advancement panel (now loaded with this character) — elite advances bought here apply their instant changes automatically. Then continue to equipment.`;
-        add(hint);
-        add(button('Open in the advancement panel', async () => { await openDoc(wiz.state.doc, null); }));
-        add(button('Continue to equipment', () => {
-            if (session) wiz.state.doc = session.doc;      // pull purchases back from the panel
-            wiz.state.equipment = null;
-            return wiz.choose('equipment', { gear: [] }).then(() => { wiz.state.equipment.pending = true; });
-        }));
-    } else if (st.step === 'equipment' || wiz.state.equipment?.pending) {
-        const info = wiz.equipmentInfo();
-        const hint = document.createElement('div');
-        hint.className = 'hint';
-        hint.innerHTML = `Equip Acolyte (core stage 4): background kit class <b class="gold">${esc(info.startingEquipmentClass || '—')}</b>; plus up to <b class="gold">${info.acquisitions}</b> acquisitions of Scarce (–10) or better (one per point of Influence bonus). Add items below (name — optional notes), then continue.`;
-        add(hint);
+        input.style.flex = '3';
+        input.placeholder = "Emperor's Tarot / divination text";
+        input.value = st.divination || '';
+        db.appendChild(input);
+        const b = document.createElement('button');
+        b.className = 'minibtn';
+        b.textContent = 'Record';
+        b.addEventListener('click', ccAct(() => creation.setDivination(input.value || '—')));
+        db.appendChild(b);
+    }
+
+    // Equip & finish (creation mode only; loaded docs use the panel below) ---
+    $('ccFinish').hidden = !creating || !ccVisible('startingXp');
+    if (!$('ccFinish').hidden) {
+        const fb = $('ccFinishBody');
+        fb.innerHTML = '';
+        const info = creation.equipmentInfo();
+        fb.insertAdjacentHTML('beforeend',
+            `<div class="hint">Spend the starting XP in the panel below (elite advances apply their instant changes automatically). Equip Acolyte: kit class <b class="gold">${esc(info.startingEquipmentClass || '—')}</b> + up to <b class="gold">${info.acquisitions}</b> acquisitions of Scarce (–10) or better. Carried: ${esc((st.doc?.gear ?? []).map((g) => g.name).join(', ') || '(nothing yet)')}</div>`);
+        const row = document.createElement('div');
+        row.className = 'ccrow';
         const nameIn = document.createElement('input'); nameIn.placeholder = 'Item name';
         const noteIn = document.createElement('input'); noteIn.placeholder = 'Notes (optional)';
-        add(nameIn); add(noteIn);
-        add(button('Add item', () => {
+        const addBtn = document.createElement('button'); addBtn.className = 'minibtn ghost'; addBtn.textContent = 'Add item';
+        addBtn.addEventListener('click', ccAct(() => {
             if (!nameIn.value.trim()) throw new Error('item needs a name');
-            return wiz.choose('equipment', { gear: [{ name: nameIn.value.trim(), notes: noteIn.value.trim() || undefined }] })
-                .then(() => { wiz.state.equipment.pending = true; });
+            return creation.choose('equipment', { gear: [{ name: nameIn.value.trim(), notes: noteIn.value.trim() || undefined }] });
         }));
-        const listed = document.createElement('div'); listed.className = 'hint';
-        listed.textContent = 'Carried: ' + ((wiz.state.doc.gear ?? []).map((g) => g.name).join(', ') || '(nothing yet)');
-        add(listed);
-        const nameInput = document.createElement('input');
-        nameInput.placeholder = 'Character name';
-        add(nameInput);
-        add(button('Done — continue with this name', () => {
-            delete wiz.state.equipment.pending;
-            if (!nameInput.value.trim()) throw new Error('a name is required');
-            wiz.setDetails({ name: nameInput.value.trim() });
+        const charName = document.createElement('input'); charName.placeholder = 'Character name'; charName.value = st.details.name || '';
+        const finishBtn = document.createElement('button'); finishBtn.className = 'minibtn'; finishBtn.textContent = 'Validate & finish';
+        finishBtn.addEventListener('click', ccAct(async () => {
+            if (!charName.value.trim()) throw new Error('a name is required');
+            creation.setDetails({ name: charName.value.trim() });
+            if (!creation.state.equipment) await creation.choose('equipment', { gear: [] });
+            const { validation } = await creation.finish();
+            creating = false;
+            showReport(validation.build);
         }));
-    } else if (st.step === 'validate') {
-        add(button('Validate & finish', async () => {
-            const { validation } = await wiz.finish();
-            const ok = !(validation.build.errors ?? []).length && !(validation.character.errors ?? []).length;
-            $('wizMsg').innerHTML = ok ? '<span class="gold">Character valid ✓ — loaded below; download or keep spending.</span>'
-                : [...(validation.build.errors ?? []), ...(validation.character.errors ?? [])]
-                    .map((e) => `<div class="err">✖ ${esc(e.message ?? e)}</div>`).join('');
-            await openDoc(wiz.state.doc, null);
-        }));
-    } else if (st.step === 'done') {
-        const donemsg = document.createElement('div');
-        donemsg.className = 'hint';
-        donemsg.textContent = 'Wizard complete — the character is loaded in the panel. Download JSON to keep it.';
-        add(donemsg);
+        for (const el of [nameIn, noteIn, addBtn, charName, finishBtn]) row.appendChild(el);
+        fb.appendChild(row);
     }
-}
 
-function showRolled(add) {
-    if (!wiz.state.characteristics) return;
-    const t = document.createElement('div');
-    t.className = 'hint';
-    const v = wiz.state.characteristics.values;
-    t.textContent = 'Rolled: ' + Object.entries(v).map(([k, x]) => `${k.toUpperCase()} ${x}`).join(' · ')
-        + (wiz.state.characteristics.rerolled ? ` (rerolled ${wiz.state.characteristics.rerolled})` : '');
-    add(t);
+    // Replay conflicts -----------------------------------------------------
+    $('ccConflicts').innerHTML = (st.conflicts ?? [])
+        .map((c) => `<div class="wrn">⚠ ${esc(c)}</div>`).join('');
 }
 
 loadRoster();

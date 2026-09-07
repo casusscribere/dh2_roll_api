@@ -361,8 +361,11 @@ function applyGrantTo(d, pack, grant, source) {
     }
     const entry = {
         name: label, cost: 0, kind: ledgerKind,
+        grantKind: grant.kind,                 // what to re-apply on replay
         ...(grant.ref && { ref: grant.ref }),
         ...(grant.rank !== undefined && { rank: grant.rank }),
+        ...(grant.kind === 'psy_rating' && grant.rating !== undefined && { rank: grant.rating }),
+        ...(grant.speciality && { speciality: grant.speciality }),
         source, date: today(),
     };
     d.xp ??= { total: 0, ledger: [] };
@@ -756,3 +759,213 @@ export function validateBuild(doc, pack) {
  *  Exported rather than made public because the grant-expansion rules are
  *  fiddly enough to deserve direct tests, not only end-to-end ones. */
 export const originGrantedTalentsForTest = originGrantedTalents;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Creation-flow validation + ledger replay (2026-08-27) — the engine half of
+ * the Builder's integrated creation panels.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+const originEntryFor = (pack, list, member) => {
+    if (!member) return null;
+    const ref = typeof member === 'object' ? member.ref : null;
+    const name = norm(entryName(member));
+    return pack[list].find((e) => (ref && e.ref === ref) || norm(e.name) === name) ?? null;
+};
+
+const orChoiceSatisfied = (options, satisfied) =>
+    options.split(/\s+or\s+/i).some((o) => satisfied(o.trim()));
+
+/**
+ * Findings over the CHARACTER CREATION process — unselected origin members,
+ * unresolved "A or B" choice points, ungenerated characteristics (with the
+ * RAW 27–45 range check when the recorded method is 'raw'), unset wounds/
+ * fate/influence, fate below the home-world threshold, empty divination, and
+ * the Psyker↔Untouchable combination. Pure display facts: `validateBuild`
+ * carries them as `creation` and the D-I errors/warnings policy is untouched.
+ */
+export function validateCreation(doc, pack) {
+    const findings = [];
+    const origin = doc.origin ?? {};
+    const hw = originEntryFor(pack, 'homeworlds', origin.homeworld);
+    const bg = originEntryFor(pack, 'backgrounds', origin.background);
+    const role = originEntryFor(pack, 'roles', origin.role);
+
+    for (const [member, entry, label] of [
+        [origin.homeworld, hw, 'home world'], [origin.background, bg, 'background'], [origin.role, role, 'role'],
+    ]) {
+        if (!member) findings.push(`${label} not selected`);
+        else if (!entry) findings.push(`${label} "${entryName(member)}" is not a pack entry`);
+    }
+
+    const talentHeld = (name) => (doc.talents ?? []).some((t) => norm(entryName(t)) === norm(name));
+    const aptitudeHeld = (name) => (doc.aptitudes ?? []).some((a) => norm(entryName(a)) === norm(name));
+    const skillTrained = (grant) => {
+        const m = grant.match(/^([^(]+?)\s*\(([^)]+)\)\s*$/);
+        const canonical = canonicalSkillName(m ? m[1] : grant);
+        if (!canonical) return false;
+        const s = skillEntryFor(doc, canonical);
+        if (!s) return false;
+        if (m) return (s.specialities?.[m[2]]?.advances ?? 0) >= 1;
+        return (s.advances ?? 0) >= 1;
+    };
+
+    if (role?.roleTalentChoice?.length && !role.roleTalentChoice.some(talentHeld)) {
+        findings.push(`role talent choice unresolved: ${role.roleTalentChoice.join(' or ')}`);
+    }
+    for (const [entry, kind] of [[hw?.aptitude, 'home world aptitude'], [bg?.startingAptitude, 'background aptitude']]) {
+        if (entry && /\s+or\s+/i.test(entry) && !orChoiceSatisfied(entry, aptitudeHeld)) {
+            findings.push(`${kind} choice unresolved: ${entry}`);
+        }
+    }
+    for (const grant of bg?.skillsGranted ?? []) {
+        if (/\s+or\s+/i.test(grant) && !orChoiceSatisfied(grant, skillTrained)) {
+            findings.push(`background skill choice unresolved: ${grant}`);
+        }
+    }
+    for (const grant of bg?.talentsGranted ?? []) {
+        if (/\s+or\s+/i.test(grant) && !orChoiceSatisfied(grant, talentHeld)) {
+            findings.push(`background talent choice unresolved: ${grant}`);
+        }
+    }
+
+    // characteristics: generated, and RAW-legal when the recipe says rolled
+    const method = doc.extensions?.builder?.creation?.characteristics?.method
+        ?? doc.extensions?.builder?.wizard?.characteristics?.method ?? null;
+    const CHAR_KEYS = ['ws', 'bs', 's', 't', 'ag', 'int', 'per', 'wp', 'fel'];
+    const ungenerated = CHAR_KEYS.filter((k) => {
+        const c = doc.characteristics?.[k];
+        return !((typeof c === 'number' ? c : c?.base) > 0);
+    });
+    if (ungenerated.length) findings.push(`characteristics not yet generated: ${ungenerated.join(', ')}`);
+    else if (method === 'raw') {
+        for (const k of CHAR_KEYS) {
+            const base = doc.characteristics[k].base ?? doc.characteristics[k];
+            if (base < 27 || base > 45) findings.push(`characteristic ${k} value ${base} is outside the RAW 27–45 range`);
+        }
+    }
+    if (hw && !(doc.influence > 0)) findings.push('influence not generated');
+
+    if (!(doc.wounds?.max > 0)) findings.push('wounds not rolled/set');
+    if (!(doc.fate?.max > 0)) findings.push('fate not set');
+    else if (hw && doc.fate.max < hw.fateThreshold) {
+        findings.push(`fate max ${doc.fate.max} is below the ${hw.name} threshold ${hw.fateThreshold}`);
+    }
+    if (!doc.tarot?.card && !doc.tarot?.text && !doc.tarot?.effect) findings.push('divination not recorded');
+
+    const eas = new Set((doc.origin?.eliteAdvances ?? []).map((e) => norm(entryName(e))));
+    if (eas.has('psyker') && eas.has('untouchable')) {
+        findings.push('invalid combination: the Psyker and Untouchable elite advances are mutually exclusive');
+    }
+    return findings;
+}
+
+/**
+ * Re-buy a ledger against a (possibly re-derived) doc at CURRENT prices — the
+ * propagation mechanism when an earlier creation step changes. Purchases are
+ * replayed in order through applyAdvance (aptitude matches and costs
+ * recomputed; prerequisite failures are kept but reported), grants through
+ * applyGrant via their recorded grantKind, and elite-advance grant ECHOES are
+ * skipped (the EA purchase regenerates them). Anything unappliable lands in
+ * `conflicts` instead of aborting the rebuild or being silently charged.
+ * @returns {{ doc: object, conflicts: string[] }}
+ */
+export function replayPurchases(doc, pack, entries) {
+    let d = structuredClone(doc);
+    const conflicts = [];
+    for (const e of entries ?? []) {
+        try {
+            if ((e.cost ?? 0) === 0 && /^Elite Advance: /.test(e.source ?? '')) continue;
+            if ((e.cost ?? 0) === 0 && e.kind !== 'elite_advance') {
+                const grantKind = e.grantKind
+                    ?? (['talent', 'skill', 'psy_rating'].includes(e.kind) ? e.kind : 'note');
+                const grant = grantKind === 'note'
+                    ? { kind: 'note', text: e.name }
+                    : {
+                        kind: grantKind, name: e.name.replace(/\s*\([^)]*\)\s*$/, grantKind === 'skill' && e.speciality ? '' : '$&').trim(),
+                        ...(e.ref && { ref: e.ref }), ...(e.rank !== undefined && { rank: e.rank }),
+                        ...(grantKind === 'psy_rating' && { rating: e.rank ?? 1 }),
+                        ...(e.speciality && { speciality: e.speciality }),
+                    };
+                if (grant.kind === 'skill') grant.name = String(e.name).replace(/\s*\([^)]*\)\s*$/, '');
+                ({ doc: d } = applyGrant(d, pack, grant, { source: e.source ?? 'grant' }));
+                continue;
+            }
+            const advance = reconstructAdvance(d, pack, e);
+            if (!advance) {
+                // not in the pack (custom content): carry the record verbatim
+                if (e.kind === 'talent' && !(d.talents ?? []).some((t) => norm(entryName(t)) === norm(e.name))) {
+                    (d.talents ??= []).push({ name: e.name, ...(e.ref && { ref: e.ref }) });
+                }
+                (d.xp.ledger ??= []).push({ ...e });
+                continue;
+            }
+            if (advance.prereqsMet === false) {
+                conflicts.push(`"${e.name}" now fails prerequisites (${advance.prereqProblems.join('; ')}) — kept as bought`);
+            }
+            ({ doc: d } = applyAdvance(d, pack, advance, { confirmed: true, source: e.source }));
+        } catch (err) {
+            conflicts.push(`"${e.name}" could not be re-applied: ${err.message}`);
+        }
+    }
+    return { doc: d, conflicts };
+}
+
+/** The current-price advance object for a recorded ledger entry, or null when
+ *  the pack does not know the purchase (custom content). */
+function reconstructAdvance(doc, pack, e) {
+    switch (e.kind) {
+        case 'characteristic': {
+            const packKey = Object.keys(pack.characteristicAptitudes)
+                .find((pk) => docCharKey(pk) === docCharKey(e.ref));
+            if (!packKey) return null;
+            const matches = aptitudeMatches(doc, pack.characteristicAptitudes[packKey]);
+            return {
+                kind: 'characteristic', ref: docCharKey(e.ref), name: e.name, rank: e.rank, matches,
+                cost: advanceCost(pack, { kind: 'characteristic', matches, rank: e.rank }),
+                prereqsMet: true, prereqProblems: [],
+            };
+        }
+        case 'skill': {
+            const skill = pack.skills.find((s) => s.ref === e.ref);
+            if (!skill) return null;
+            const matches = aptitudeMatches(doc, skill.aptitudes);
+            const m = String(e.name).match(/\(([^)]+)\)\s*$/);
+            return {
+                kind: 'skill', ref: e.ref, name: e.name, rank: e.rank, matches,
+                speciality: skill.specialist ? (e.speciality ?? m?.[1] ?? null) : undefined,
+                cost: advanceCost(pack, { kind: 'skill', matches, rank: e.rank }),
+                prereqsMet: true, prereqProblems: [],
+            };
+        }
+        case 'talent': {
+            const talent = pack.talents.find((t) => t.ref === e.ref)
+                ?? pack.talents.find((t) => norm(t.name) === norm(String(e.name).replace(/\s*\(.*\)$/, '')));
+            if (!talent) return null;
+            const matches = aptitudeMatches(doc, talent.aptitudes);
+            const { met, problems } = checkPrerequisites(doc, talent.prerequisites);
+            return {
+                kind: 'talent', ref: talent.ref, name: e.name, tier: talent.tier, matches,
+                cost: advanceCost(pack, { kind: 'talent', matches, tier: talent.tier }),
+                prereqsMet: met, prereqProblems: problems,
+            };
+        }
+        case 'psy_rating':
+            return {
+                kind: 'psy_rating', ref: 'psy.rating', name: e.name, rank: e.rank, matches: 0,
+                cost: advanceCost(pack, { kind: 'psy_rating', rank: e.rank }),
+                prereqsMet: true, prereqProblems: [],
+            };
+        case 'elite_advance': {
+            const ea = pack.eliteAdvances.find((x) => x.ref === e.ref);
+            if (!ea) return null;
+            const { met, problems } = checkPrerequisites(doc,
+                typeof ea.prerequisites === 'string' ? [ea.prerequisites] : ea.prerequisites);
+            return {
+                kind: 'elite_advance', ref: ea.ref, name: ea.name, matches: 0, cost: ea.xpCost,
+                prereqsMet: met, prereqProblems: problems,
+            };
+        }
+        default:
+            return null;
+    }
+}

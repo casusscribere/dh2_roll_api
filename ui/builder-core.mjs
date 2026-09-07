@@ -119,17 +119,30 @@ export class BuilderSession {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * CB-4 — the creation wizard (DOM-free; builder.html renders what this holds).
+ * CB-4 (revised 2026-08-27) — the creation session, integrated with editing.
  *
- * RAW (core p.31–35, verified against the corpus text dumps):
- * - a characteristic is 2d10 + 25 (the campaign's "experienced" variant);
- *   a home-world "+" characteristic rolls 3d10 and keeps the HIGHEST two, a
- *   "−" characteristic keeps the lowest two (pack encodes ±3); Influence is
- *   the tenth rolled characteristic;
- * - ONE characteristic may be rerolled, second result kept (D-K also allows
- *   manual entry; the method is recorded for auditability);
- * - wounds roll the home world's formula ("9+1d5"); Emperor's Blessing rolls
- *   1d10 and grants +1 Fate threshold when the roll ≥ the listed value.
+ * The wizard is no longer a one-way corridor. Its state is a persistent
+ * CREATION RECIPE at `doc.extensions.builder.creation` — selections, the
+ * characteristic values + method, the recorded wounds/blessing dice,
+ * divination, equipment — and every mutation re-persists it. Because the
+ * recipe is a pure derivation record, ANY earlier step can change at any
+ * time: rebuild() re-derives the doc from the recipe (origin → stored
+ * characteristic values → wounds/fate recomputed from the RECORDED rolls
+ * against the new home world → divination → equipment) and then REPLAYS the
+ * XP ledger at current prices (POST /api/chargen/replay) — purchases that
+ * become illegal surface in state.conflicts, never silently vanish.
+ *
+ * Edit mode: createWizard({ doc }) loads an existing character. A wizard-born
+ * doc restores its recipe and propagates fully. A doc WITHOUT a recipe
+ * (roster imports) shows its creation choices read from the document; origin
+ * selections apply as engine DELTAS onto the live doc (nothing to re-derive
+ * from), and stat edits write directly — validateCreation reports what is
+ * missing or inconsistent either way.
+ *
+ * RAW facts unchanged from the first cut (core p.31–35, corpus-verified):
+ * 2d10+25; ± home-world characteristics roll 3d10 keep-highest/lowest-two;
+ * Influence is the tenth roll; ONE reroll, second result kept; wounds roll
+ * the formula; Emperor's Blessing 1d10 ≥ value → +1 Fate threshold.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 export const WIZARD_STEPS = [
@@ -137,7 +150,7 @@ export const WIZARD_STEPS = [
     'divination', 'startingXp', 'equipment', 'details', 'validate', 'done',
 ];
 
-const WIZ_CHAR_KEYS = ['ws', 'bs', 's', 't', 'ag', 'int', 'per', 'wp', 'fel'];
+export const WIZ_CHAR_KEYS = ['ws', 'bs', 's', 't', 'ag', 'int', 'per', 'wp', 'fel'];
 /** pack characteristicModifiers key → doc key ('Inf' → the influence scalar). */
 const PACK_MOD_KEY = {
     WS: 'ws', BS: 'bs', S: 's', T: 't', Ag: 'ag',
@@ -145,21 +158,76 @@ const PACK_MOD_KEY = {
 };
 const ORIGIN_STEP = { homeWorld: 'homeworldRef', background: 'backgroundRef', role: 'roleRef' };
 
-export function createWizard({ pack, api, rng = Math.random }) {
+const emptySelections = () => ({ homeworldRef: null, backgroundRef: null, roleRef: null, choices: {} });
+
+/** The persisted recipe carried at doc.extensions.builder.creation. */
+const recipeOfState = (state) => ({
+    selections: structuredClone(state.selections),
+    characteristics: state.characteristics ? structuredClone(state.characteristics) : null,
+    woundsFate: state.woundsFate ? structuredClone(state.woundsFate) : null,
+    divination: state.divination,
+    equipment: state.equipment ? structuredClone(state.equipment) : null,
+});
+
+export function createWizard({ pack, api, rng = Math.random, doc = null } = {}) {
     const d = (sides) => 1 + Math.floor(rng() * sides);
 
     const state = {
         step: 'homeWorld',
-        selections: { homeworldRef: null, backgroundRef: null, roleRef: null, choices: {} },
+        selections: emptySelections(),
         pendingChoices: [],
         originInfo: null,
         characteristics: null,        // { method, values, rerolled }
         woundsFate: null,             // { woundsRoll, blessingRoll, blessed }
         divination: '',
-        equipment: null,              // { added: [...] } once the step is visited
+        equipment: null,              // { added: [{name, notes?}] }
         details: { name: '' },
         doc: null,
+        conflicts: [],                // replay conflicts from the last rebuild
+        hasRecipe: true,              // false = extant doc without a creation recipe
         finished: false,
+    };
+
+    /* ---- edit mode: restore or derive state from an existing doc ---------- */
+    if (doc) {
+        state.doc = doc;
+        state.details.name = doc.name ?? '';
+        const rec = doc.extensions?.builder?.creation ?? null;
+        if (rec) {
+            Object.assign(state.selections, rec.selections ?? {});
+            state.characteristics = rec.characteristics ?? null;
+            state.woundsFate = rec.woundsFate ?? null;
+            state.divination = rec.divination ?? '';
+            state.equipment = rec.equipment ?? null;
+        } else {
+            state.hasRecipe = false;
+            const refOf = (m) => (m && typeof m === 'object' ? m.ref ?? null : null);
+            state.selections.homeworldRef = refOf(doc.origin?.homeworld);
+            state.selections.backgroundRef = refOf(doc.origin?.background);
+            state.selections.roleRef = refOf(doc.origin?.role);
+            const values = {};
+            for (const k of WIZ_CHAR_KEYS) {
+                const c = doc.characteristics?.[k];
+                values[k] = (typeof c === 'number' ? c : c?.base) ?? 0;
+            }
+            values.influence = doc.influence ?? 0;
+            state.characteristics = { method: null, values, rerolled: null };
+            if (doc.wounds?.max > 0 || doc.fate?.max > 0) {
+                state.woundsFate = { woundsRoll: null, blessingRoll: null, blessed: null };
+            }
+            state.divination = doc.tarot?.text ?? doc.tarot?.card ?? '';
+            if ((doc.gear ?? []).length) state.equipment = { added: [] };
+        }
+        state.finished = false;
+    }
+
+    const persistRecipe = () => {
+        if (!state.doc || !state.hasRecipe) return;
+        state.doc.extensions = state.doc.extensions ?? {};
+        state.doc.extensions.builder = {
+            ...(state.doc.extensions.builder ?? {}),
+            creation: recipeOfState(state),
+        };
     };
 
     const advanceStep = () => {
@@ -174,23 +242,6 @@ export function createWizard({ pack, api, rng = Math.random }) {
             : !s.equipment ? 'startingXp'      // XP spend, then Equip Acolyte (core stage 4)
             : !s.details.name ? 'details'
             : s.finished ? 'done' : 'validate';
-    };
-
-    /** Re-derive the doc from a bare stub through POST /api/chargen/origin —
-     *  idempotent, so revisiting an origin step never half-applies. */
-    const applyOrigin = async () => {
-        const r = await api('POST', '/api/chargen/origin', {
-            doc: { schemaVersion: 4, kind: 'dh2.character', system: 'dh2', name: state.details.name || 'Unnamed' },
-            ...state.selections,
-        });
-        state.doc = r.doc;
-        state.pendingChoices = r.choicesNeeded ?? [];
-        state.originInfo = {
-            woundsFormula: r.woundsFormula,
-            fateThreshold: r.fateThreshold,
-            emperorsBlessing: r.emperorsBlessing,
-            characteristicModifiers: r.characteristicModifiers ?? {},
-        };
     };
 
     /** Direction (+1/−1/0) of the home-world modifier for a doc key. */
@@ -219,24 +270,87 @@ export function createWizard({ pack, api, rng = Math.random }) {
         if (values.influence !== undefined) state.doc.influence = values.influence;
     };
 
+    const applyWoundsFate = () => {
+        if (!state.woundsFate || !state.originInfo) return;
+        const m = /^(\d+)\+1d5$/.exec(state.originInfo.woundsFormula ?? '');
+        if (m && state.woundsFate.woundsRoll != null) {
+            const wounds = Number(m[1]) + state.woundsFate.woundsRoll;
+            state.doc.wounds = { max: wounds, current: wounds, critical: 0 };
+        }
+        if (state.woundsFate.blessingRoll != null) {
+            const blessed = state.woundsFate.blessingRoll >= (state.originInfo.emperorsBlessing ?? 11);
+            state.woundsFate.blessed = blessed;
+            const fate = (state.originInfo.fateThreshold ?? 0) + (blessed ? 1 : 0);
+            state.doc.fate = { max: fate, current: fate };
+        }
+    };
+
+    /**
+     * Re-derive the doc from the recipe and replay the ledger — the
+     * propagation path for recipe docs. Any step can change; everything
+     * downstream recomputes; illegal purchases land in state.conflicts.
+     */
+    const rebuild = async () => {
+        const priorLedger = state.doc?.xp?.ledger ?? [];
+        const priorGear = state.equipment?.added ?? [];
+        const r = await api('POST', '/api/chargen/origin', {
+            doc: { schemaVersion: 4, kind: 'dh2.character', system: 'dh2', name: state.details.name || state.doc?.name || 'Unnamed' },
+            ...state.selections,
+        });
+        state.doc = r.doc;
+        state.pendingChoices = r.choicesNeeded ?? [];
+        state.originInfo = {
+            woundsFormula: r.woundsFormula,
+            fateThreshold: r.fateThreshold,
+            emperorsBlessing: r.emperorsBlessing,
+            characteristicModifiers: r.characteristicModifiers ?? {},
+        };
+        if (state.characteristics?.values) writeCharacteristics(state.characteristics.values);
+        applyWoundsFate();
+        if (state.divination) state.doc.tarot = { text: state.divination };
+        for (const g of priorGear) {
+            (state.doc.gear ??= []).push({ name: g.name, ...(g.notes && { notes: g.notes }), equipped: g.equipped !== false });
+        }
+        if (priorLedger.length) {
+            const rp = await api('POST', '/api/chargen/replay', { doc: state.doc, entries: priorLedger });
+            state.doc = rp.doc;
+            state.conflicts = rp.conflicts ?? [];
+            state.xp = rp.xp;
+        } else {
+            state.conflicts = [];
+        }
+        persistRecipe();
+    };
+
+    /** Origin delta for extant docs with no recipe: apply the ONE changed
+     *  member onto the live doc (nothing recorded to re-derive from). */
+    const applyOriginDelta = async (memberKey, ref) => {
+        const r = await api('POST', '/api/chargen/origin', {
+            doc: state.doc, [memberKey]: ref, choices: state.selections.choices,
+        });
+        state.doc = r.doc;
+        state.pendingChoices = r.choicesNeeded ?? [];
+        state.originInfo = {
+            woundsFormula: r.woundsFormula, fateThreshold: r.fateThreshold,
+            emperorsBlessing: r.emperorsBlessing, characteristicModifiers: r.characteristicModifiers ?? {},
+        };
+    };
+
     return {
         steps: WIZARD_STEPS,
         state,
 
-        /** Origin steps pick a pack entry (+ choice-point answers); the
-         *  woundsFate step rolls the formula and the Blessing. */
+        /** Origin steps pick a pack entry (+ choice-point answers) — at ANY
+         *  time; the woundsFate step rolls; equipment adds gear. */
         async choose(stepId, choice = {}) {
             if (ORIGIN_STEP[stepId]) {
-                if (state.characteristics) throw new Error('origin is locked once characteristics are set — restart the wizard to change it');
-                state.selections[ORIGIN_STEP[stepId]] = choice.ref ?? state.selections[ORIGIN_STEP[stepId]];
+                const memberKey = ORIGIN_STEP[stepId];
+                if (choice.ref !== undefined) state.selections[memberKey] = choice.ref;
                 Object.assign(state.selections.choices, choice.choices ?? {});
-                await applyOrigin();
+                if (state.hasRecipe) await rebuild();
+                else await applyOriginDelta(memberKey, state.selections[memberKey]);
             } else if (stepId === 'equipment') {
-                // Equip Acolyte (core stage 4): the background's kit class is
-                // guidance (equipment lists are not yet corpus-extracted), and
-                // the RAW allowance is one Scarce-or-better acquisition per
-                // point of Influence bonus. Items land as gear entries.
-                const added = [];
+                const added = state.equipment?.added ?? [];
                 for (const g of choice.gear ?? []) {
                     if (!g?.name) continue;
                     (state.doc.gear ??= []).push({
@@ -245,32 +359,31 @@ export function createWizard({ pack, api, rng = Math.random }) {
                         ...(g.weight !== undefined && { weight: g.weight }),
                         equipped: g.equipped !== false,
                     });
-                    added.push(g.name);
+                    added.push({ name: g.name, ...(g.notes && { notes: g.notes }) });
                 }
                 state.equipment = { added };
+                persistRecipe();
             } else if (stepId === 'woundsFate') {
-                const m = /^(\d+)\+1d5$/.exec(state.originInfo?.woundsFormula ?? '');
-                if (!m) throw new Error(`unrecognised wounds formula "${state.originInfo?.woundsFormula}"`);
-                const woundsRoll = d(5);
-                const wounds = Number(m[1]) + woundsRoll;
-                const blessingRoll = d(10);
-                const blessed = blessingRoll >= (state.originInfo.emperorsBlessing ?? 11);
-                const fate = (state.originInfo.fateThreshold ?? 0) + (blessed ? 1 : 0);
-                state.doc.wounds = { max: wounds, current: wounds, critical: 0 };
-                state.doc.fate = { max: fate, current: fate };
-                state.woundsFate = { woundsRoll, blessingRoll, blessed };
+                if (!state.originInfo) throw new Error('choose an origin first');
+                const m = /^(\d+)\+1d5$/.exec(state.originInfo.woundsFormula ?? '');
+                if (!m) throw new Error(`unrecognised wounds formula "${state.originInfo.woundsFormula}"`);
+                state.woundsFate = { woundsRoll: d(5), blessingRoll: d(10), blessed: null };
+                applyWoundsFate();
+                persistRecipe();
             } else {
                 throw new Error(`choose() does not drive the "${stepId}" step`);
             }
             advanceStep();
         },
 
-        /** D-K: RAW roll (one reroll, kept) or manual entry; method recorded. */
+        /** D-K: RAW roll (one reroll, kept) or manual entry; method recorded.
+         *  Callable again at any time — a re-roll-everything or a manual edit
+         *  replaces the values and keeps the audit trail honest. */
         rollCharacteristics({ method = 'raw', values, rerollIndex } = {}) {
             if (!state.doc) throw new Error('choose an origin first');
             if (method === 'manual') {
                 state.characteristics = { method, values: { ...values }, rerolled: null };
-                writeCharacteristics(values);
+                writeCharacteristics(state.characteristics.values);
             } else if (rerollIndex !== undefined) {
                 if (!state.characteristics) throw new Error('roll first');
                 if (state.characteristics.rerolled) throw new Error('RAW allows exactly one reroll (second result kept)');
@@ -284,12 +397,24 @@ export function createWizard({ pack, api, rng = Math.random }) {
                 state.characteristics = { method: 'raw', values: rolled, rerolled: null };
                 writeCharacteristics(rolled);
             }
+            persistRecipe();
             advanceStep();
+        },
+
+        /** Edit one characteristic value in place (manual tweak — the method
+         *  flips to 'manual' because the rolled provenance no longer holds). */
+        setCharacteristic(key, value) {
+            if (!state.characteristics) state.characteristics = { method: 'manual', values: {}, rerolled: null };
+            state.characteristics.values[key] = value;
+            if (state.characteristics.method === 'raw') state.characteristics.method = 'manual';
+            writeCharacteristics(state.characteristics.values);
+            persistRecipe();
         },
 
         setDivination(text) {
             state.divination = text ?? '';
             state.doc.tarot = text ? { text } : {};
+            persistRecipe();
             advanceStep();
         },
 
@@ -304,6 +429,7 @@ export function createWizard({ pack, api, rng = Math.random }) {
                 { doc: state.doc, advance, confirmed, override, source: 'Creation' });
             state.doc = r.doc;
             state.xp = r.xp;
+            persistRecipe();
             return r.entry;
         },
 
@@ -319,23 +445,13 @@ export function createWizard({ pack, api, rng = Math.random }) {
 
         setDetails({ name } = {}) {
             if (name) { state.details.name = name; state.doc.name = name; }
+            persistRecipe();
             advanceStep();
         },
 
-        /** Persist the audit trail into the doc, validate, close the wizard. */
+        /** Validate (build + creation findings) and close the session. */
         async finish() {
-            state.doc.extensions = state.doc.extensions ?? {};
-            state.doc.extensions.builder = {
-                ...(state.doc.extensions.builder ?? {}),
-                wizard: {
-                    selections: structuredClone(state.selections),
-                    characteristics: {
-                        method: state.characteristics?.method ?? null,
-                        rerolled: state.characteristics?.rerolled ?? null,
-                    },
-                    woundsFate: state.woundsFate,
-                },
-            };
+            persistRecipe();
             const build = await api('POST', '/api/chargen/validate', { doc: state.doc });
             const character = await api('POST', '/api/character/validate', { character: state.doc });
             state.finished = true;

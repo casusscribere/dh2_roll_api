@@ -24,6 +24,7 @@ import { dispatch } from '../lib/api-router.mjs';
 import { createWizard, WIZARD_STEPS } from '../../ui/builder-core.mjs';
 import { CHARGEN_PACK } from '../data/chargen/pack.mjs';
 import { migrateCharacter, validateCharacter } from '../lib/character-schema.mjs';
+import { CHARACTER_ROSTER } from '../data/characters/roster.mjs';
 import { characterToFoundryActor, foundryActorToCharacter, normalizeForRoundTrip } from '../lib/foundry-actor.mjs';
 
 const EXPECTED = JSON.parse(readFileSync(
@@ -149,11 +150,68 @@ test('manual entry stores the values and records method:"manual"', async () => {
     assert.equal(w.state.characteristics.method, 'manual');
 });
 
-test('origin locks once characteristics are set (restart to change it)', async () => {
-    const w = wizard();
+test('changing an earlier step PROPAGATES: origin swap recomputes wounds/fate from the recorded rolls and replays purchases at new prices', async () => {
+    // woundsFate dice (seqRng encodes d10 faces): 9 → d5 = 5; blessing d10 = 10.
+    const w = wizard(seqRng([9, 10]));
+    await chooseOrigin(w);                                   // Feral World: 9+1d5, fate 2, blessing 3+
+    w.rollCharacteristics({ method: 'manual', values: { ...EXPECTED.characteristics, influence: EXPECTED.influence } });
+    await w.choose('woundsFate');
+    assert.deepEqual(w.state.doc.wounds, { max: 14, current: 14, critical: 0 });
+    assert.deepEqual(w.state.doc.fate, { max: 3, current: 3 });
+
+    const ag = (await w.advances()).find((a) => a.kind === 'characteristic' && a.ref === 'ag');
+    assert.equal(ag.cost, 100);                              // Desperado holds Agility + Finesse
+    await w.buy(ag);
+
+    // swap the home world: Voidborn is 7+1d5, fate 3, blessing 5+ — same recorded dice
+    await w.choose('homeWorld', { ref: 'dh2:home_world:voidborn' });
+    const d = w.state.doc;
+    assert.deepEqual(d.wounds, { max: 12, current: 12, critical: 0 }, 'wounds recomputed: 7 + the recorded 5');
+    assert.deepEqual(d.fate, { max: 4, current: 4 }, 'fate recomputed: threshold 3 + recorded blessing 10 ≥ 5');
+    assert.ok(d.aptitudes.some((a) => a.name === 'Intelligence' && a.source === 'homeworld'), 'new home-world aptitude');
+    assert.ok(!d.aptitudes.some((a) => a.name === 'Toughness' && a.source === 'homeworld'), 'old aptitude gone');
+    assert.equal(d.characteristics.ag.base, EXPECTED.characteristics.ag, 'values preserved');
+    assert.equal(d.characteristics.ag.advances, 1, 'the purchase survived the rebuild');
+    assert.equal(d.xp.ledger[0].cost, 100, 'Desperado still holds both Ag aptitudes — price unchanged');
+    assert.deepEqual(w.state.conflicts, []);
+
+    // …and swapping the ROLE moves aptitudes, so the same purchase REPRICES
+    await w.choose('role', { ref: 'dh2:role:chirurgeon' });
+    assert.equal(w.state.doc.xp.ledger[0].cost, 500, 'repriced at 0 matches after the role swap');
+    assert.equal(w.state.doc.characteristics.ag.advances, 1);
+});
+
+test('edit mode: a wizard-born doc reloads its recipe and keeps propagating', async () => {
+    const w = wizard(seqRng([9, 10]));
     await chooseOrigin(w);
     w.rollCharacteristics({ method: 'manual', values: { ...EXPECTED.characteristics, influence: EXPECTED.influence } });
-    await assert.rejects(() => w.choose('homeWorld', { ref: 'dh2:home_world:hive_world' }), /locked/i);
+    await w.choose('woundsFate');
+    w.setDivination('First pass.');
+    const savedDoc = structuredClone(w.state.doc);
+
+    const w2 = wizard();
+    const edit = (await import('../../ui/builder-core.mjs')).createWizard({ pack: CHARGEN_PACK, api, doc: savedDoc });
+    assert.equal(edit.state.selections.homeworldRef, 'dh2:home_world:feral_world');
+    assert.equal(edit.state.characteristics.method, 'manual');
+    assert.equal(edit.state.hasRecipe, true);
+    await edit.choose('homeWorld', { ref: 'dh2:home_world:voidborn' });
+    assert.deepEqual(edit.state.doc.wounds, { max: 12, current: 12, critical: 0 });
+});
+
+test('edit mode: an extant doc WITHOUT a recipe shows its creation state; origin sets apply as deltas', async () => {
+    const roster = migrateCharacter(structuredClone(CHARACTER_ROSTER.find((c) => c.id.includes('gnaeus')).doc));
+    const edit = (await import('../../ui/builder-core.mjs')).createWizard({ pack: CHARGEN_PACK, api, doc: roster });
+    assert.equal(edit.state.hasRecipe, false);
+    assert.equal(edit.state.selections.homeworldRef, null, 'roster docs carry no origin');
+    assert.ok(edit.state.characteristics.values.ws > 0, 'characteristics read from the doc');
+
+    const before = structuredClone(edit.state.doc.xp.ledger);
+    await edit.choose('homeWorld', { ref: 'dh2:home_world:hive_world' });
+    const d = edit.state.doc;
+    assert.equal(d.origin.homeworld.name, 'Hive World');
+    assert.ok(d.aptitudes.some((a) => a.name === 'Perception' && a.source === 'homeworld'));
+    assert.deepEqual(d.xp.ledger, before, 'delta mode never rewrites the ledger');
+    assert.ok(d.characteristics.ws.advances !== undefined, 'existing stats untouched');
 });
 
 /* ── (d) the full flow against the hand-computed sheet ──────────────────── */
@@ -200,10 +258,12 @@ test('full flow: one legal character; XP spend equals the fixture; validators cl
     assert.equal(doc.tarot.text, 'Trust in your fear.');
     assert.equal(w.state.step, 'done');
 
-    // wizard state persisted for auditability (D-K)
-    const audit = doc.extensions.builder.wizard;
+    // the creation RECIPE persisted for auditability + propagation (D-K)
+    const audit = doc.extensions.builder.creation;
     assert.equal(audit.characteristics.method, 'manual');
     assert.equal(audit.selections.homeworldRef, 'dh2:home_world:feral_world');
+    assert.equal(audit.woundsFate.woundsRoll, 5);
+    assert.equal(audit.divination, 'Trust in your fear.');
 
     // every creation purchase carries its source note
     assert.ok(doc.xp.ledger.length >= 3);

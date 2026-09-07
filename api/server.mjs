@@ -34,7 +34,7 @@ for (const path of ['/api/weapons', '/api/options', '/api/rules', '/api/dsl-docs
 //   /api/test  /api/damage  /api/soak  /api/parry  /api/attack
 //   /api/resolve                  full engagement (forcedRolls → rollTrace)
 //   /api/engage                   one engagement phase (stepped UI)
-for (const path of ['/api/rules/validate', '/api/character/validate', '/api/test', '/api/damage', '/api/soak', '/api/parry', '/api/attack', '/api/resolve', '/api/engage', '/api/encounter/tick', '/api/config/check', '/api/chargen/advances', '/api/chargen/advance', '/api/chargen/grant', '/api/chargen/origin', '/api/chargen/validate']) {
+for (const path of ['/api/rules/validate', '/api/character/validate', '/api/test', '/api/damage', '/api/soak', '/api/parry', '/api/attack', '/api/resolve', '/api/engage', '/api/encounter/tick', '/api/config/check', '/api/chargen/advances', '/api/chargen/advance', '/api/chargen/grant', '/api/chargen/replay', '/api/chargen/origin', '/api/chargen/validate']) {
     app.post(path, (req, res) => send(res, dispatch('POST', path, req.body ?? {})));
 }
 
