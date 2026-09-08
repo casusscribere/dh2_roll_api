@@ -28,7 +28,7 @@
 import XLSX from 'xlsx';
 import { readdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname, basename } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { canonicalSkillName, SKILL_DEFS, normalizeAptitudeSource } from '../api/lib/character-schema.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -44,18 +44,29 @@ const OUT = join(__dirname, '..', 'api', 'data', 'characters', 'roster.mjs');
 // SCANNING ONLY and are stripped from everything the roster stores (no
 // player field; player-name parentheticals removed from source filenames).
 // The guard suite (api/test/privacy-guard.test.mjs) enforces both halves.
-let ROSTER_DIRS, PLAYER_NAMES;
+// Soft-load at import (the coverage suite imports this module on machines —
+// CI included — that rightly have no local config; parser functions must
+// stay usable). The hard requirement is enforced in main(), the only path
+// that actually reads the workbook folders. Tests inject a SYNTHETIC config
+// via CAMPAIGN_ROSTER_CONFIG so no real name ever appears in a fixture.
+let ROSTER_DIRS = null;
+let PLAYER_NAMES = /(?!x)x/g;                    // never matches — nothing to strip
 try {
-    ({ ROSTER_DIRS, PLAYER_NAMES } = await import('./campaign-roster.local.mjs'));
-} catch {
+    const cfgUrl = process.env.CAMPAIGN_ROSTER_CONFIG
+        ? pathToFileURL(process.env.CAMPAIGN_ROSTER_CONFIG).href
+        : './campaign-roster.local.mjs';
+    ({ ROSTER_DIRS, PLAYER_NAMES } = await import(cfgUrl));
+} catch { /* no local config — main() refuses below */ }
+const requireLocalConfig = () => {
+    if (ROSTER_DIRS) return;
     console.error(
         'import:campaign needs tools/campaign-roster.local.mjs (git-ignored — D9 privacy):\n'
         + '  export const ROSTER_DIRS — the "<player>(<char>-<char>)" workbook folders\n'
-        + '  export const PLAYER_NAMES — a /\\s*\\((…name alternation…)[^)]*\\)/gi strip-regex\n'
+        + '  export const PLAYER_NAMES — a strip-regex over the parenthesized player names\n'
         + '  export const playerNames — every real name/alias, for the privacy scanner\n'
         + 'It lives only on machines that hold the campaign workbooks.');
     process.exit(1);
-}
+};
 const EXCLUDE = /goal|priorit|lineage|draco|planning|combat calc/i;
 
 const CHAR_KEYS = {
@@ -522,6 +533,16 @@ function parseNamedSection(g, headerPred, maxRows = 25) {
 // ---- CLI main (guarded: importing this module never touches the fs) --------
 const kebab = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+if (!ROSTER_DIRS) {
+    // a --dry run stays runnable without the local config (CI coverage walks
+    // this path); a REAL import refuses — it would clobber the roster
+    if (process.argv.includes('--dry')) {
+        console.warn('⚠ no tools/campaign-roster.local.mjs — dry run over an empty roster (D9: the folder map is local-only)');
+        ROSTER_DIRS = [];
+    } else {
+        requireLocalConfig();
+    }
+}
 const roster = [];
 for (const dir of ROSTER_DIRS) {
     const full = join(SHEETS_DIR, dir);

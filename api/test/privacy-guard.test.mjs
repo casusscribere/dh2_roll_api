@@ -66,8 +66,9 @@ test('the importer names no player: literals moved to the git-ignored local conf
     assert.match(src, /campaign-roster\.local\.mjs/, 'importer loads the local config');
     assert.ok(!/ROSTER_DIRS\s*=\s*\[\s*['"]/.test(src), 'no inline ROSTER_DIRS literal');
     // the historical leak shape: PLAYER_NAMES defined as an inline regex
-    // (the names must only ever arrive via the local-config import)
-    assert.ok(!/PLAYER_NAMES\s*=\s*\//.test(src), 'no inline PLAYER_NAMES regex literal');
+    // carrying a name ALTERNATION (the never-matching /(?!x)x/g fallback is
+    // fine — names must only ever arrive via the local-config import)
+    assert.ok(!/PLAYER_NAMES\s*=\s*\/[^/\n]*\|[^/\n]*\//.test(src), 'no inline PLAYER_NAMES name-alternation literal');
 });
 
 test('the local privacy files are git-ignored', () => {

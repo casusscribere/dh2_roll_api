@@ -8,8 +8,23 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseGrids } from '../../tools/import-campaign.mjs';
-import { validateCharacter, CHARACTER_SCHEMA_VERSION } from '../lib/character-schema.mjs';
+import { writeFileSync, mkdtempSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+
+// D9: a SYNTHETIC roster config (never real names) injected before the module
+// loads, so the player-parenthetical stripping path is testable everywhere —
+// CI included, where the real git-ignored config rightly does not exist.
+const cfgDir = mkdtempSync(join(tmpdir(), 'dh2-roster-cfg-'));
+const cfgPath = join(cfgDir, 'campaign-roster.fixture.mjs');
+writeFileSync(cfgPath, `export const ROSTER_DIRS = ['Zzplayer(Testchar)'];
+export const PLAYER_NAMES = /\\s*\\((zzplayer)[^)]*\\)/gi;
+export const playerNames = ['Zzplayer'];
+`);
+process.env.CAMPAIGN_ROSTER_CONFIG = cfgPath;
+
+const { parseGrids } = await import('../../tools/import-campaign.mjs');
+const { validateCharacter, CHARACTER_SCHEMA_VERSION } = await import('../lib/character-schema.mjs');
 
 /** Minimal Character Sheet grid with the v4-relevant blocks. */
 function sheetGrid() {
@@ -56,7 +71,7 @@ function sheetGrid() {
 }
 
 test('Task 2.2: parseGrids emits a valid v4 doc with origin/influence/trainings/cybernetics/extensions', () => {
-    const doc = parseGrids({ sheet: sheetGrid(), xp: null, stored: null }, 'Testchar (steve).xlsx');
+    const doc = parseGrids({ sheet: sheetGrid(), xp: null, stored: null }, 'Testchar (zzplayer).xlsx');
     assert.equal(doc.schemaVersion, CHARACTER_SCHEMA_VERSION);
     assert.equal(doc.source.adapter, 'xlsx-campaign-v4');
     assert.equal(doc.name, 'Testchar Von Fixture');

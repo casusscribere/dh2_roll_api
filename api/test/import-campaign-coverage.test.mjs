@@ -40,6 +40,17 @@ const ROSTER = join(REPO, 'api', 'data', 'characters', 'roster.mjs');
 const rosterBefore = existsSync(ROSTER) ? statSync(ROSTER) : null;
 const cliLines = [];
 const importer = await (async () => {
+    // D9: synthetic roster config (never real names) so the strip path and
+    // the --dry CLI scan behave identically on CI and the campaign machine —
+    // the fixture folder does not exist, so the scan warns "missing folder".
+    const { writeFileSync, mkdtempSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const cfgPath = join(mkdtempSync(join(tmpdir(), 'dh2-roster-cfg-')), 'campaign-roster.fixture.mjs');
+    writeFileSync(cfgPath, `export const ROSTER_DIRS = ['Zzplayer(Fullchar)'];
+export const PLAYER_NAMES = /\\s*\\((zzplayer)[^)]*\\)/gi;
+export const playerNames = ['Zzplayer'];
+`);
+    process.env.CAMPAIGN_ROSTER_CONFIG = cfgPath;
     const savedArgv = process.argv;
     const savedLog = console.log;
     const savedWarn = console.warn;
@@ -231,7 +242,7 @@ function storedGrid() {
 
 const fullDoc = () => parseGrids(
     { sheet: fullSheet(), xp: xpGrid(), stored: storedGrid() },
-    'Fullchar (matt) - sheet.xlsx');
+    'Fullchar (zzplayer) - sheet.xlsx');
 
 // ---------------------------------------------------------------------------
 // SKILLS table + speciality side tables
