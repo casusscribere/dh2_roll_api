@@ -545,3 +545,19 @@ quality "Blast" {
   when is_ranged and has_quality("Blast") and not success and roll <= jam_threshold
   then set scatter = 1d5; flag detonate; roll_on "Scatter Diagram"
 }
+
+# --- Force — the Focus Power rider (DH2 core p.145; Phase 6) --------------------
+# "…whenever a psyker damages an opponent, he may take a Focus Power action
+# (Opposed with Willpower) as a Half Action. If he wins the test, then for every
+# degree of success, the Force weapon's wielder deals an additional 1d10 Energy
+# damage, ignoring Armour and Toughness bonus. Psykers always use their base psy
+# rating when determining psychic strength for this test, and cannot generate
+# Psychic Phenomena on this test." Roll it as the power "Force Weapon" on
+# /api/power with { opposed: true, noPhenomena: true } at the base rating; the
+# engine rolls the rider dice declared here after the opposed test.
+quality "Force (Focus Power rider)" {
+  meta { page 145 }
+  on power.EFFECT
+  when is_power("Force Weapon") and success and opposed_won
+  then set rider_dice += dos; set damage_type = "Energy"; emit "Force", "opposed Willpower won: +1d10 Energy damage per degree of success, ignoring Armour and Toughness bonus"
+}

@@ -32,6 +32,7 @@ const mechanicsSrc = readRule('mechanics.dsl');
 const rollTablesSrc = readRule('roll-tables.dsl');
 const specListsSrc = readRule('spec-lists.dsl');
 const actionsSrc = readRule('actions.dsl');
+const psychicSrc = readRule('psychic.dsl');
 
 // Compile the Action declarations once at load and register them into the actions
 // taxonomy (is_action/action_type/is_reaction read this). "Checked at startup."
@@ -48,6 +49,7 @@ export const circumstanceEffects = compile(circumstancesSrc); // environmental C
 export const configurationEffects = compile(configurationsSrc); // per-character toggles (Maximal, …)
 export const mechanicEffects = compile(mechanicsSrc);   // Jam mechanic + craftsmanship
 export const actionRuleEffects = compile(actionsSrc);   // action legality + Suppressing Fire (the file's action DECLARATIONS compile separately above)
+export const psychicEffects = compile(psychicSrc);      // Phase 6: the power.* pipeline content (classes, sustaining, psychic talents)
 
 /** Built-in roll tables (Scatter Diagram, Haywire, Hallucinogenic), for roll_on. */
 export const rollTables = compileTables(rollTablesSrc);
@@ -61,19 +63,19 @@ export const availableTables = rollTables.map((t) => ({ name: t.name, die: `${t.
  *  rule elsewhere (e.g. Maximal — both a quality and a Configuration: the quality
  *  gates the config's availability) is recognised. */
 export const availableQualities = referencedNames(
-    [qualitiesSrc, talentsSrc, traitsSrc, conditionsSrc, circumstancesSrc, configurationsSrc, mechanicsSrc].join('\n\n'),
+    [qualitiesSrc, talentsSrc, traitsSrc, conditionsSrc, circumstancesSrc, configurationsSrc, mechanicsSrc, psychicSrc].join('\n\n'),
 ).qualities;
 // actions.dsl's legality rules reference talents too (Swift/Lightning Attack) —
 // include them so the UI's talent panel can gate the actions.
-export const availableTalents = referencedNames([talentsSrc, actionsSrc].join('\n\n')).talents;
+export const availableTalents = referencedNames([talentsSrc, actionsSrc, psychicSrc].join('\n\n')).talents;
 export const availableTraits = referencedNames(traitsSrc).traits;
-export const availableConditions = referencedNames(conditionsSrc).conditions;
+export const availableConditions = referencedNames([conditionsSrc, psychicSrc].join('\n\n')).conditions;
 export const availableCircumstances = referencedNames(circumstancesSrc).circumstances;
-export const availableConfigurations = referencedNames(configurationsSrc).configurations;
+export const availableConfigurations = referencedNames([configurationsSrc, psychicSrc].join('\n\n')).configurations;
 /** Names of rules that take a numeric severity/level variable (Brutal Charge,
  *  Haywire Field, …) — the UI shows a value input only for these. */
 export const availableValued = valuedNames(
-    [qualitiesSrc, talentsSrc, traitsSrc, conditionsSrc, circumstancesSrc, configurationsSrc, mechanicsSrc].join('\n\n'),
+    [qualitiesSrc, talentsSrc, traitsSrc, conditionsSrc, circumstancesSrc, configurationsSrc, mechanicsSrc, psychicSrc].join('\n\n'),
 );
 /** @deprecated alias kept for callers expecting the old name */
 export const availableStatuses = availableConditions;
@@ -91,6 +93,7 @@ export const builtinSources = [
     withInfo({ category: 'Mechanical', file: 'mechanics.dsl' }, mechanicsSrc),
     withInfo({ category: 'Actions', file: 'actions.dsl' }, actionsSrc),
     withInfo({ category: 'Roll tables', file: 'roll-tables.dsl' }, rollTablesSrc),
+    withInfo({ category: 'Psychic', file: 'psychic.dsl' }, psychicSrc),
 ];
 
 /** Flat per-RULE list of the (toggleable) built-in rules — one entry per rule
@@ -116,7 +119,7 @@ const GROUP_ORDER = [
 ];
 
 export const builtinRules = (() => {
-    const all = [...weaponQualityEffects, ...talentEffects, ...traitEffects, ...conditionEffects, ...circumstanceEffects, ...configurationEffects, ...mechanicEffects, ...actionRuleEffects];
+    const all = [...weaponQualityEffects, ...talentEffects, ...traitEffects, ...conditionEffects, ...circumstanceEffects, ...configurationEffects, ...mechanicEffects, ...actionRuleEffects, ...psychicEffects];
     const seen = new Set();
     const out = [];
     for (const e of all) {
@@ -159,6 +162,7 @@ export function buildDefaultRegistry() {
         .addAll(circumstanceEffects)
         .addAll(configurationEffects)
         .addAll(mechanicEffects)
+        .addAll(psychicEffects)
         .addTables(rollTables);
 }
 
@@ -192,6 +196,7 @@ export function buildRegistry(customRules, disabledIds = []) {
         .addAll(keep(configurationEffects))
         .addAll(keep(mechanicEffects))
         .addAll(keep(actionRuleEffects))
+        .addAll(keep(psychicEffects))
         .addTables(rollTables);
     if (custom.length) {
         registry.addAll(custom);

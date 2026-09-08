@@ -16,8 +16,8 @@
  * checkpoint ids stay unqualified ("MODIFIERS") for v1 compatibility, and the
  * compiler normalises an explicit `attack.` prefix away. Every other pipeline
  * uses qualified ids ("test.MODIFIERS"). New pipelines land here as they are
- * built: `test` (generic characteristic/skill tests) now; `power`, `upkeep`,
- * `ship_attack` per the roadmap.
+ * built: `test` (generic tests), `upkeep` (encounter ticks), `power` (Focus
+ * Power flow); `ship_attack` per the roadmap.
  */
 export const CHECKPOINTS = Object.freeze({
     // --- attack pipeline (default namespace) — to-hit test ---
@@ -48,6 +48,15 @@ export const CHECKPOINTS = Object.freeze({
     UPKEEP_TURN_START: 'upkeep.TURN_START', // start of the actor's turn (On Fire burns, …)
     UPKEEP_TURN_END: 'upkeep.TURN_END',     // end of the actor's turn (Toxified test, cooldowns clear)
     UPKEEP_ROUND_END: 'upkeep.ROUND_END',   // end of the round (Haywire decay, durations tick)
+    // --- power pipeline (Phase 6): the Focus Power flow (DH2 p.194–198). Rules
+    //     read the psyker facts (psy rating, push, class, doubles) and steer the
+    //     Phenomena/Perils chain; the engine owns the psy-strength maths, the
+    //     d100, the doubles test, and the table rolls. ---
+    POWER_MODIFIERS: 'power.MODIFIERS',   // before the Focus Power d100 (talents, push bonuses)
+    POWER_POST_ROLL: 'power.POST_ROLL',   // roll known; Phenomena decided (flag phenomena / no_phenomena)
+    POWER_PHENOMENA: 'power.PHENOMENA',   // after the Phenomena roll (reroll_phenomena, riders)
+    POWER_PERILS: 'power.PERILS',         // after a Perils of the Warp roll
+    POWER_EFFECT: 'power.EFFECT',         // the power resolves (rider damage, narrative effects)
 });
 
 /** pipeline → its checkpoint ids (unqualified ids belong to `attack`). */
@@ -55,6 +64,7 @@ export const PIPELINES = Object.freeze({
     attack: Object.values(CHECKPOINTS).filter((c) => !c.includes('.')),
     test: Object.values(CHECKPOINTS).filter((c) => c.startsWith('test.')),
     upkeep: Object.values(CHECKPOINTS).filter((c) => c.startsWith('upkeep.')),
+    power: Object.values(CHECKPOINTS).filter((c) => c.startsWith('power.')),
 });
 
 const CHECKPOINT_SET = new Set(Object.values(CHECKPOINTS));

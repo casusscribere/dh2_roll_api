@@ -108,6 +108,31 @@ export const FACT_DEFS = [
         attacker: (c) => Number(c.psyRating) || 0 } },
     { name: 'is_psyker', type: 'bool', summary: 'The attacker has a psy rating > 0.', scopes: {
         attacker: (c) => (Number(c.psyRating) || 0) > 0 } },
+    // --- power.* pipeline (Phase 6): the Focus Power flow ---------------------
+    { name: 'effective_psy_rating', type: 'number', summary: 'power.*: the psy rating the power manifests at — the psyker\'s chosen strength (≤ base, or above it when pushing) plus any rule bonuses (`set effective_psy_rating += …`) minus the sustaining reduction. 0 outside the power pipeline.', scopes: {
+        attacker: (c) => num(c.finalPsyRating) } },
+    { name: 'push', type: 'number', summary: 'power.*: points the chosen effective psy rating exceeds the base rating (0 = not pushing). Each point is −10 on the Focus Power test (p.194).', scopes: {
+        attacker: (c) => num(c.push) } },
+    { name: 'is_pushing', type: 'bool', summary: 'power.*: the psyker is pushing (effective psy rating above base) — Phenomena trigger on anything but doubles (p.194).', scopes: {
+        attacker: (c) => num(c.push) > 0 } },
+    { name: 'psyker_class', type: 'string', summary: 'power.*: the psyker\'s class per Table 6–1 (p.195): "bound" (sanctioned), "unbound" (wyrds, unsanctioned), "daemonic". "" outside the power pipeline.', scopes: {
+        attacker: (c) => c.psykerClass ?? '' } },
+    { name: 'sustained', type: 'number', summary: 'power.*: how many powers the psyker is currently sustaining (p.198).', scopes: {
+        attacker: (c) => num(c.sustained) } },
+    { name: 'power_name', type: 'string', summary: 'power.*: the name of the power being manifested (e.g. "Smite", "Force Weapon"). Prefer is_power("…") for spelling-blind matching.', scopes: {
+        attacker: (c) => c.powerName ?? '' } },
+    { name: 'is_doubles', type: 'bool', summary: 'power.POST_ROLL onward: the Focus Power d100 came up doubles (tens = ones; 100 counts). The normal Phenomena trigger.', scopes: {
+        attacker: (c) => !!c.doubles } },
+    { name: 'phenomena', type: 'bool', summary: 'power.POST_ROLL onward: Psychic Phenomena are (currently) going to be rolled. Rules may `flag phenomena` / `flag no_phenomena` at POST_ROLL to override.', scopes: {
+        attacker: (c) => !!c.phenomenaTriggered } },
+    { name: 'phenomena_roll', type: 'number', summary: 'power.PHENOMENA onward: the modified Table 6–2 result (75+ = Perils). 0 if none.', scopes: {
+        attacker: (c) => num(c.phenomenaRoll) } },
+    { name: 'perils_roll', type: 'number', summary: 'power.PERILS onward: the modified Table 6–3 result. 0 if none.', scopes: {
+        attacker: (c) => num(c.perilsRoll) } },
+    { name: 'opposed_won', type: 'bool', summary: 'power.EFFECT (opposed powers): the psyker passed AND out-degreed the resister (p.195). False for unopposed powers.', scopes: {
+        attacker: (c) => !!c.opposedWon } },
+    { name: 'opposed_dos', type: 'number', summary: 'power.EFFECT (opposed powers): the resister\'s degrees of success (0 on a failed resist).', scopes: {
+        attacker: (c) => num(c.opposedDos) } },
     // --- combat state ----------------------------------------------------------
     { name: 'dual_wielding', type: 'bool', summary: 'Wielding two weapons this turn — the "DualWield (main hand)" configuration, or the legacy combat.dualWielding flag.', scopes: {
         attacker: (c) => !!c.combat?.dualWielding || hasNamed(c.configs ?? c.firingModes, 'DualWield (main hand)') } },
@@ -183,6 +208,8 @@ const FUNCTION_DEFS_RAW = [
         attacker: (c, [n]) => isAction(c.action, n) } },
     { name: 'is_test', params: [str('Name')], returns: 'bool', summary: 'The generic test (test.* pipeline) is the named one, spelling-blind — is_test("Tech-Use") matches testName "tech_use"/"TechUse". THE way to write "+X to <skill>" item/talent rules: when is_test("Tech-Use") [and <condition>] then add modifier "…" = X.', scopes: {
         attacker: (c, [n]) => normName(c.testName ?? '') === normName(n) } },
+    { name: 'is_power', params: [str('Name')], returns: 'bool', summary: 'power.*: the power being manifested is the named one, spelling-blind — is_power("Force Weapon") gates the Force rider (p.145).', scopes: {
+        attacker: (c, name) => normName(c.powerName ?? '') === normName(name) } },
     { name: 'is_reaction', params: [], returns: 'bool', summary: 'The current action is a Reaction (Parry, Dodge, …).', scopes: {
         attacker: (c) => isReaction(c.action) } },
     { name: 'action_subtype', params: [str('Name')], returns: 'bool', summary: 'The current action carries the named subtype (declared via `subtype`/`attack` on the action). `is_attack` is shorthand for action_subtype("attack").', scopes: {
@@ -283,6 +310,26 @@ export const SLOT_DEFS = {
         summary: 'Additional hits. `add_hits N` is sugar for `set extra_hits += N`.',
         apply: (ctx, op, v) => { ctx.additionalHits = (ctx.additionalHits || 0) + v; },
     },
+    effective_psy_rating: {
+        modes: ['+='], at: 'power.MODIFIERS',
+        summary: 'power.*: bonus points on the manifested psy rating (Warp Conduit\'s Fate-bought 1d5). Potency only — the push penalty stays on the CHOSEN rating.',
+        apply: (ctx, op, v) => { ctx.finalPsyRating = (ctx.finalPsyRating || 0) + v; },
+    },
+    phenomena_roll: {
+        modes: ['+='], at: 'power.POST_ROLL, power.PHENOMENA',
+        summary: 'power.*: modifier to the Table 6–2 Psychic Phenomena roll (unbound +10, Warp Conduit +30, sustaining, Warp-tainted).',
+        apply: (ctx, op, v) => { ctx.phenomenaModifier = (ctx.phenomenaModifier || 0) + v; },
+    },
+    perils_roll: {
+        modes: ['+='], at: 'power.POST_ROLL, power.PHENOMENA, power.PERILS',
+        summary: 'power.*: modifier to the Table 6–3 Perils of the Warp roll (a Warp-tainted psyker\'s permanent +10).',
+        apply: (ctx, op, v) => { ctx.perilsModifier = (ctx.perilsModifier || 0) + v; },
+    },
+    rider_dice: {
+        modes: ['+='], at: 'power.EFFECT',
+        summary: 'power.EFFECT: d10s of direct rider damage the engine rolls after the power resolves (the Force weapon\'s +1d10 per DoS, p.145); type from `set damage_type` (default Energy), ignoring Armour and Toughness.',
+        apply: (ctx, op, v) => { ctx.riderDice = (ctx.riderDice || 0) + v; },
+    },
     unnatural_toughness_reduction: {
         modes: ['+='], at: 'PENETRATION',
         summary: 'Reduce the target\'s Unnatural Toughness for this damage calc (Felling; Sanctified vs Daemonic). `reduce_unnatural_toughness N` is sugar.',
@@ -311,6 +358,21 @@ export const FLAG_DEFS = {
         at: 'POST_ROLL',
         summary: 'Cancel the attack\'s success (a jam). `fail` is sugar.',
         apply: (ctx) => { ctx.success = false; },
+    },
+    phenomena: {
+        at: 'power.POST_ROLL',
+        summary: 'power.*: force a Psychic Phenomena roll regardless of doubles/push (Blood Rain\'s automatic Perils, house rules).',
+        apply: (ctx) => { ctx.phenomenaTriggered = true; ctx.phenomenaReason = 'forced by rule'; },
+    },
+    no_phenomena: {
+        at: 'power.POST_ROLL',
+        summary: 'power.*: cancel the Psychic Phenomena roll (Warp Lock).',
+        apply: (ctx) => { ctx.phenomenaTriggered = false; ctx.phenomenaCancelledBy = ctx.rollLabel ?? 'rule'; },
+    },
+    reroll_phenomena: {
+        at: 'power.PHENOMENA',
+        summary: 'power.PHENOMENA: roll Table 6–2 a second time and keep the LOWER result — both are reported (Favoured by the Warp).',
+        apply: (ctx) => { ctx.rerollPhenomena = true; },
     },
     keep_highest: {
         at: 'DAMAGE_POOL',

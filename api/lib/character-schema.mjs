@@ -806,8 +806,10 @@ export function characterToCombatant(doc, { weaponIndex = 0, location = 'body' }
         traits: canonList(doc.traits),
         conditions: doc.conditions ?? [],
         circumstances: doc.circumstances ?? [],
-        // psyker (Force weapons read this; the power.* pipeline will too)
+        // psyker (Force weapons read the rating; the power.* pipeline reads all three)
         psyRating: doc.psy?.rating ?? 0,
+        psykerClass: doc.psy?.class ?? 'none',
+        sustained: doc.psy?.sustained ?? 0,
         // defender-side extras (harmless on the attacker side):
         armour: armourByLocation(doc)[location] ?? 0,
         toughnessBonus: Math.floor(ct('t') / 10),

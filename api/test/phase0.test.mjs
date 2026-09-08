@@ -75,7 +75,7 @@ test('rule meta { source } overrides the package source book', () => {
 });
 
 test('every built-in file declares dsl 3 and a dh2.core.* package', () => {
-    assert.equal(builtinSources.length, 9);
+    assert.equal(builtinSources.length, 10);   // + psychic.dsl (Phase 6)
     for (const b of builtinSources) {
         assert.equal(b.dslVersion, 3, `${b.file} should declare dsl 3`);
         assert.ok(b.package?.name?.startsWith('dh2.core.'), `${b.file} should have a dh2.core.* package`);

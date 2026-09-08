@@ -108,11 +108,14 @@ action      = "add" "modifier" STRING "=" expr
             | "set" IDENT ( "+=" | "=" ) expr       (* PRIMITIVE: write a REGISTERED SLOT (pen,
                                                        jam_threshold, scatter, damage_type,
                                                        extra_dice, extra_hits, rf_threshold,
-                                                       unnatural_toughness_reduction);
+                                                       unnatural_toughness_reduction,
+                                                       effective_psy_rating, phenomena_roll,
+                                                       perils_roll, rider_dice);
                                                        compiler validates name + mode *)
             | "flag" IDENT                          (* PRIMITIVE: raise a REGISTERED FLAG (no_parry,
                                                        cannot_parry, detonate, attack_failed,
-                                                       keep_highest) *)
+                                                       keep_highest, phenomena, no_phenomena,
+                                                       reroll_phenomena) *)
             | "declare" declaration                 (* PRIMITIVE: structured record the engine resolves *)
             (* --- retained rich verbs (ergonomic surface over the primitives) --- *)
             | "multiply_hits" expr
@@ -181,7 +184,18 @@ Other pipelines use qualified ids:
   damage …`; the ENGINE owns duration decrement/expiry, `decay: N` severity
   reduction (Haywire Field), and the Recharge cooldown clear at TURN_END.
 
-Planned per ROADMAP.md: `power.*`, `ship_attack.*`.
+- **`power.MODIFIERS`**, **`power.POST_ROLL`**, **`power.PHENOMENA`**,
+  **`power.PERILS`**, **`power.EFFECT`** (Phase 6) — the Focus Power flow behind
+  `/api/power` (DH2 p.194–198). The ENGINE owns psy strength and the push
+  penalty, the class push caps, the d100 + doubles test, the opposed resist
+  (run through `test.*` as "Psychic Powers"), the Table 6–2 → 6–3 chain and the
+  attack-mode hit counts; rules read `psyker_class`, `push`/`is_pushing`,
+  `is_doubles`, `phenomena`, `phenomena_roll`, `opposed_won`, `is_power("…")`
+  and steer with `set phenomena_roll += …`, `set perils_roll += …`,
+  `set effective_psy_rating += …`, `set rider_dice += …`, `flag phenomena`,
+  `flag no_phenomena`, `flag reroll_phenomena`.
+
+Planned per ROADMAP.md: `ship_attack.*`.
 
 ## Vocabulary (`when` / expressions)
 Facts and functions are exposed to the interpreter over a whitelist. **The
@@ -199,8 +213,11 @@ authoritative, always-current list lives in `lib/dsl/docs.mjs`, served at
 - combat state: `dual_wielding`, `firing_offhand`, `firing_both`
 - parry (opposing_weapon scope): `opposing_weapon.present`,
   `opposing_weapon.has_quality("…")` (the parried attacking weapon — Power Field)
+- psyker (power.* pipeline): `psy_rating`, `is_psyker`, `effective_psy_rating`,
+  `push`, `is_pushing`, `psyker_class`, `sustained`, `power_name`, `is_doubles`,
+  `phenomena`, `phenomena_roll`, `perils_roll`, `opposed_won`, `opposed_dos`
 - functions: `has_quality`, `has_talent`, `has_trait`, `has_condition`,
-  `has_circumstance`, `circumstance_severity`, `configuration`,
+  `has_circumstance`, `circumstance_severity`, `configuration`, `is_power`,
   `is_action`, `is_reaction`, `action_subtype`, `quality_level`, `trait_level`,
   `condition_severity`, `condition_duration`, `condition_location`, `tens`,
   `is_natural`, `ceil`, `floor`, `half`

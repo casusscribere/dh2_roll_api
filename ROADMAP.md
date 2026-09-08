@@ -110,7 +110,8 @@ rule definition.
 talents/traits covered with tests; a Foundry playtest runs on generated packs.
 
 ## Phase 6 — Psychic powers (DH2 completion)
-*(stage 7)*
+*(stage 7)* — **shipped 2026-09-08** (Lanes A+B; Lane C satisfied by re-vendoring the
+bundle into `rogue-trader-2e`). See README → "Psychic powers (Phase 6)".
 
 | Lane | Work |
 |---|---|

@@ -15,11 +15,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const dataDir = join(__dirname, '..', '..', 'data');
 const read = (rel) => readFileSync(join(dataDir, rel), 'utf8');
 
-/** The nine built-in rule files, keyed by filename (the keys the engine reads). */
+/** The built-in rule files, keyed by filename (the keys the engine reads). */
 export const RULE_FILES = [
     'weapon-qualities.dsl', 'talents.dsl', 'traits.dsl', 'conditions.dsl',
     'circumstances.dsl', 'configurations.dsl', 'mechanics.dsl', 'roll-tables.dsl',
-    'actions.dsl', 'spec-lists.dsl',
+    'actions.dsl', 'spec-lists.dsl', 'psychic.dsl',
 ];
 
 /** filename → raw DSL source text. */

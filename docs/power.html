@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="dh2-engine.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DH2 Roll Servitor — Focus Power</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav>
+  <a class="brand" href="index.html">DH2 Roll Servitor</a>
+  <div class="links">
+    <a href="index.html">Home</a>
+    <a href="roll.html">Roll</a>
+    <a href="power.html" class="active">Power</a>
+    <a href="characters.html">Characters</a>
+    <a href="builder.html">Builder</a>
+    <a href="rules.html">Rules</a>
+  </div>
+</nav>
+
+<h1>Focus Power</h1>
+<div class="sub">psychic powers per DH2 Chapter VI &middot; psy strength &amp; push (p.194) &middot; Psychic Phenomena (p.196) &middot; Perils of the Warp (p.197) &middot; <span id="activeRules" class="dim"></span></div>
+
+<div class="grid">
+
+  <!-- ===================== PSYKER ===================== -->
+  <fieldset>
+    <legend>Psyker</legend>
+    <div class="row">
+      <div><label>Character <span class="dim">— roster preset or a Builder-made Acolyte (★); loads WP, psy rating, class, sustaining, talents, known powers</span></label>
+        <select id="char-preset"><option value="">— manual entry —</option></select></div>
+      <div><label>&nbsp;</label><button class="minibtn" style="margin-top:0" onclick="applyCharacter()">Apply</button></div>
+    </div>
+    <div class="row4">
+      <div><label>Willpower</label><input type="number" id="p-wp" value="45"></div>
+      <div><label title="Unnatural Willpower (X): a successful test gains ⌈X/2⌉ bonus DoS (p.139)">Unnat. WP</label><input type="number" id="p-un-wp" value="0" min="0"></div>
+      <div><label title="Base psy rating (p.193)">Psy Rating</label><input type="number" id="p-pr" value="3" min="1"></div>
+      <div><label title="Powers currently sustained: 2+ lowers the rating of each by the count and adds +10 to Phenomena per power after the first (p.198)">Sustaining</label><input type="number" id="p-sustained" value="0" min="0"></div>
+    </div>
+    <div class="row">
+      <div><label title="Table 6–1 Psychic Strength (p.195): governs the push cap and the Phenomena modifiers">Psyker class</label><select id="p-class"></select></div>
+    </div>
+    <div class="note" id="p-classnote"></div>
+    <label style="margin-top:.6rem">Active rules <span class="dim">— talents &amp; traits default ON; per-use options (Fate for Warp Conduit, Warp Lock) default OFF</span></label>
+    <div id="p-rules" class="rulepanel"><span class="dim">loading…</span></div>
+    <div class="result" id="char-status" style="display:none"></div>
+  </fieldset>
+
+  <!-- ===================== POWER ===================== -->
+  <fieldset>
+    <legend>Power</legend>
+    <div class="row">
+      <div><label>Known power <span class="dim">— from the applied character (equipped powers)</span></label>
+        <select id="pw-known"><option value="">— custom —</option></select></div>
+      <div><label>Name</label><input id="pw-name" value="Smite"></div>
+    </div>
+    <div class="row3">
+      <div><label title="What the Focus Power test rolls against. Psyniscience uses the character's skill target when a character is applied.">Focus</label>
+        <select id="pw-focus">
+          <option value="wp" selected>Willpower</option>
+          <option value="per">Perception</option>
+          <option value="psyniscience">Psyniscience (skill)</option>
+          <option value="manual">Manual target</option>
+        </select></div>
+      <div><label>Target</label><input type="number" id="pw-target" value="45"></div>
+      <div><label>Difficulty</label>
+        <select id="pw-difficulty">
+          <option value="40">Simple (+40)</option><option value="30">Easy (+30)</option>
+          <option value="20">Routine (+20)</option><option value="10">Ordinary (+10)</option>
+          <option value="0" selected>Challenging (+0)</option><option value="-10">Difficult (-10)</option>
+          <option value="-20">Hard (-20)</option><option value="-30">Very Hard (-30)</option>
+          <option value="-40">Arduous (-40)</option>
+        </select></div>
+    </div>
+    <div class="row3">
+      <div><label title="Psychic Bolt / Barrage / Storm / Blast (p.198): hit counts from the DoS, capped at the effective psy rating">Attack mode</label>
+        <select id="pw-mode"><option value="">— none —</option></select></div>
+      <div><label>Other modifier</label><input type="number" id="pw-mod" value="0"></div>
+      <div><label title="Debug: comma-separated die faces in roll order (Focus Power d100, opposed d100, Phenomena d100, Perils d100, rider d10s…). Blank = random.">Forced rolls</label><input id="pw-forced" placeholder="e.g. 33,10"></div>
+    </div>
+    <div class="checks">
+      <label><input type="checkbox" id="pw-opposed" onchange="syncOpposed()"> Opposed <span class="dim">(the target resists with Willpower, p.195)</span></label>
+      <label><input type="checkbox" id="pw-nophen"> Cannot generate Phenomena <span class="dim">(the Force weapon rider, p.145)</span></label>
+    </div>
+    <div id="pw-opposed-box" style="display:none">
+      <label class="gold">— Resisting target —</label>
+      <div class="row4">
+        <div><label>Willpower</label><input type="number" id="o-wp" value="35"></div>
+        <div><label>Unnat. WP</label><input type="number" id="o-un-wp" value="0" min="0"></div>
+        <div><label title="A resisting psyker adds DOUBLE his (pushed) psy rating to the Willpower test (p.195)">Psy Rating</label><input type="number" id="o-pr" value="0" min="0"></div>
+        <div><label>Name</label><input id="o-name" value="target"></div>
+      </div>
+      <label>Talents / traits <span class="dim">— comma separated; test.* rules gated on "Psychic Powers" apply (Resistance, Bastion of Iron Will, Strong Minded)</span></label>
+      <input id="o-rules" placeholder="e.g. Resistance (Psychic Powers), Strong Minded">
+    </div>
+    <div class="checks" style="margin-top:.5rem">
+      <button class="minibtn" style="margin-top:0" onclick="presetForce()" title="Force weapon (p.145): after damaging with a Force weapon — Opposed Willpower at the BASE rating, no Phenomena; +1d10 Energy per DoS on a win">⚔ Force weapon rider</button>
+    </div>
+  </fieldset>
+
+  <!-- ===================== STRENGTH + RESULT ===================== -->
+  <fieldset style="grid-column: 1 / -1;">
+    <legend>Psychic strength &amp; manifestation</legend>
+    <div class="row3">
+      <div><label title="Step 1 (p.194): commit part of the base rating (+10 per point under) or PUSH above it (−10 per point, capped by class)">Effective psy rating</label>
+        <select id="pw-effective"></select></div>
+      <div><label>Focus Power modifier preview</label><div class="result" id="pw-preview" style="margin-top:0">&mdash;</div></div>
+      <div><label>&nbsp;</label><button onclick="manifest()">Manifest</button></div>
+    </div>
+    <div class="result" id="pw-result">&mdash;</div>
+  </fieldset>
+
+</div>
+
+<script src="rules-store.js"></script>
+<script src="char-store.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const api = (path, body) => fetch(path, {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+}).then(r => r.json());
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const sign = (n) => (n >= 0 ? '+' : '') + n;
+
+let OPTIONS = { psykerClasses: [], psychicAttackModes: [] };
+let RULES = {};
+let PSY_CONFIGS = [];      // configurations referenced by psychic.dsl (Warp Conduit (Fate), Warp Lock)
+let PRESET_RAW = {};
+let DOC = null;            // the applied character document
+let ITEM_DSL = '';
+
+// --- rule panel (talents / traits / conditions / psychic per-use options) -------
+const RULE_GROUPS = [
+  { cat: 'talents', label: 'Talents', on: true },
+  { cat: 'traits', label: 'Traits', on: true },
+  { cat: 'conditions', label: 'Conditions', on: false },
+  { cat: 'configs', label: 'Psychic options (per use)', on: false },
+];
+function buildRulePanel(rules) {
+  const items = (cat) => cat === 'configs' ? PSY_CONFIGS : (rules[cat] ?? []);
+  const valued = new Set(rules.valued ?? []);
+  let h = '';
+  for (const g of RULE_GROUPS) {
+    const list = items(g.cat);
+    h += `<div class="rulegroup"><div class="ghead">${g.label}</div>`;
+    if (!list.length) { h += '<span class="dim">none</span></div>'; continue; }
+    h += '<div class="rrows">';
+    for (const name of list) {
+      const val = valued.has(name) ? `<input type="number" class="rval" placeholder="X" title="severity / level value (X)">` : '';
+      h += `<span class="rrow" data-tipname="${esc(name)}"><label><input type="checkbox" class="rtoggle" data-cat="${g.cat}" value="${esc(name)}"${g.on ? ' checked' : ''}> ${esc(name)}</label>${val}</span>`;
+    }
+    h += '</div></div>';
+  }
+  $('p-rules').innerHTML = h;
+}
+function collectRules(cat) {
+  const out = [];
+  document.querySelectorAll(`.rtoggle[data-cat="${cat}"]:checked`).forEach((cb) => {
+    const valEl = cb.closest('.rrow')?.querySelector('.rval');
+    const raw = valEl && valEl.value.trim() !== '' ? +valEl.value : null;
+    if (cat === 'conditions') out.push(raw != null ? { name: cb.value, severity: raw } : cb.value);
+    else out.push(raw != null ? `${cb.value} (${raw})` : cb.value);
+  });
+  return out;
+}
+const normName = (s) => String(s ?? '').toLowerCase().replace(/[\s_-]+/g, '');
+// tick the toggles matching a character's entries (spelling-blind, prefix); report the unmatched
+function setRulePanel(cat, list) {
+  const unmatched = [];
+  const boxes = [...document.querySelectorAll(`.rtoggle[data-cat="${cat}"]`)];
+  boxes.forEach((cb) => { cb.checked = false; });
+  for (const entry of (list ?? [])) {
+    const o = (entry && typeof entry === 'object') ? entry : { name: entry };
+    if (o.enabled === false) continue;
+    const key = normName(o.name);
+    const hit = boxes.find((cb) => key.startsWith(normName(cb.value)) || normName(cb.value).startsWith(key));
+    if (hit) {
+      hit.checked = true;
+      const valEl = hit.closest('.rrow')?.querySelector('.rval');
+      if (valEl && o.level != null) valEl.value = o.level;
+    } else unmatched.push(o.name);
+  }
+  return unmatched;
+}
+
+// --- character presets (roster + custom, edited overlay via CharStore) ---------
+const presetDoc = (id) => (id && PRESET_RAW[id]) ? CharStore.effective(id, PRESET_RAW[id]) : null;
+async function loadPresets() {
+  const sel = $('char-preset');
+  try {
+    const r = await fetch('/api/characters').then(x => x.json());
+    for (const c of (r.characters ?? [])) {
+      PRESET_RAW[c.id] = c.document ?? c;
+      sel.add(new Option(c.name + (CharStore.edited(c.id) ? ' ✎' : ''), c.id));
+    }
+  } catch { /* no roster in this build */ }
+  for (const c of CharStore.customList()) {
+    PRESET_RAW[c.id] = CharStore.get(c.id);
+    sel.add(new Option('★ ' + c.name, c.id));
+  }
+  const want = new URLSearchParams(location.search).get('preset');
+  if (want && PRESET_RAW[want]) { sel.value = want; applyCharacter(); }
+  CharStore.onChange(() => { if (sel.value) applyCharacter(); });
+}
+const charTotal = (doc, k) => {
+  const c = doc.characteristics?.[k];
+  if (typeof c === 'number') return c;
+  if (!c || typeof c !== 'object') return 0;
+  return (c.base ?? 0) + 5 * (c.advances ?? 0) + (c.modifiers ?? []).reduce((a, m) => a + (m.value || 0), 0);
+};
+function charStatus(html, bad) {
+  const el = $('char-status'); el.style.display = 'block';
+  el.innerHTML = bad ? `<span class="bad">${html}</span>` : html;
+}
+async function applyCharacter() {
+  const raw = presetDoc($('char-preset').value);
+  if (!raw) { DOC = null; charStatus('Pick a character first.', true); return; }
+  const r = await api('/api/character/validate', { character: raw });
+  if (!r.ok) { charStatus('Schema errors: ' + r.errors.map(e => `${e.path} — ${e.message}`).join('; '), true); return; }
+  DOC = r.character;
+  const stats = r.combatant?.characteristics ?? {};
+  $('p-wp').value = stats.wp ?? charTotal(DOC, 'wp');
+  $('p-un-wp').value = DOC.unnatural?.wp ?? 0;
+  const pr = DOC.psy?.rating ?? 0;
+  $('p-pr').value = Math.max(1, pr);
+  const cls = DOC.psy?.class && DOC.psy.class !== 'none' ? DOC.psy.class : 'bound';
+  if ([...$('p-class').options].some(o => o.value === cls)) $('p-class').value = cls;
+  $('p-sustained').value = DOC.psy?.sustained ?? 0;
+  ITEM_DSL = [...(DOC.weapons ?? []), ...(DOC.armourItems ?? []), ...(DOC.gear ?? [])]
+    .filter((x) => x?.equipped !== false && typeof x.dsl === 'string' && x.dsl.trim())
+    .map((x) => `# item: ${x.name}\n${x.dsl}`).join('\n\n');
+  const unmatched = [];
+  for (const [cat, list] of [['talents', DOC.talents], ['traits', DOC.traits], ['conditions', DOC.conditions]]) unmatched.push(...setRulePanel(cat, list));
+  // known powers (equipped only)
+  const sel = $('pw-known');
+  sel.innerHTML = '<option value="">— custom —</option>';
+  const powers = (DOC.psychicPowers ?? []).map((p) => (p && typeof p === 'object') ? p : { name: p }).filter((p) => p.equipped !== false);
+  powers.forEach((p, i) => sel.add(new Option(p.discipline ? `${p.name} (${p.discipline})` : p.name, String(i))));
+  sel.onchange = () => {
+    const p = powers[+sel.value];
+    if (!p) return;
+    $('pw-name').value = p.name;
+    // notes like "Difficult (–10) Opposed Willpower test" pre-fill difficulty / opposed
+    const m = String(p.notes ?? '').match(/\(([+–−-]?\s?\d+)\)/);
+    if (m) { const v = String(+m[1].replace(/[–−]/, '-').replace(/\s/g, '')); if ([...$('pw-difficulty').options].some(o => o.value === v)) $('pw-difficulty').value = v; }
+    $('pw-opposed').checked = /opposed/i.test(String(p.notes ?? ''));
+    syncOpposed();
+  };
+  syncStrength(); syncFocus();
+  charStatus(`<span class="ok">Loaded "${esc(DOC.name)}"</span> — psy rating ${pr || '<span class="bad">0 (not a psyker)</span>'}, class ${esc(cls)}, ${powers.length} power${powers.length === 1 ? '' : 's'}` +
+    (unmatched.length ? `<br><span class="dim">no matching rule toggle for: ${esc(unmatched.join(', '))}</span>` : ''));
+}
+
+// --- focus / strength / opposed sync ------------------------------------------
+function skillTargetFromDoc(doc, name) {
+  const s = doc?.skills?.[name] ?? doc?.skills?.[name.toLowerCase()];
+  if (!s) return null;
+  const cv = charTotal(doc, s.characteristic ?? 'per');
+  const adv = s.advances ?? 0;
+  return (adv > 0 ? cv + (adv - 1) * 10 : Math.floor(cv / 2)) + (s.modifiers ?? []).reduce((a, m) => a + (m.value || 0), 0);
+}
+function syncFocus() {
+  const f = $('pw-focus').value;
+  const t = $('pw-target');
+  if (f === 'wp') { t.value = +$('p-wp').value; t.readOnly = true; }
+  else if (f === 'per') { t.value = DOC ? charTotal(DOC, 'per') : +t.value; t.readOnly = !!DOC; }
+  else if (f === 'psyniscience') { const st = DOC ? skillTargetFromDoc(DOC, 'psyniscience') : null; if (st != null) t.value = st; t.readOnly = st != null; }
+  else t.readOnly = false;
+}
+function classInfo() { return OPTIONS.psykerClasses.find(c => c.id === $('p-class').value) ?? { maxPush: 0, note: '' }; }
+function syncStrength() {
+  const base = Math.max(1, +$('p-pr').value || 1);
+  const cap = classInfo().maxPush ?? 0;
+  const sel = $('pw-effective');
+  const prev = +sel.value || base;
+  sel.innerHTML = '';
+  for (let n = 1; n <= base + cap; n++) {
+    const delta = (base - n) * 10;
+    const label = n === base ? `${n} (base — no modifier)` : n < base ? `${n} (${sign(delta)})` : `${n} (push +${n - base}: ${sign(delta)})`;
+    sel.add(new Option(label, String(n), n === base, n === (prev >= 1 && prev <= base + cap ? prev : base)));
+  }
+  $('p-classnote').textContent = classInfo().note ?? '';
+  syncPreview();
+}
+function syncPreview() {
+  const base = Math.max(1, +$('p-pr').value || 1);
+  const eff = +$('pw-effective').value || base;
+  const push = Math.max(0, eff - base);
+  const parts = [];
+  const diff = +$('pw-difficulty').value; if (diff) parts.push(`${sign(diff)} difficulty`);
+  if (eff !== base) parts.push(`${sign((base - eff) * 10)} psy rating${push ? ` (push +${push})` : ''}`);
+  const mod = +$('pw-mod').value; if (mod) parts.push(`${sign(mod)} other`);
+  const sus = +$('p-sustained').value || 0;
+  let trig = $('pw-nophen').checked ? 'no Phenomena on this test' : push ? 'PUSHING — Phenomena on anything but doubles' : 'Phenomena on doubles';
+  if (sus >= 2) trig += `; sustaining ${sus}: final rating −${sus}, +${10 * (sus - 1)} to Phenomena`;
+  $('pw-preview').innerHTML = `target <span class="gold">${+$('pw-target').value + diff + (eff !== base ? (base - eff) * 10 : 0) + mod}</span> <span class="dim">(${$('pw-target').value}${parts.length ? ' ' + parts.join(' ') : ''})</span><br><span class="dim">${trig}</span>`;
+}
+function syncOpposed() { $('pw-opposed-box').style.display = $('pw-opposed').checked ? 'block' : 'none'; }
+function presetForce() {
+  $('pw-known').value = '';
+  $('pw-name').value = 'Force Weapon';
+  $('pw-focus').value = 'wp'; syncFocus();
+  $('pw-difficulty').value = '0';
+  $('pw-mode').value = '';
+  $('pw-opposed').checked = true; syncOpposed();
+  $('pw-nophen').checked = true;
+  $('pw-effective').value = String(Math.max(1, +$('p-pr').value || 1));   // base rating (p.145)
+  syncPreview();
+}
+
+// --- manifest ------------------------------------------------------------------
+function refreshActiveRules() {
+  const n = RulesStore.activeCount();
+  const off = RulesStore.disabledBuiltins().length;
+  $('activeRules').innerHTML = (n ? `<span class="gold">${n}</span> custom rule${n !== 1 ? 's' : ''} active` : 'no custom rules active') +
+    (off ? ` · <span class="bad">${off}</span> built-in disabled` : '');
+}
+async function manifest() {
+  const body = {
+    characteristics: { wp: +$('p-wp').value, per: DOC ? charTotal(DOC, 'per') : 0 },
+    target: +$('pw-target').value,
+    unnatural: +$('p-un-wp').value,
+    psyRating: +$('p-pr').value, effectivePsyRating: +$('pw-effective').value,
+    psykerClass: $('p-class').value, sustained: +$('p-sustained').value,
+    power: {
+      name: $('pw-name').value.trim() || 'Psychic Power',
+      difficulty: +$('pw-difficulty').value,
+      opposed: $('pw-opposed').checked,
+      noPhenomena: $('pw-nophen').checked,
+      ...( $('pw-mode').value ? { attackMode: $('pw-mode').value } : {} ),
+    },
+    modifiers: +$('pw-mod').value ? { other: +$('pw-mod').value } : {},
+    talents: collectRules('talents'), traits: collectRules('traits'), conditions: collectRules('conditions'), configs: collectRules('configs'),
+  };
+  if (body.power.opposed) {
+    const oRules = $('o-rules').value.split(',').map(x => x.trim()).filter(Boolean);
+    body.opposed = { name: $('o-name').value || 'target', characteristics: { wp: +$('o-wp').value }, unnatural: +$('o-un-wp').value, psyRating: +$('o-pr').value, talents: oRules, traits: oRules };
+  }
+  const forced = $('pw-forced').value.split(',').map(x => x.trim()).filter(Boolean).map(Number);
+  if (forced.length && forced.every(Number.isFinite)) body.forcedRolls = forced;
+  const disabled = RulesStore.disabledBuiltins();
+  if (disabled.length) body.disabledRules = disabled;
+  const custom = [RulesStore.activeDsl(), ITEM_DSL].filter(s => s && s.trim()).join('\n\n');
+  if (custom.trim()) body.customRules = custom;
+  const r = await api('/api/power', body);
+  if (r.error) { $('pw-result').innerHTML = `<span class="bad">${esc(r.error)}</span>`; return; }
+  $('pw-result').innerHTML = renderResult(r);
+}
+function renderResult(r) {
+  const t = r.test;
+  const modList = Object.entries(r.modifiers ?? {}).filter(([, v]) => v).map(([k, v]) => `${sign(v)} ${esc(k)}`).join(' ');
+  let out = `<span class="gold">${esc(r.power.name)}</span> — psy rating <span class="gold">${r.psy.effective}</span>` +
+    (r.psy.pushing ? ` <span class="bad">(pushing +${r.psy.push} of ${r.psy.class} cap +${r.psy.cap})</span>` : ` <span class="dim">(base ${r.psy.base})</span>`) +
+    (r.psy.final !== r.psy.effective ? ` → final <span class="gold">${r.psy.final}</span>` : '') + '\n';
+  out += `Focus Power: <span class="gold">${t.roll}</span> vs ${t.modifiedTarget} <span class="dim">(${t.target}${modList ? ' ' + modList : ''})</span>${t.doubles ? ' <span class="rf">DOUBLES</span>' : ''}\n`;
+  out += r.success
+    ? `<span class="ok">MANIFESTS</span> — ${r.dos} degree${r.dos !== 1 ? 's' : ''} of success${t.autoSuccess ? ' (natural 1!)' : ''}${t.bonusDos ? ` <span class="dim">(incl. +${t.bonusDos} Unnatural)</span>` : ''}`
+    : `<span class="bad">FAILS</span> — ${r.dof} degree${r.dof !== 1 ? 's' : ''} of failure${t.autoFailure ? ' (natural 100!)' : ''}`;
+  if (r.opposed) {
+    const o = r.opposed, ot = o.test;
+    const oMods = Object.entries(ot.modifiers ?? {}).filter(([, v]) => v).map(([k, v]) => `${sign(v)} ${esc(k)}`).join(' ');
+    out += `\nOpposed — ${esc(o.name)} resists: <span class="gold">${ot.roll}</span> vs ${ot.modifiedTarget} <span class="dim">(${ot.target}${oMods ? ' ' + oMods : ''})</span> → ${ot.success ? `${ot.dos} DoS` : `fails (${ot.dof} DoF)`}`;
+    out += o.won ? ` — <span class="ok">psyker WINS</span> by ${o.margin}` : ` — <span class="bad">psyker does not win</span>${o.margin === 0 ? ' (tie — the psyker needs more degrees, p.195)' : ''}`;
+    for (const e of (ot.effects ?? [])) out += `\n  <span class="rf">⚑ ${esc(e.name)}</span> <span class="dim">${esc(e.effect ?? '')}</span>`;
+  }
+  if (r.hits !== null && r.hits !== undefined) out += `\nHits: <span class="gold">${r.hits}</span>`;
+  if (r.rider) out += `\n<span class="rf">⚔ rider damage</span>: ${r.rider.dice.join(' + ')} = <span class="gold">${r.rider.total}</span> ${esc(r.rider.damageType)} <span class="dim">(ignores Armour and Toughness bonus)</span>`;
+  const ph = r.phenomena;
+  out += `\n\n<span class="gold">Psychic Phenomena</span>: ${ph.triggered ? '<span class="bad">TRIGGERED</span>' : '<span class="ok">none</span>'} <span class="dim">— ${esc(ph.reason)}</span>`;
+  if (ph.triggered) {
+    const rollTxt = ph.rolls && ph.rolls.length > 1 ? `rolls ${ph.rolls.join(' / ')} → kept ${ph.roll}` : `roll ${ph.natural}${ph.modifier ? ` ${sign(ph.modifier)} = ${ph.roll}` : ''}`;
+    out += `\n  <span class="gold">${rollTxt}</span>${ph.chosen ? ` <span class="dim">(${esc(ph.chosen)})</span>` : ''}\n  ${esc(ph.text)}`;
+    if (ph.statuses?.length) out += `\n  <span class="dim">conditions: ${esc(ph.statuses.join(', '))}</span>`;
+  }
+  if (r.perils) {
+    const p = r.perils;
+    out += `\n<span class="bad">PERILS OF THE WARP</span>: roll ${p.natural}${p.modifier ? ` ${sign(p.modifier)} = ${p.roll}` : ''}\n  ${esc(p.text)}`;
+    if (p.statuses?.length) out += `\n  <span class="dim">conditions: ${esc(p.statuses.join(', '))}</span>`;
+  }
+  for (const dmg of (r.declaredDamage ?? [])) out += `\n<span class="rf">⚑ ${esc(dmg.source ?? 'damage')}</span>: <span class="bad">${dmg.amount}</span> <span class="dim">${esc(dmg.reason ?? '')}</span>`;
+  for (const e of (r.effects ?? [])) out += `\n<span class="rf">⚑ ${esc(e.name)}</span>${e.effect ? ` <span class="dim">${esc(e.effect)}</span>` : ''}`;
+  if (r.rollTrace?.length) out += `\n\n<span class="dim">dice: ${r.rollTrace.map(x => `${esc(x.label)} d${x.sides}=${x.value}${x.forced ? '*' : ''}`).join(' · ')}</span>`;
+  return out;
+}
+
+// --- init --------------------------------------------------------------------
+async function init() {
+  const [opts, rules, src] = await Promise.all([
+    fetch('/api/options').then(r => r.json()),
+    fetch('/api/rules').then(r => r.json()),
+    fetch('/api/rules/source').then(r => r.json()),
+  ]);
+  OPTIONS = opts; RULES = rules;
+  const psySrc = (src.builtins ?? []).find(b => b.file === 'psychic.dsl')?.source ?? '';
+  PSY_CONFIGS = (rules.configurations ?? []).filter(c => psySrc.includes(`"${c}"`));
+  for (const c of (opts.psykerClasses ?? [])) $('p-class').add(new Option(`${c.id} — ${c.label}`, c.id));
+  for (const m of (opts.psychicAttackModes ?? [])) $('pw-mode').add(new Option(m.label, m.id));
+  buildRulePanel(rules);
+  refreshActiveRules();
+  syncStrength(); syncFocus();
+  for (const id of ['p-pr', 'p-class', 'p-sustained']) $(id).addEventListener('change', syncStrength);
+  for (const id of ['p-wp', 'pw-focus']) $(id).addEventListener('change', () => { syncFocus(); syncPreview(); });
+  for (const id of ['pw-target', 'pw-difficulty', 'pw-mod', 'pw-effective', 'pw-nophen']) $(id).addEventListener('change', syncPreview);
+  $('p-wp').addEventListener('input', () => { syncFocus(); syncPreview(); });
+  loadPresets();
+  window.addEventListener('focus', refreshActiveRules);
+}
+init();
+</script>
+<script type="module">
+  import { mount } from './prose-tip.mjs';
+  mount({ api: async (m, p) => { const r = await fetch(p); if (!r.ok) throw new Error(r.status); return r.json(); } });
+</script>
+</body>
+</html>

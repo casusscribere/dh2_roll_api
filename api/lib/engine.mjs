@@ -21,6 +21,7 @@ import {
     defaultRegistry,
     COMBAT_ACTIONS, RANGE_BANDS, AIM_MODES, canonicalAction,
 } from './rules/index.mjs';
+import { PSYKER_CLASSES, maxPushFor, PSYCHIC_ATTACK_MODES, psychicHits } from './rules/psychic-strength.mjs';
 
 // Re-export the primitives + reference tables that callers/tests expect from
 // this module, so the public surface is unchanged by the restructure.
@@ -95,6 +96,9 @@ export function resolveTest(input, rng = Math.random, registry = defaultRegistry
         statuses: input.conditions ?? input.statuses ?? [], circumstances: input.circumstances ?? [],
         combat: { dualWielding: false, firingOffhand: false, firingBoth: false },
         modifiers: { ...(input.modifiers ?? {}) },
+        // the tested character's psy rating (a psyker RESISTING a power reads it
+        // through psy_rating — Bastion of Iron Will's 5 × PR, p.121)
+        psyRating: Number(input.psyRating) || 0,
         // `foe` = the creature the test is ABOUT (the Fear source, the grappler),
         // exposed through the target.* scope so target-scoped rules (the Fear
         // trait) can read its traits. input.target stays the TEST TARGET NUMBER.
@@ -112,6 +116,182 @@ export function resolveTest(input, rng = Math.random, registry = defaultRegistry
     ctx.success = test.success;
     runCheckpoint(registry, CHECKPOINTS.TEST_POST_ROLL, ctx);
     return { ...test, success: ctx.success, testName: ctx.testName, effects: ctx.effects, log: ctx.log };
+}
+
+// ------------------------------------------------------------ focus power --
+
+/** Doubles on a d100: tens digit = ones digit (11, 22, … 99). 100 reads as
+ *  0/0 and counts (it is also the automatic failure); 01–09 never do. */
+const isDoubles = (roll) => roll >= 10 && Math.floor(roll / 10) % 10 === roll % 10;
+
+/**
+ * Resolve a FOCUS POWER test through the `power.*` pipeline (Phase 6, DH2
+ * core p.194–198). Mechanism only — the numbers (push caps, attack-mode hit
+ * counts) come from rules/psychic-strength.mjs and the content (class Phenomena
+ * modifiers, talents, the Force rider, the tables) from the DSL.
+ *
+ *  1. Psychic strength (p.194): the chosen effective psy rating (default =
+ *     base) is +10/pt below base, −10/pt above (pushing), capped per class
+ *     (Table 6–1). Sustaining ≥2 powers lowers the final rating (p.198).
+ *  2. power.MODIFIERS → d100 vs the focus characteristic (or `target`) with
+ *     the power's difficulty → optional OPPOSED resist through the test.*
+ *     pipeline ("Psychic Powers"; a resisting psyker adds 2 × PR, p.195).
+ *  3. Phenomena decision: doubles trigger; pushing inverts it (anything but
+ *     doubles); `power.noPhenomena` (the Force rider) never. power.POST_ROLL
+ *     rules may flag phenomena / no_phenomena and add phenomena_roll.
+ *  4. Table 6–2 (+modifier) → power.PHENOMENA (reroll_phenomena keeps the
+ *     lower) → 75+ chains into Table 6–3 → power.PERILS.
+ *  5. Attack-mode hits (p.198) → power.EFFECT → rider d10s (Force, p.145).
+ *
+ * input = { characteristics:{wp,…}, target?, power:{ name, difficulty, opposed?,
+ *           noPhenomena?, attackMode? }, psyRating, effectivePsyRating?,
+ *           psykerClass?, sustained?, modifiers?, unnatural?, talents?, traits?,
+ *           conditions?, circumstances?, configs?, opposed?:{ name?, target?,
+ *           characteristics:{wp}, psyRating?, unnatural?, talents?, traits?, … } }
+ */
+export function resolveFocusPower(input, rng = Math.random, registry = defaultRegistry) {
+    const base = Number(input.psyRating) || 0;
+    if (base < 1) throw new Error('a Focus Power test needs a psy rating of at least 1 (psyRating) — p.194');
+    const cls = String(input.psykerClass ?? 'bound').toLowerCase();
+    if (!PSYKER_CLASSES[cls]) throw new Error(`Unknown psyker class '${input.psykerClass}' (${Object.keys(PSYKER_CLASSES).join(', ')})`);
+    const cap = maxPushFor(cls);
+    const effective = input.effectivePsyRating == null ? base : Number(input.effectivePsyRating);
+    if (!Number.isInteger(effective) || effective < 1) throw new Error('effectivePsyRating must be at least 1 (p.194)');
+    const push = Math.max(0, effective - base);
+    if (push > cap) throw new Error(`effective psy rating ${effective} exceeds the ${cls} push cap of base + ${cap} (Table 6–1, p.195)`);
+    const power = {
+        name: String(input.power?.name ?? 'Psychic Power'),
+        difficulty: Number(input.power?.difficulty) || 0,
+        opposed: !!input.power?.opposed,
+        noPhenomena: !!input.power?.noPhenomena,
+        attackMode: input.power?.attackMode ? String(input.power.attackMode).toLowerCase() : null,
+    };
+    if (power.attackMode && !PSYCHIC_ATTACK_MODES[power.attackMode]) {
+        throw new Error(`Unknown attackMode '${input.power.attackMode}' (${Object.keys(PSYCHIC_ATTACK_MODES).join(', ')})`);
+    }
+    const sustained = Math.max(0, Number(input.sustained) || 0);
+    const characteristics = input.characteristics ?? {};
+    const target = input.target != null ? Number(input.target) : (Number(characteristics.wp) || 0);
+    const modifiers = { ...(input.modifiers ?? {}) };
+    if (power.difficulty) modifiers.difficulty = power.difficulty;
+    if (effective !== base) modifiers['psy rating'] = (base - effective) * 10;   // p.194: ±10 per point
+
+    const ctx = new RollContext({
+        input, characteristics, action: 'Focus Power', testName: 'Focus Power',
+        isMelee: false, rangeBand: '', aimValue: 0, rng, qualities: [], craftsmanship: 'Common',
+        talents: canonList(input.talents), traits: canonList(input.traits),
+        statuses: input.conditions ?? input.statuses ?? [], circumstances: input.circumstances ?? [],
+        configs: input.configs ?? input.firingModes ?? [], firingModes: input.configs ?? input.firingModes ?? [],
+        combat: { dualWielding: false, firingOffhand: false, firingBoth: false },
+        modifiers, effects: [], target: null,
+        targetEffects: { tests: [], statuses: [], armour: [] },
+        // psyker facts (vocabulary.mjs power.* block)
+        psyRating: base, push, psykerClass: cls, sustained, powerName: power.name,
+        // sustaining ≥2 powers reduces the effective rating of each by the count (p.198)
+        finalPsyRating: sustained >= 2 ? Math.max(1, effective - sustained) : effective,
+        phenomenaModifier: 0, perilsModifier: 0, riderDice: 0, damageType: 'Energy',
+    });
+    runCheckpoint(registry, CHECKPOINTS.POWER_MODIFIERS, ctx);
+
+    const test = rollTest({ target, modifiers: ctx.modifiers, label: 'Focus Power', unnatural: input.unnatural ?? 0 }, rng);
+    test.doubles = isDoubles(test.roll);
+    ctx.test = test; ctx.success = test.success; ctx.doubles = test.doubles;
+
+    // Opposed Focus Power (p.195): the resister tests through the test.* pipeline
+    // so Resistance / Bastion of Iron Will / Strong Minded apply; a resisting
+    // psyker adds double his (pushed) psy rating. The psyker wins only by passing
+    // AND out-degreeing the resister.
+    let opposed = null;
+    if (power.opposed) {
+        const o = input.opposed ?? {};
+        const oMods = { ...(o.modifiers ?? {}) };
+        const oPr = Number(o.psyRating) || 0;
+        if (oPr) oMods['psy rating x2'] = oPr * 2;
+        const resist = resolveTest({
+            target: o.target != null ? Number(o.target) : (Number(o.characteristics?.wp) || 0),
+            testName: 'Psychic Powers', modifiers: oMods, unnatural: o.unnatural ?? 0,
+            talents: o.talents, traits: o.traits, conditions: o.conditions, circumstances: o.circumstances,
+            psyRating: oPr, label: 'resist (Willpower)',
+        }, rng, registry);
+        const won = test.success && test.dos > resist.dos;
+        opposed = { name: o.name ?? 'target', test: resist, won, margin: test.success ? test.dos - resist.dos : null };
+        ctx.opposedWon = won; ctx.opposedDos = resist.dos;
+    }
+
+    // Phenomena decision (p.194) — rules at POST_ROLL may override via flags.
+    if (power.noPhenomena) {
+        ctx.phenomenaTriggered = false; ctx.phenomenaReason = 'this test cannot generate Psychic Phenomena';
+    } else if (push > 0) {
+        ctx.phenomenaTriggered = !test.doubles;
+        ctx.phenomenaReason = test.doubles
+            ? `pushing +${push} — doubles (${test.roll}) do NOT trigger Phenomena (p.194)`
+            : `pushing +${push} — any roll but doubles triggers Psychic Phenomena (p.194)`;
+    } else {
+        ctx.phenomenaTriggered = test.doubles;
+        ctx.phenomenaReason = test.doubles ? `doubles (${test.roll}) trigger Psychic Phenomena (p.194)` : 'no doubles — no Phenomena';
+    }
+    runCheckpoint(registry, CHECKPOINTS.POWER_POST_ROLL, ctx);
+    if (ctx.phenomenaCancelledBy) ctx.phenomenaReason = `Psychic Phenomena ignored — ${ctx.phenomenaCancelledBy}`;
+
+    let phenomena = { triggered: false, reason: ctx.phenomenaReason };
+    let perils = null;
+    if (ctx.phenomenaTriggered) {
+        const table = registry.table('Psychic Phenomena');
+        if (!table) throw new Error('roll_table "Psychic Phenomena" is not loaded');
+        const first = resolveTable(table, rng, ctx.phenomenaModifier);
+        const rolls = [first.roll];
+        let result = first;
+        ctx.phenomenaRoll = first.roll; ctx.phenomenaText = first.text;
+        runCheckpoint(registry, CHECKPOINTS.POWER_PHENOMENA, ctx);
+        if (ctx.rerollPhenomena) {
+            // Favoured by the Warp: roll again, keep the LOWER (tables escalate)
+            const second = resolveTable(table, rng, ctx.phenomenaModifier);
+            rolls.push(second.roll);
+            if (second.roll < first.roll) result = second;
+            ctx.phenomenaRoll = result.roll;
+        }
+        phenomena = {
+            triggered: true, reason: ctx.phenomenaReason,
+            roll: result.roll, natural: result.roll - result.modifier, modifier: result.modifier,
+            text: result.text, statuses: result.statuses, rolls,
+            ...(rolls.length > 1 ? { chosen: 'lower result kept — the player may choose either' } : {}),
+        };
+        if (result.roll >= 75) {
+            const perilsTable = registry.table('Perils of the Warp');
+            if (!perilsTable) throw new Error('roll_table "Perils of the Warp" is not loaded');
+            const p = resolveTable(perilsTable, rng, ctx.perilsModifier);
+            ctx.perilsRoll = p.roll; ctx.perilsText = p.text;
+            runCheckpoint(registry, CHECKPOINTS.POWER_PERILS, ctx);
+            perils = { roll: p.roll, natural: p.roll - p.modifier, modifier: p.modifier, text: p.text, statuses: p.statuses };
+        }
+    }
+
+    // Psychic Bolt / Barrage / Storm / Blast (p.198)
+    let hits = null;
+    if (power.attackMode) {
+        hits = psychicHits(power.attackMode, ctx.success, test.dos, ctx.finalPsyRating);
+        const mode = PSYCHIC_ATTACK_MODES[power.attackMode];
+        ctx.effects.push({ name: mode.label, effect: hits === null ? mode.note : (ctx.success ? `${hits} hit${hits === 1 ? '' : 's'} — ${mode.note}` : 'the power fails to manifest — no hits') });
+    }
+
+    runCheckpoint(registry, CHECKPOINTS.POWER_EFFECT, ctx);
+
+    // rider damage declared by rules (Force weapon: +1d10 Energy per DoS, p.145)
+    let rider = null;
+    if (ctx.riderDice > 0) {
+        const dice = [];
+        for (let i = 0; i < ctx.riderDice; i++) dice.push(d(10, rng, `rider damage die ${i + 1}`));
+        rider = { dice, total: dice.reduce((a, b) => a + b, 0), damageType: ctx.damageType ?? 'Energy', ignoresArmour: true, ignoresToughness: true };
+    }
+
+    return {
+        power,
+        psy: { base, effective, push, pushing: push > 0, class: cls, cap, final: ctx.finalPsyRating, sustained },
+        test, success: ctx.success, dos: ctx.success ? test.dos : 0, dof: test.dof,
+        modifiers: ctx.modifiers, opposed, phenomena, perils, hits, rider,
+        declaredDamage: ctx.declaredDamage ?? [],
+        effects: ctx.effects, log: ctx.log,
+    };
 }
 
 // ------------------------------------------------------------ damage roll ---
