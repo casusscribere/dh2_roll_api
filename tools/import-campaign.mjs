@@ -38,14 +38,24 @@ const OUT = join(__dirname, '..', 'api', 'data', 'characters', 'roster.mjs');
 
 // Active roster folders; workbook files that are not character sheets
 // (planning docs, lineages, alt builds) are excluded by pattern.
-// PRIVACY: the folder names identify the human players — they are used for
+// PRIVACY (D9 safeguard, 2026-09-08): the folder names identify the human
+// players, so the folder map and the strip-pattern live in the GIT-IGNORED
+// local config — this PUBLIC file must never name a player. They are used for
 // SCANNING ONLY and are stripped from everything the roster stores (no
 // player field; player-name parentheticals removed from source filenames).
-const ROSTER_DIRS = [
-    'Chris(Augustine-Jack)', 'John (Harys-Gnaeus)', 'Matt (Uiyeldi-Ogg)',
-    'Ryan(Talvdin-Reco)', 'Steve(Rex-Uriel)',
-];
-const PLAYER_NAMES = /\s*\((chris|john|matt|ryan|steve|ethan|ian|scott)[^)]*\)/gi;
+// The guard suite (api/test/privacy-guard.test.mjs) enforces both halves.
+let ROSTER_DIRS, PLAYER_NAMES;
+try {
+    ({ ROSTER_DIRS, PLAYER_NAMES } = await import('./campaign-roster.local.mjs'));
+} catch {
+    console.error(
+        'import:campaign needs tools/campaign-roster.local.mjs (git-ignored — D9 privacy):\n'
+        + '  export const ROSTER_DIRS — the "<player>(<char>-<char>)" workbook folders\n'
+        + '  export const PLAYER_NAMES — a /\\s*\\((…name alternation…)[^)]*\\)/gi strip-regex\n'
+        + '  export const playerNames — every real name/alias, for the privacy scanner\n'
+        + 'It lives only on machines that hold the campaign workbooks.');
+    process.exit(1);
+}
 const EXCLUDE = /goal|priorit|lineage|draco|planning|combat calc/i;
 
 const CHAR_KEYS = {

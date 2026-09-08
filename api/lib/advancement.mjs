@@ -22,6 +22,7 @@
 import {
     characteristicTotal, canonicalSkillName, SKILL_DEFS, LEDGER_KINDS,
 } from './character-schema.mjs';
+import { DIVINATION_EFFECTS } from '../data/chargen/divination-effects.mjs';
 
 const CHAR_KEY_BY_NAME = {
     'weapon skill': 'ws', 'ballistic skill': 'bs', 'strength': 's', 'toughness': 't',
@@ -398,6 +399,120 @@ export function applyGrant(doc, pack, grant, { source = 'grant' } = {}) {
     const d = structuredClone(doc);
     const entry = applyGrantTo(d, pack, grant, source);
     return { doc: d, entry };
+}
+
+/**
+ * Apply a Table 2-9 Divination roll (creation Stage 5, core pp.84-85).
+ *
+ * The pack row supplies identity + citation only (D-N keeps the rulebook text
+ * out of the public pack); the MECHANICAL interpretation comes from
+ * api/data/chargen/divination-effects.mjs. Unconditional effects apply
+ * immediately as 0-XP ledger entries sourced "Divination (Table 2-9, roll N)";
+ * characteristic changes land as modifiers-by-source (never touching base —
+ * origin changes re-derive base freely); player choices (pick-a-characteristic,
+ * Resistance spec, Hatred write-in) surface as `pendingChoices` in the origin
+ * choice-point shape and resolve via `choices`. Rows whose effect (or its
+ * remainder) is a session-conditional or table-roll rule return `manual: true`
+ * — the Builder shows the consult-the-book note.
+ *
+ * @returns {{ doc, entries, pendingChoices, manual, row }}
+ */
+export function applyDivination(doc, pack, { roll, choices = {}, source } = {}) {
+    if (!Number.isInteger(roll) || roll < 1 || roll > 100) {
+        throw new Error('divination roll must be an integer 1-100');
+    }
+    const row = (pack.divinations ?? []).find((r) => roll >= r.range[0] && roll <= r.range[1]);
+    if (!row) throw new Error(`no divination row covers roll ${roll} (pack has no divinations table?)`);
+    const enc = DIVINATION_EFFECTS[row.range[0]];
+    if (!enc) throw new Error(`no effect encoding for divination row ${row.range[0]}-${row.range[1]}`);
+
+    const d = structuredClone(doc);
+    const src = source ?? `Divination (Table 2-9, roll ${roll})`;
+    const before = (d.xp?.ledger ?? []).length;
+    const pendingChoices = [];
+    const CHAR_LABEL = Object.fromEntries(
+        Object.entries(CHAR_KEY_BY_NAME).map(([name, key]) => [key,
+            name.replace(/\b\w/g, (c) => c.toUpperCase())]));
+
+    const addCharMod = (key, delta) => {
+        const c = d.characteristics?.[key];
+        if (!c || typeof c !== 'object') throw new Error(`characteristics not generated yet (missing ${key})`);
+        (c.modifiers ??= []).push({ value: delta, source: 'Divination (Table 2-9)' });
+        d.xp ??= { total: 0, ledger: [] };
+        (d.xp.ledger ??= []).push({
+            name: `${CHAR_LABEL[key]} ${delta > 0 ? '+' : ''}${delta}`,
+            cost: 0, kind: 'divination', grantKind: 'note', source: src, date: today(),
+        });
+    };
+    const applyFallback = (fb) => {
+        for (const [k, delta] of Object.entries(fb?.char ?? {})) addCharMod(k, delta);
+    };
+    const holdsTalent = (base) => (d.talents ?? []).some((t) =>
+        norm(entryName(t)) === norm(base) || norm(entryName(t)).startsWith(`${norm(base)} (`));
+
+    for (const op of enc.ops) {
+        if (op.char) {
+            for (const [k, delta] of Object.entries(op.char)) addCharMod(k, delta);
+        } else if (op.charChoice) {
+            const { options, delta } = op.charChoice;
+            const key = `Divination: ${delta > 0 ? '+' : ''}${delta} ${options.map((o) => CHAR_LABEL[o]).join(' or ')}`;
+            const picked = choices[key];
+            if (picked) {
+                const k = options.find((o) => o === picked || CHAR_LABEL[o] === picked);
+                if (!k) throw new Error(`"${picked}" is not an option for ${key}`);
+                addCharMod(k, delta);
+            } else {
+                pendingChoices.push({ key, options: options.map((o) => CHAR_LABEL[o]), label: key });
+            }
+        } else if (op.talent) {
+            if (holdsTalent(op.talent)) {
+                applyFallback(op.fallback);
+            } else if (op.specOptions || op.specOpen) {
+                const key = `Divination: ${op.talent}`;
+                const picked = choices[key];
+                if (picked) {
+                    applyGrantTo(d, pack, { kind: 'talent', name: picked }, src);
+                } else {
+                    pendingChoices.push({
+                        key, base: op.talent, label: key,
+                        options: op.specOptions ? op.specOptions.map((s) => `${op.talent} (${s})`) : null,
+                    });
+                }
+            } else {
+                applyGrantTo(d, pack, { kind: 'talent', name: op.talent }, src);
+            }
+        } else if (op.skill) {
+            const known = (d.skills?.[op.skill]?.advances ?? 0) >= 1;
+            if (known) applyFallback(op.fallback);
+            else applyGrantTo(d, pack, { kind: 'skill', name: op.skill, rank: 1 }, src);
+        } else if (op.disorder) {
+            d.insanity ??= { points: 0, disorders: [] };
+            (d.insanity.disorders ??= []).push({ name: op.disorder });
+            d.xp ??= { total: 0, ledger: [] };
+            (d.xp.ledger ??= []).push({
+                name: `${op.disorder} (Mental Disorder)`, cost: 0, kind: 'divination',
+                grantKind: 'note', source: src, date: today(),
+            });
+        } else if (op.fate) {
+            d.fate ??= { max: 0, current: 0 };
+            d.fate.max += op.fate;
+            d.fate.current += op.fate;
+            d.xp ??= { total: 0, ledger: [] };
+            (d.xp.ledger ??= []).push({
+                name: `Fate threshold ${op.fate > 0 ? '+' : ''}${op.fate}`, cost: 0,
+                kind: 'divination', grantKind: 'note', source: src, date: today(),
+            });
+        } else {
+            throw new Error(`unknown divination op ${JSON.stringify(op)}`);
+        }
+    }
+    return {
+        doc: d,
+        entries: (d.xp?.ledger ?? []).slice(before),
+        pendingChoices,
+        manual: enc.manual === true,
+        row,
+    };
 }
 
 /**
@@ -1020,7 +1135,7 @@ export function replayPurchases(doc, pack, entries) {
     const conflicts = [];
     for (const e of entries ?? []) {
         try {
-            if ((e.cost ?? 0) === 0 && /^(Elite Advance: |Character creation)/.test(e.source ?? '')) continue;
+            if ((e.cost ?? 0) === 0 && /^(Elite Advance: |Character creation|Divination \(Table 2-9)/.test(e.source ?? '')) continue;
             if ((e.cost ?? 0) === 0 && e.kind !== 'elite_advance') {
                 const grantKind = e.grantKind
                     ?? (['talent', 'skill', 'psy_rating'].includes(e.kind) ? e.kind : 'note');

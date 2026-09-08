@@ -11082,10 +11082,10 @@ talent "Strong Minded" tier 2 {
   // api/data/chargen/pack.mjs
   var CHARGEN_PACK = {
     "packVersion": 1,
-    "generatedAt": "2026-09-07T16:14:43.783Z",
+    "generatedAt": "2026-09-08T13:11:24.332Z",
     "corpus": {
       "system": "dark_heresy_2e",
-      "commit": "9d602967c123677fe5589b044ea027a514ee9243"
+      "commit": "260ebeffe7b1e91489cf92b8dd36889b2b68f15d"
     },
     "startingXp": 1e3,
     "aptitudes": [
@@ -11740,6 +11740,14 @@ talent "Strong Minded" tier 2 {
         ],
         "startingAptitude": "Knowledge",
         "startingEquipmentClass": "Adeptus Administratum",
+        "startingEquipment": [
+          "Laspistol or stub automatic",
+          "Imperial robes",
+          "autoquill",
+          "chrono",
+          "dataslate",
+          "medi-kit"
+        ],
         "_source": "src_dh2_core_p45",
         "citation": {
           "book": "Core Rulebook",
@@ -11763,6 +11771,13 @@ talent "Strong Minded" tier 2 {
         ],
         "startingAptitude": "Defence",
         "startingEquipmentClass": "Adeptus Arbites",
+        "startingEquipment": [
+          "Shotgun or shock maul",
+          "Enforcer light carapace armour or carapace chestplate",
+          "3 doses of stimm",
+          "manacles",
+          "12 lho sticks"
+        ],
         "_source": "src_dh2_core_p45",
         "citation": {
           "book": "Core Rulebook",
@@ -11786,6 +11801,12 @@ talent "Strong Minded" tier 2 {
         ],
         "startingAptitude": "Psyker",
         "startingEquipmentClass": "Adeptus Astra Telepathica",
+        "startingEquipment": [
+          "Laspistol",
+          "staff or whip",
+          "light flak cloak or flak vest",
+          "micro-bead or psy focus"
+        ],
         "_source": "src_dh2_core_p45",
         "citation": {
           "book": "Core Rulebook",
@@ -11809,6 +11830,12 @@ talent "Strong Minded" tier 2 {
         ],
         "startingAptitude": "Tech",
         "startingEquipmentClass": "Adeptus Mechanicus",
+        "startingEquipment": [
+          "Autogun or hand cannon",
+          "monotask servo-skull (utility) or optical mechadendrite",
+          "Imperial robes",
+          "2 vials of sacred unguents"
+        ],
         "_source": "src_dh2_core_p45",
         "citation": {
           "book": "Core Rulebook",
@@ -11832,6 +11859,13 @@ talent "Strong Minded" tier 2 {
         ],
         "startingAptitude": "Social",
         "startingEquipmentClass": "Adeptus Ministorum",
+        "startingEquipment": [
+          "Hand flamer (or warhammer and stub revolver)",
+          "Imperial robes or flak vest",
+          "backpack",
+          "glow-globe",
+          "monotask servo-skull (laud hailer)"
+        ],
         "_source": "src_dh2_core_p45",
         "citation": {
           "book": "Core Rulebook",
@@ -11856,6 +11890,14 @@ talent "Strong Minded" tier 2 {
         ],
         "startingAptitude": "Defence",
         "startingEquipmentClass": "Imperial Guard",
+        "startingEquipment": [
+          "Lasgun (or laspistol and sword)",
+          "combat vest",
+          "Imperial Guard flak armour",
+          "grapnel and line",
+          "12 lho sticks",
+          "magnoculars"
+        ],
         "_source": "src_dh2_core_p45",
         "citation": {
           "book": "Core Rulebook",
@@ -11878,6 +11920,13 @@ talent "Strong Minded" tier 2 {
         ],
         "startingAptitude": "Knowledge",
         "startingEquipmentClass": "Outcast",
+        "startingEquipment": [
+          "Autopistol or laspistol",
+          "chainsword",
+          "armoured bodyglove or flak vest",
+          "injector",
+          "2 doses of obscura or slaught"
+        ],
         "_source": "src_dh2_core_p45",
         "citation": {
           "book": "Core Rulebook",
@@ -11923,6 +11972,15 @@ talent "Strong Minded" tier 2 {
         ],
         "startingAptitude": "Offence or Social",
         "startingEquipmentClass": "",
+        "startingEquipment": [
+          "Hand flamer or laspistol",
+          "chainblade",
+          "armoured bodyglove",
+          "chrono",
+          "dataslate",
+          "stablight",
+          "micro-bead"
+        ],
         "_source": "src_dh2_within_p31",
         "_book_page": 30,
         "citation": {
@@ -11947,6 +12005,13 @@ talent "Strong Minded" tier 2 {
         ],
         "startingAptitude": "Fieldcraft or Offence",
         "startingEquipmentClass": "",
+        "startingEquipment": [
+          "Shotgun (or stub revolver and great weapon)",
+          "grapnel and line",
+          "heavy leathers",
+          "combat vest",
+          "2 doses of stimm"
+        ],
         "_source": "src_dh2_within_p33",
         "_book_page": 32,
         "citation": {
@@ -11971,6 +12036,16 @@ talent "Strong Minded" tier 2 {
         ],
         "startingAptitude": "Finesse or Tech",
         "startingEquipmentClass": "",
+        "startingEquipment": [
+          "Stub revolver with 2 extra clips of Expander bullets or Man-Stopper rounds",
+          "1 web grenade",
+          "combi-tool",
+          "flak cloak",
+          "filtration plugs",
+          "1 dose of de-tox",
+          "dataslate",
+          "stablight"
+        ],
         "_source": "src_dh2_without_p33",
         "_book_page": 32,
         "citation": {
@@ -11995,6 +12070,13 @@ talent "Strong Minded" tier 2 {
         ],
         "startingAptitude": "Offence or Tech",
         "startingEquipmentClass": "",
+        "startingEquipment": [
+          "Combat shotgun or hand cannon",
+          "chainsword or shock whip",
+          "flak coat",
+          "rebreather",
+          "micro-bead"
+        ],
         "_source": "src_dh2_without_p35",
         "_book_page": 34,
         "citation": {
@@ -12019,6 +12101,13 @@ talent "Strong Minded" tier 2 {
         ],
         "startingAptitude": "Finesse or Social",
         "startingEquipmentClass": "",
+        "startingEquipment": [
+          "Laspistol or autopistol (fitted with Compact weapon upgrade)",
+          "shock maul",
+          "mesh cloak or carapace chestplate",
+          "auspex",
+          "chrono"
+        ],
         "_source": "src_dh2_without_p37",
         "_book_page": 36,
         "citation": {
@@ -15499,6 +15588,358 @@ talent "Strong Minded" tier 2 {
           "source": "src_dh2_within"
         }
       }
+    ],
+    "divinations": [
+      {
+        "range": [
+          1,
+          1
+        ],
+        "ref": "dh2:divination:1",
+        "_source": "src_dh2_core_p85",
+        "_book_page": 84,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 84,
+          "source": "src_dh2_core_p85"
+        }
+      },
+      {
+        "range": [
+          2,
+          5
+        ],
+        "ref": "dh2:divination:2",
+        "_source": "src_dh2_core_p85",
+        "_book_page": 84,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 84,
+          "source": "src_dh2_core_p85"
+        }
+      },
+      {
+        "range": [
+          6,
+          9
+        ],
+        "ref": "dh2:divination:6",
+        "_source": "src_dh2_core_p85",
+        "_book_page": 84,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 84,
+          "source": "src_dh2_core_p85"
+        }
+      },
+      {
+        "range": [
+          10,
+          13
+        ],
+        "ref": "dh2:divination:10",
+        "_source": "src_dh2_core_p85",
+        "_book_page": 84,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 84,
+          "source": "src_dh2_core_p85"
+        }
+      },
+      {
+        "range": [
+          14,
+          17
+        ],
+        "ref": "dh2:divination:14",
+        "_source": "src_dh2_core_p85",
+        "_book_page": 84,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 84,
+          "source": "src_dh2_core_p85"
+        }
+      },
+      {
+        "range": [
+          18,
+          21
+        ],
+        "ref": "dh2:divination:18",
+        "_source": "src_dh2_core_p85",
+        "_book_page": 84,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 84,
+          "source": "src_dh2_core_p85"
+        }
+      },
+      {
+        "range": [
+          22,
+          25
+        ],
+        "ref": "dh2:divination:22",
+        "_source": "src_dh2_core_p85",
+        "_book_page": 84,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 84,
+          "source": "src_dh2_core_p85"
+        }
+      },
+      {
+        "range": [
+          26,
+          29
+        ],
+        "ref": "dh2:divination:26",
+        "_source": "src_dh2_core_p85",
+        "_book_page": 84,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 84,
+          "source": "src_dh2_core_p85"
+        }
+      },
+      {
+        "range": [
+          30,
+          33
+        ],
+        "ref": "dh2:divination:30",
+        "_source": "src_dh2_core_p85",
+        "_book_page": 84,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 84,
+          "source": "src_dh2_core_p85"
+        }
+      },
+      {
+        "range": [
+          34,
+          38
+        ],
+        "ref": "dh2:divination:34",
+        "_source": "src_dh2_core_p85",
+        "_book_page": 84,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 84,
+          "source": "src_dh2_core_p85"
+        }
+      },
+      {
+        "range": [
+          39,
+          43
+        ],
+        "ref": "dh2:divination:39",
+        "_source": "src_dh2_core_p85",
+        "_book_page": 84,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 84,
+          "source": "src_dh2_core_p85"
+        }
+      },
+      {
+        "range": [
+          44,
+          49
+        ],
+        "ref": "dh2:divination:44",
+        "_source": "src_dh2_core_p85",
+        "_book_page": 84,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 84,
+          "source": "src_dh2_core_p85"
+        }
+      },
+      {
+        "range": [
+          50,
+          54
+        ],
+        "ref": "dh2:divination:50",
+        "_source": "src_dh2_core_p86",
+        "_book_page": 85,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 85,
+          "source": "src_dh2_core_p86"
+        }
+      },
+      {
+        "range": [
+          55,
+          59
+        ],
+        "ref": "dh2:divination:55",
+        "_source": "src_dh2_core_p86",
+        "_book_page": 85,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 85,
+          "source": "src_dh2_core_p86"
+        }
+      },
+      {
+        "range": [
+          60,
+          63
+        ],
+        "ref": "dh2:divination:60",
+        "_source": "src_dh2_core_p86",
+        "_book_page": 85,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 85,
+          "source": "src_dh2_core_p86"
+        }
+      },
+      {
+        "range": [
+          64,
+          67
+        ],
+        "ref": "dh2:divination:64",
+        "_source": "src_dh2_core_p86",
+        "_book_page": 85,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 85,
+          "source": "src_dh2_core_p86"
+        }
+      },
+      {
+        "range": [
+          68,
+          71
+        ],
+        "ref": "dh2:divination:68",
+        "_source": "src_dh2_core_p86",
+        "_book_page": 85,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 85,
+          "source": "src_dh2_core_p86"
+        }
+      },
+      {
+        "range": [
+          72,
+          75
+        ],
+        "ref": "dh2:divination:72",
+        "_source": "src_dh2_core_p86",
+        "_book_page": 85,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 85,
+          "source": "src_dh2_core_p86"
+        }
+      },
+      {
+        "range": [
+          76,
+          79
+        ],
+        "ref": "dh2:divination:76",
+        "_source": "src_dh2_core_p86",
+        "_book_page": 85,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 85,
+          "source": "src_dh2_core_p86"
+        }
+      },
+      {
+        "range": [
+          80,
+          83
+        ],
+        "ref": "dh2:divination:80",
+        "_source": "src_dh2_core_p86",
+        "_book_page": 85,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 85,
+          "source": "src_dh2_core_p86"
+        }
+      },
+      {
+        "range": [
+          84,
+          87
+        ],
+        "ref": "dh2:divination:84",
+        "_source": "src_dh2_core_p86",
+        "_book_page": 85,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 85,
+          "source": "src_dh2_core_p86"
+        }
+      },
+      {
+        "range": [
+          88,
+          91
+        ],
+        "ref": "dh2:divination:88",
+        "_source": "src_dh2_core_p86",
+        "_book_page": 85,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 85,
+          "source": "src_dh2_core_p86"
+        }
+      },
+      {
+        "range": [
+          92,
+          95
+        ],
+        "ref": "dh2:divination:92",
+        "_source": "src_dh2_core_p86",
+        "_book_page": 85,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 85,
+          "source": "src_dh2_core_p86"
+        }
+      },
+      {
+        "range": [
+          96,
+          99
+        ],
+        "ref": "dh2:divination:96",
+        "_source": "src_dh2_core_p86",
+        "_book_page": 85,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 85,
+          "source": "src_dh2_core_p86"
+        }
+      },
+      {
+        "range": [
+          100,
+          100
+        ],
+        "ref": "dh2:divination:100",
+        "_source": "src_dh2_core_p86",
+        "_book_page": 85,
+        "citation": {
+          "book": "Core Rulebook",
+          "page": 85,
+          "source": "src_dh2_core_p86"
+        }
+      }
     ]
   };
 
@@ -16159,6 +16600,63 @@ talent "Strong Minded" tier 2 {
     };
   }
 
+  // api/data/chargen/divination-effects.mjs
+  var DIVINATION_EFFECTS = {
+    1: { ops: [], manual: true },
+    // roll on Table 8-15: Malignancies
+    2: { ops: [{ char: { per: 5 } }, { disorder: "Phobia" }] },
+    6: { ops: [{ talent: "Jaded", fallback: { char: { wp: 2 } } }] },
+    10: { ops: [{ char: { ag: -3 } }], manual: true },
+    // + once-per-session crit escape
+    14: { ops: [{ talent: "Hatred", specOpen: true, fallback: { char: { s: 2 } } }] },
+    18: { ops: [
+      { charChoice: { options: ["ag", "int"], delta: 3 } },
+      { charChoice: { options: ["ws", "bs"], delta: -3 } }
+    ] },
+    22: { ops: [{ talent: "Quick Draw", fallback: { char: { ag: 2 } } }] },
+    26: { ops: [{ char: { per: 3 } }], manual: true },
+    // + per-session Corruption rider
+    30: { ops: [{ char: { int: -3 } }], manual: true },
+    // + per-session Corruption rider
+    34: { ops: [
+      { charChoice: { options: ["fel", "s"], delta: 3 } },
+      { charChoice: { options: ["t", "wp"], delta: -3 } }
+    ] },
+    39: { ops: [], manual: true },
+    // Mental Disorder selection rule
+    44: { ops: [
+      { charChoice: { options: ["t", "wp"], delta: 3 } },
+      { charChoice: { options: ["fel", "s"], delta: -3 } }
+    ] },
+    50: { ops: [], manual: true },
+    // Malignancy selection rule
+    55: { ops: [
+      { charChoice: { options: ["ws", "bs"], delta: 3 } },
+      { charChoice: { options: ["ag", "int"], delta: -3 } }
+    ] },
+    60: { ops: [{ char: { per: -3 } }], manual: true },
+    // + per-session Insanity rider
+    64: { ops: [{ char: { wp: 3 } }], manual: true },
+    // + per-session Insanity rider
+    68: { ops: [{ char: { per: 2 } }], manual: true },
+    // + Awareness re-roll vs Surprise
+    72: { ops: [{ char: { t: -3 } }], manual: true },
+    // + once-per-session +20 rider
+    76: { ops: [{
+      talent: "Resistance",
+      specOptions: ["Cold", "Heat", "Fear"],
+      fallback: { char: { t: 2 } }
+    }] },
+    80: { ops: [], manual: true },
+    // per-session Fatigue reduction
+    84: { ops: [{ talent: "Keen Intuition", fallback: { char: { int: 2 } } }] },
+    88: { ops: [{ skill: "Dodge", fallback: { char: { ag: 2 } } }] },
+    92: { ops: [{ talent: "Clues from the Crowds", fallback: { char: { fel: 2 } } }] },
+    96: { ops: [], manual: true },
+    // once-ever Fate-burn escape
+    100: { ops: [{ fate: 1 }] }
+  };
+
   // api/lib/advancement.mjs
   var CHAR_KEY_BY_NAME = {
     "weapon skill": "ws",
@@ -16486,6 +16984,118 @@ talent "Strong Minded" tier 2 {
     const d2 = structuredClone(doc);
     const entry = applyGrantTo(d2, pack, grant, source);
     return { doc: d2, entry };
+  }
+  function applyDivination(doc, pack, { roll, choices = {}, source } = {}) {
+    var _a, _b, _c;
+    if (!Number.isInteger(roll) || roll < 1 || roll > 100) {
+      throw new Error("divination roll must be an integer 1-100");
+    }
+    const row = (pack.divinations ?? []).find((r) => roll >= r.range[0] && roll <= r.range[1]);
+    if (!row) throw new Error(`no divination row covers roll ${roll} (pack has no divinations table?)`);
+    const enc = DIVINATION_EFFECTS[row.range[0]];
+    if (!enc) throw new Error(`no effect encoding for divination row ${row.range[0]}-${row.range[1]}`);
+    const d2 = structuredClone(doc);
+    const src = source ?? `Divination (Table 2-9, roll ${roll})`;
+    const before = (d2.xp?.ledger ?? []).length;
+    const pendingChoices = [];
+    const CHAR_LABEL = Object.fromEntries(
+      Object.entries(CHAR_KEY_BY_NAME).map(([name, key]) => [
+        key,
+        name.replace(/\b\w/g, (c) => c.toUpperCase())
+      ])
+    );
+    const addCharMod = (key, delta) => {
+      var _a2;
+      const c = d2.characteristics?.[key];
+      if (!c || typeof c !== "object") throw new Error(`characteristics not generated yet (missing ${key})`);
+      (c.modifiers ?? (c.modifiers = [])).push({ value: delta, source: "Divination (Table 2-9)" });
+      d2.xp ?? (d2.xp = { total: 0, ledger: [] });
+      ((_a2 = d2.xp).ledger ?? (_a2.ledger = [])).push({
+        name: `${CHAR_LABEL[key]} ${delta > 0 ? "+" : ""}${delta}`,
+        cost: 0,
+        kind: "divination",
+        grantKind: "note",
+        source: src,
+        date: today()
+      });
+    };
+    const applyFallback = (fb) => {
+      for (const [k, delta] of Object.entries(fb?.char ?? {})) addCharMod(k, delta);
+    };
+    const holdsTalent = (base) => (d2.talents ?? []).some((t) => norm2(entryName2(t)) === norm2(base) || norm2(entryName2(t)).startsWith(`${norm2(base)} (`));
+    for (const op of enc.ops) {
+      if (op.char) {
+        for (const [k, delta] of Object.entries(op.char)) addCharMod(k, delta);
+      } else if (op.charChoice) {
+        const { options, delta } = op.charChoice;
+        const key = `Divination: ${delta > 0 ? "+" : ""}${delta} ${options.map((o) => CHAR_LABEL[o]).join(" or ")}`;
+        const picked = choices[key];
+        if (picked) {
+          const k = options.find((o) => o === picked || CHAR_LABEL[o] === picked);
+          if (!k) throw new Error(`"${picked}" is not an option for ${key}`);
+          addCharMod(k, delta);
+        } else {
+          pendingChoices.push({ key, options: options.map((o) => CHAR_LABEL[o]), label: key });
+        }
+      } else if (op.talent) {
+        if (holdsTalent(op.talent)) {
+          applyFallback(op.fallback);
+        } else if (op.specOptions || op.specOpen) {
+          const key = `Divination: ${op.talent}`;
+          const picked = choices[key];
+          if (picked) {
+            applyGrantTo(d2, pack, { kind: "talent", name: picked }, src);
+          } else {
+            pendingChoices.push({
+              key,
+              base: op.talent,
+              label: key,
+              options: op.specOptions ? op.specOptions.map((s) => `${op.talent} (${s})`) : null
+            });
+          }
+        } else {
+          applyGrantTo(d2, pack, { kind: "talent", name: op.talent }, src);
+        }
+      } else if (op.skill) {
+        const known = (d2.skills?.[op.skill]?.advances ?? 0) >= 1;
+        if (known) applyFallback(op.fallback);
+        else applyGrantTo(d2, pack, { kind: "skill", name: op.skill, rank: 1 }, src);
+      } else if (op.disorder) {
+        d2.insanity ?? (d2.insanity = { points: 0, disorders: [] });
+        ((_a = d2.insanity).disorders ?? (_a.disorders = [])).push({ name: op.disorder });
+        d2.xp ?? (d2.xp = { total: 0, ledger: [] });
+        ((_b = d2.xp).ledger ?? (_b.ledger = [])).push({
+          name: `${op.disorder} (Mental Disorder)`,
+          cost: 0,
+          kind: "divination",
+          grantKind: "note",
+          source: src,
+          date: today()
+        });
+      } else if (op.fate) {
+        d2.fate ?? (d2.fate = { max: 0, current: 0 });
+        d2.fate.max += op.fate;
+        d2.fate.current += op.fate;
+        d2.xp ?? (d2.xp = { total: 0, ledger: [] });
+        ((_c = d2.xp).ledger ?? (_c.ledger = [])).push({
+          name: `Fate threshold ${op.fate > 0 ? "+" : ""}${op.fate}`,
+          cost: 0,
+          kind: "divination",
+          grantKind: "note",
+          source: src,
+          date: today()
+        });
+      } else {
+        throw new Error(`unknown divination op ${JSON.stringify(op)}`);
+      }
+    }
+    return {
+      doc: d2,
+      entries: (d2.xp?.ledger ?? []).slice(before),
+      pendingChoices,
+      manual: enc.manual === true,
+      row
+    };
   }
   function applyAdvance(doc, pack, advance, { confirmed = false, override = false, source } = {}) {
     var _a, _b, _c, _d, _e, _f;
@@ -16956,7 +17566,7 @@ talent "Strong Minded" tier 2 {
     const conflicts = [];
     for (const e of entries ?? []) {
       try {
-        if ((e.cost ?? 0) === 0 && /^(Elite Advance: |Character creation)/.test(e.source ?? "")) continue;
+        if ((e.cost ?? 0) === 0 && /^(Elite Advance: |Character creation|Divination \(Table 2-9)/.test(e.source ?? "")) continue;
         if ((e.cost ?? 0) === 0 && e.kind !== "elite_advance") {
           const grantKind = e.grantKind ?? (["talent", "skill", "psy_rating"].includes(e.kind) ? e.kind : "note");
           const grant = grantKind === "note" ? { kind: "note", text: e.name } : {
@@ -17437,6 +18047,27 @@ package "dh2.core.example" {      // optional, one per file \u2014 provenance fo
       const doc = migrateCharacter(body.doc ?? {});
       const { doc: next, entry } = applyGrant(doc, CHARGEN_PACK, body.grant ?? {}, { source: body.source ?? "grant" });
       return { doc: next, entry, xp: xpSummary(next) };
+    },
+    // Table 2-9 Divination (creation Stage 5): applies the rolled row's
+    // mechanical effects (0-XP, sourced) and returns the row identity +
+    // citation; text stays overlay-side (D-N).
+    "/api/chargen/divination": (body) => {
+      const doc = migrateCharacter(body.doc ?? {});
+      const { doc: next, entries, pendingChoices, manual, row } = applyDivination(
+        doc,
+        CHARGEN_PACK,
+        { roll: body.roll, choices: body.choices ?? {}, source: body.source }
+      );
+      return {
+        doc: next,
+        entries,
+        pendingChoices,
+        manual,
+        range: row.range,
+        ref: row.ref,
+        citation: row.citation,
+        xp: xpSummary(next)
+      };
     },
     // Re-buy a recorded ledger against a re-derived doc at current prices —
     // the Builder's propagation path when an earlier creation step changes.

@@ -36,10 +36,14 @@ lane detail in [ROADMAP.md](ROADMAP.md). Suite baseline: 339/339.
 5. **Phase 7 — Rogue Trader policies** — the campaign's actual system;
    everything above is the DH2 chassis it layers onto via `POLICIES.rt1` +
    `rt1.*` packs + `ship_attack`.
-6. Along the way: **decide D9** (roster in the public Pages bundle — the
-   roster is now player-name-free, but the PCs' full builds still ship; an
-   exclude flag is one line), and the **engine half of ammo** (refuse-empty,
-   `consume_ammo`, Recharge economy).
+6. Along the way: ~~decide D9~~ — **RESOLVED 2026-09-08** (user): the PCs'
+   builds may ship, but **no player name or personal information** ever does.
+   Enforced by the privacy safeguard (`npm run privacy:scan`,
+   `api/test/privacy-guard.test.mjs`, git-ignored
+   `tools/campaign-roster.local.mjs` + `_privacy_review.local.json` doubt
+   log — anything doubtful is logged for the user to rule on). Still open
+   along the way: the **engine half of ammo** (refuse-empty, `consume_ammo`,
+   Recharge economy).
 
 ## 1. Remaining roadmap phases
 
@@ -148,9 +152,9 @@ lane detail in [ROADMAP.md](ROADMAP.md). Suite baseline: 339/339.
       `api/data/characters/roster.mjs`; `GET /api/characters`; player-grouped
       dropdown sharing the file-upload validate/apply path; lossiness recorded
       per document in `source.unmapped` and shown in the status panel.
-      D10 resolved as proposed (explicit re-run only). **D9 still open**: the
-      roster is currently bundled by `build:static` — decide before the next
-      Pages publish whether PC data should ship (exclude flag is trivial).
+      D10 resolved as proposed (explicit re-run only). **D9 RESOLVED
+      2026-09-08**: PC builds ship; player names/PII never do — see the
+      privacy safeguard (README "Privacy (D9)").
 - [x] **Schema v2** — SHIPPED (2026-07-08): characteristics as
       { base, advances, modifiers[] } (totals derived), skills incl.
       specialist categories with per-speciality advances, modifiers-by-source

@@ -31,7 +31,7 @@ import { CHARACTER_ROSTER } from '../data/characters/roster.mjs';
 import { CHARGEN_PACK } from '../data/chargen/pack.mjs';
 import { loadProseOverlay } from './prose.mjs';
 import {
-    listAvailableAdvances, applyAdvance, applyGrant, applyOrigin, replayPurchases, validateBuild, validateCreation, xpSummary,
+    listAvailableAdvances, applyAdvance, applyGrant, applyDivination, applyOrigin, replayPurchases, validateBuild, validateCreation, xpSummary,
 } from './advancement.mjs';
 import { compile } from './dsl/compiler.mjs';
 import { DslError } from './dsl/tokenizer.mjs';
@@ -132,6 +132,19 @@ const POST = {
         const doc = migrateCharacter(body.doc ?? {});
         const { doc: next, entry } = applyGrant(doc, CHARGEN_PACK, body.grant ?? {}, { source: body.source ?? 'grant' });
         return { doc: next, entry, xp: xpSummary(next) };
+    },
+    // Table 2-9 Divination (creation Stage 5): applies the rolled row's
+    // mechanical effects (0-XP, sourced) and returns the row identity +
+    // citation; text stays overlay-side (D-N).
+    '/api/chargen/divination': (body) => {
+        const doc = migrateCharacter(body.doc ?? {});
+        const { doc: next, entries, pendingChoices, manual, row } = applyDivination(
+            doc, CHARGEN_PACK, { roll: body.roll, choices: body.choices ?? {}, source: body.source });
+        return {
+            doc: next, entries, pendingChoices, manual,
+            range: row.range, ref: row.ref, citation: row.citation,
+            xp: xpSummary(next),
+        };
     },
     // Re-buy a recorded ledger against a re-derived doc at current prices —
     // the Builder's propagation path when an earlier creation step changes.

@@ -115,7 +115,7 @@
       </fieldset>
       <fieldset id="ccDiv" hidden>
         <legend>Divination</legend>
-        <div id="ccDivBody" class="ccrow"></div>
+        <div id="ccDivBody"></div>
       </fieldset>
       <fieldset id="ccFinish" hidden>
         <legend>Equip &amp; finish</legend>
@@ -185,6 +185,14 @@
 import { BuilderSession, groupAdvances, createWizard, WIZARD_STEPS, WIZ_CHAR_KEYS } from './builder-core.mjs';
 import { mount as mountProseTips } from './prose-tip.mjs';
 mountProseTips({ api: async (m, p) => { const r = await fetch(p); if (!r.ok) throw new Error(r.status); return r.json(); } });
+
+/** Full Table 2-9 row text — local builds only (D-N: Pages gets citation-only). */
+let _prosePromise = null;
+async function divinationProse(ref) {
+    _prosePromise ??= fetch('/api/prose').then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    const overlay = await _prosePromise;
+    return overlay?.available ? overlay.prose?.[ref]?.text ?? null : null;
+}
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -789,16 +797,71 @@ function renderCreation() {
     {
         const db = $('ccDivBody');
         db.innerHTML = '';
+        const row1 = document.createElement('div');
+        row1.className = 'ccrow';
+        const rollBtn = document.createElement('button');
+        rollBtn.className = 'minibtn';
+        rollBtn.textContent = st.divinationRoll
+            ? `Re-roll on Table 2-9 (rolled ${st.divinationRoll.roll})`
+            : 'Roll on Table 2-9: Divinations (1d100)';
+        rollBtn.addEventListener('click', ccAct(() => creation.rollDivination({ override: ccOverride() })));
+        row1.appendChild(rollBtn);
         const input = document.createElement('input');
         input.style.flex = '3';
-        input.placeholder = "Emperor's Tarot / divination text";
+        input.placeholder = "…or record the Emperor's Tarot text by hand";
         input.value = st.divination || '';
-        db.appendChild(input);
+        row1.appendChild(input);
         const b = document.createElement('button');
-        b.className = 'minibtn';
+        b.className = 'minibtn ghost';
         b.textContent = 'Record';
         b.addEventListener('click', ccAct(() => creation.setDivination(input.value || '—', { override: ccOverride() })));
-        db.appendChild(b);
+        row1.appendChild(b);
+        db.appendChild(row1);
+
+        if (st.divinationInfo) {
+            const info = st.divinationInfo;
+            const cite = info.citation ? `${info.citation.book} p.${info.citation.page}` : '';
+            const line = document.createElement('div');
+            line.className = 'hint';
+            line.textContent = `Rolled ${st.divinationRoll.roll} → row ${info.range[0]}–${info.range[1]} (${cite}). `
+                + `Mechanical effects applied to the sheet as 0-XP entries.`
+                + (info.manual ? ' ⚠ This row (or part of it) is a per-session rule — consult the book.' : '');
+            db.appendChild(line);
+            divinationProse(info.ref).then((text) => {
+                if (!text) return;
+                const p = document.createElement('div');
+                p.className = 'hint';
+                p.style.whiteSpace = 'pre-wrap';
+                p.textContent = `“${text}”`;
+                db.appendChild(p);
+            });
+        }
+        // unresolved divination choices (pick-a-characteristic / talent spec)
+        for (const c of st.divinationPending ?? []) {
+            const row = document.createElement('div');
+            row.className = 'ccrow';
+            row.insertAdjacentHTML('beforeend', `<span class="hint">${esc(c.label ?? c.key)}:</span>`);
+            if (Array.isArray(c.options)) {
+                const sel = document.createElement('select');
+                sel.add(new Option('— choose —', ''));
+                for (const o of c.options) sel.add(new Option(o, o));
+                sel.addEventListener('change', ccAct(() =>
+                    sel.value && creation.setDivinationChoice(c.key, sel.value, { override: ccOverride() })));
+                row.appendChild(sel);
+            } else {
+                const inp = document.createElement('input');
+                inp.placeholder = `${c.base ?? ''} specialization…`;
+                const ok = document.createElement('button');
+                ok.className = 'minibtn';
+                ok.textContent = '✓';
+                ok.addEventListener('click', ccAct(() => {
+                    if (!inp.value.trim()) throw new Error('a specialization is required');
+                    return creation.setDivinationChoice(c.key, `${c.base} (${inp.value.trim()})`, { override: ccOverride() });
+                }));
+                row.append(inp, ok);
+            }
+            db.appendChild(row);
+        }
     }
 
     // Equip & finish (creation mode only; loaded docs use the panel below) ---
@@ -810,6 +873,40 @@ function renderCreation() {
         const info = creation.equipmentInfo();
         fb.insertAdjacentHTML('beforeend',
             `<div class="hint">Spend the starting XP in the panel below (elite advances apply their instant changes automatically). Equip Acolyte: kit class <b class="gold">${esc(info.startingEquipmentClass || '—')}</b> + up to <b class="gold">${info.acquisitions}</b> acquisitions of Scarce (–10) or better. Carried: ${esc((st.doc?.gear ?? []).map((g) => g.name).join(', ') || '(nothing yet)')}</div>`);
+
+        // Starting kit (corpus-extracted Starting Equipment box): one pick per
+        // "or" group; Apply lands everything as gear tagged "starting kit".
+        if (info.kit.length && !info.kitApplied) {
+            const kitBox = document.createElement('div');
+            kitBox.insertAdjacentHTML('beforeend',
+                '<div class="hint gold">Starting kit (Core Starting Equipment box):</div>');
+            const picks = [];
+            for (const item of info.kit) {
+                const row = document.createElement('div');
+                row.className = 'ccrow';
+                if (item.options.length === 1) {
+                    row.insertAdjacentHTML('beforeend', `<span>${esc(item.text)}</span>`);
+                    picks.push(() => item.options[0].items);
+                } else {
+                    const sel = document.createElement('select');
+                    for (const o of item.options) sel.add(new Option(o.label, o.label));
+                    row.appendChild(sel);
+                    picks.push(() => item.options.find((o) => o.label === sel.value)?.items ?? []);
+                }
+                kitBox.appendChild(row);
+            }
+            const applyBtn = document.createElement('button');
+            applyBtn.className = 'minibtn';
+            applyBtn.textContent = 'Add starting kit to gear';
+            applyBtn.addEventListener('click', ccAct(() => creation.choose('equipment', {
+                kit: true,
+                gear: picks.flatMap((p) => p()).map((name) => ({ name, notes: 'starting kit' })),
+            })));
+            kitBox.appendChild(applyBtn);
+            fb.appendChild(kitBox);
+        } else if (info.kitApplied) {
+            fb.insertAdjacentHTML('beforeend', '<div class="hint">✓ starting kit applied</div>');
+        }
         const row = document.createElement('div');
         row.className = 'ccrow';
         const nameIn = document.createElement('input'); nameIn.placeholder = 'Item name';

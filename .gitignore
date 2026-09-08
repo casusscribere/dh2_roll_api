@@ -56,3 +56,9 @@ desktop.ini
 
 # Local tool config (keep shared .claude settings tracked)
 .claude/settings.local.json
+
+# D9 privacy safeguard (2026-09-08): player-identifying data never commits.
+# The importer's roster map + player-name patterns live in the local config;
+# the privacy scanner's doubt log is per-machine review state.
+tools/*.local.mjs
+_privacy_review.local.json

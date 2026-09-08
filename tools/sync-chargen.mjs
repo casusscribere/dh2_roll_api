@@ -107,7 +107,16 @@ const projectBackground = (e) => ({
     skillsGranted: e.skills_granted ?? [], talentsGranted: e.talents_granted ?? [],
     startingAptitude: e.starting_aptitude ?? '',
     startingEquipmentClass: e.starting_equipment_class ?? '',
+    // Item-name lists are mechanical facts (like skillsGranted) — public-safe.
+    // "A or B" choice strings kept verbatim; the Builder parses them.
+    ...(e.starting_equipment?.length && { startingEquipment: e.starting_equipment }),
     ...prov(e),
+});
+// Table 2-9 rows: the PUBLIC pack carries the d100 ranges + citations ONLY.
+// The prophecy/effect text is rulebook expression → prose overlay (D-N below);
+// the mechanical interpretation lives in api/data/chargen/divination-effects.mjs.
+const projectDivination = (e) => ({
+    range: e.range, ref: ref('divination', String(e.range[0])), ...prov(e),
 });
 const projectRole = (e) => ({
     id: e.id, ref: ref('role', e.id), name: e.name,
@@ -141,6 +150,11 @@ const rolesSrc = load('data/roles.json').entries;
 const traitsSrc = load('data/traits.json').entries;
 const eliteSrc = load('data/elite_advances.json').entries;
 const adv = load('data/advancement.json');
+// divinations.json postdates most corpus checkouts — optional, like prose sources
+const divinationsSrc = (() => {
+    try { return load('data/divinations.json').entries; }
+    catch (err) { if (err?.code === 'ENOENT') return []; throw err; }
+})();
 
 const stripCostTable = (t) => ({ ranks: t.ranks, matches_2: t.matches_2, matches_1: t.matches_1, matches_0: t.matches_0 });
 
@@ -181,11 +195,12 @@ const pack = {
     traits: traitsSrc.map(projectTrait),
     skills: skillsSrc.map(projectSkill),
     eliteAdvances: eliteSrc.map(projectElite),
+    ...(divinationsSrc.length && { divinations: divinationsSrc.map(projectDivination) }),
 };
 
 // unique-ref guard (deterministic slug ids — collisions fail the sync)
 const refs = new Set();
-for (const list of [pack.homeworlds, pack.backgrounds, pack.roles, pack.talents, pack.traits, pack.skills, pack.eliteAdvances]) {
+for (const list of [pack.homeworlds, pack.backgrounds, pack.roles, pack.talents, pack.traits, pack.skills, pack.eliteAdvances, pack.divinations ?? []]) {
     for (const e of list) {
         if (refs.has(e.ref)) throw new Error(`duplicate ref: ${e.ref}`);
         refs.add(e.ref);
@@ -256,6 +271,20 @@ for (const [file, section, type] of PROSE_SOURCES) {
     }
     proseCounts.push(`${entries.length} ${type}`);
 }
+
+// Divination rows carry their verbatim text in `prophecy` + `effect` (not
+// description_verbatim), keyed by the range's low bound — same ref the pack row
+// stamps, so the Builder resolves the local text through the one prose seam.
+for (const e of divinationsSrc) {
+    const key = ref('divination', String(e.range[0]));
+    if (Object.hasOwn(prose, key)) throw new Error(`duplicate prose ref: ${key} (divinations)`);
+    prose[key] = {
+        text: `${e.prophecy}\n${e.effect}`,
+        sha256: null,
+        citation: citationOf(e),
+    };
+}
+if (divinationsSrc.length) proseCounts.push(`${divinationsSrc.length} divination`);
 
 writeFileSync(OUT_PROSE, `// GENERATED — NEVER COMMIT (decision D-N). Verbatim GW text for local builds only.
 // Emitted by \`npm run sync:chargen\` from ${pack.corpus.system} @ ${corpusCommit.slice(0, 12)}.

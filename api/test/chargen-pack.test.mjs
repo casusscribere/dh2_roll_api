@@ -14,6 +14,10 @@ import { dispatch } from '../lib/api-router.mjs';
 
 const PROSE_DENYLIST = new Set([
     'benefit', 'description', 'concept', 'skill_use', 'askellon_example',
+    // Table 2-9 text (prophecy/effect) is overlay-only; the pack row is range+citation
+    'prophecy', 'effect',
+    '_starting_equipment_source_quote', '_starting_equipment_source_quote_hash',
+    '_starting_equipment_source_quote_hash_note', '_starting_equipment_ligature_note',
     '_source_quote', '_source_quote_hash', '_source_quote_hash_note',
     'instant_changes', 'equipment_grant', 'unlocked_talents_section',
     'worked_example', '_errata_note', 'descriptors', '_authored_by',

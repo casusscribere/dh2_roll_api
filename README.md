@@ -249,8 +249,9 @@ Verbatim rulebook text is copyrighted expression; page citations are facts. This
 | A local checkout that has run `npm run sync:chargen` against the corpus | Full verbatim text, through `GET /api/prose` |
 
 `npm run sync:chargen` emits two files: the committed `api/data/chargen/pack.mjs` and the
-**git-ignored** `api/data/chargen/prose.local.mjs` (542 DH2 entries — talents, traits,
-weapons, armour, gear, cybernetics, skills, characteristics, conditions, psychic powers).
+**git-ignored** `api/data/chargen/prose.local.mjs` (567 DH2 entries — talents, traits,
+weapons, armour, gear, cybernetics, skills, characteristics, conditions, psychic powers,
+and the 25 Table 2-9 Divination rows keyed `dh2:divination:<lo>`).
 The overlay is never committed and never built into `docs/`; `GET /api/prose` reports
 `{ available: false, count: 0, prose: {} }` without it, exactly as it does on Pages, and
 UI surfaces fall back to showing the citation alone.
@@ -262,6 +263,14 @@ Set `DH2_PROSE_OVERLAY` to an absolute path to point the loader elsewhere (tests
 Guards: `api/test/chargen-pack.test.mjs` walks the pack for prose keys, over-long strings
 and malformed citations, and walks a built `docs/` for text leaks; `api/test/prose.test.mjs`
 checks the overlay gate both ways plus the `.gitignore` and `build:static` exclusions.
+
+**Privacy (D9):** no player name or personal information ships in this public repo.
+Player-identifying campaign facts (the importer's workbook-folder map, the strip-regex,
+the scan denylist) live only in the git-ignored `tools/campaign-roster.local.mjs`;
+`api/test/privacy-guard.test.mjs` enforces the structure on every run, and
+`npm run privacy:scan` runs the full denylist + heuristic sweep — anything *doubtful* is
+logged to the git-ignored `_privacy_review.local.json` for the user to rule on
+(`verdict: "ok"` acknowledges a false positive) and keeps the scan red until ruled.
 
 ## Architecture
 

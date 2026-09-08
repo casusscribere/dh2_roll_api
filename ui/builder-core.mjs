@@ -175,9 +175,27 @@ const recipeOfState = (state) => ({
     characteristics: state.characteristics ? structuredClone(state.characteristics) : null,
     woundsFate: state.woundsFate ? structuredClone(state.woundsFate) : null,
     divination: state.divination,
+    divinationRoll: state.divinationRoll ? structuredClone(state.divinationRoll) : null,
     equipment: state.equipment ? structuredClone(state.equipment) : null,
     completed: !!state.completed,
 });
+
+/**
+ * Parse one starting-equipment kit item into its pick-one options.
+ * "Lasgun (or laspistol and sword)" → Lasgun | laspistol + sword;
+ * "Shotgun or shock maul" → one of two; a plain item is its own single option.
+ */
+export function parseKitItem(text) {
+    const paren = /^(.*?)\s*\(or\s+(.+)\)\s*$/i.exec(text);
+    if (paren) {
+        return { text, options: [
+            { label: paren[1].trim(), items: [paren[1].trim()] },
+            { label: paren[2].trim(), items: paren[2].split(/\s+and\s+/i).map((s) => s.trim()) },
+        ] };
+    }
+    const parts = text.split(/\s+or\s+/i).map((s) => s.trim());
+    return { text, options: parts.map((p) => ({ label: p, items: [p] })) };
+}
 
 export function createWizard({ pack, api, rng = Math.random, doc = null } = {}) {
     const d = (sides) => 1 + Math.floor(rng() * sides);
@@ -190,7 +208,10 @@ export function createWizard({ pack, api, rng = Math.random, doc = null } = {}) 
         characteristics: null,        // { method, values, rerolled }
         woundsFate: null,             // { woundsRoll, blessingRoll, blessed }
         divination: '',
-        equipment: null,              // { added: [{name, notes?}] }
+        divinationRoll: null,         // { roll, choices } — Table 2-9, recorded dice
+        divinationPending: [],        // unresolved divination choice points
+        divinationInfo: null,         // { range, ref, citation, manual } of the rolled row
+        equipment: null,              // { added: [{name, notes?}], kitApplied? }
         details: { name: '' },
         doc: null,
         conflicts: [],                // replay conflicts from the last rebuild
@@ -209,6 +230,7 @@ export function createWizard({ pack, api, rng = Math.random, doc = null } = {}) 
             state.characteristics = rec.characteristics ?? null;
             state.woundsFate = rec.woundsFate ?? null;
             state.divination = rec.divination ?? '';
+            state.divinationRoll = rec.divinationRoll ?? null;
             state.equipment = rec.equipment ?? null;
             state.completed = !!rec.completed;
         } else {
@@ -336,6 +358,15 @@ export function createWizard({ pack, api, rng = Math.random, doc = null } = {}) 
         };
         if (state.characteristics?.values) writeCharacteristics(state.characteristics.values);
         applyWoundsFate();
+        if (state.divinationRoll && state.characteristics?.values) {
+            const dr = await api('POST', '/api/chargen/divination', {
+                doc: state.doc, roll: state.divinationRoll.roll,
+                choices: state.divinationRoll.choices ?? {},
+            });
+            state.doc = dr.doc;
+            state.divinationPending = dr.pendingChoices ?? [];
+            state.divinationInfo = { range: dr.range, ref: dr.ref, citation: dr.citation, manual: dr.manual };
+        }
         if (state.divination) state.doc.tarot = { text: state.divination };
         for (const g of priorGear) {
             (state.doc.gear ??= []).push({ name: g.name, ...(g.notes && { notes: g.notes }), equipped: g.equipped !== false });
@@ -415,7 +446,10 @@ export function createWizard({ pack, api, rng = Math.random, doc = null } = {}) 
                     });
                     added.push({ name: g.name, ...(g.notes && { notes: g.notes }) });
                 }
-                state.equipment = { added };
+                state.equipment = {
+                    added,
+                    kitApplied: !!(state.equipment?.kitApplied || choice.kit),
+                };
                 persistRecipe();
             } else if (stepId === 'woundsFate') {
                 if (!state.originInfo) throw new Error('choose an origin first');
@@ -481,6 +515,58 @@ export function createWizard({ pack, api, rng = Math.random, doc = null } = {}) 
             advanceStep();
         },
 
+        /** Roll on Table 2-9 (recorded dice, like wounds & fate) and apply the
+         *  row's mechanical effects through the engine. Re-rolling replaces the
+         *  recorded roll and REBUILDS, so the old row's modifiers never stack. */
+        async rollDivination({ override = false } = {}) {
+            const logRevision = assertEditable('divination', override);
+            if (!state.characteristics?.values) throw new Error('generate characteristics first');
+            state.divinationRoll = { roll: d(100), choices: {} };
+            state.divination = '';
+            if (state.hasRecipe) {
+                await rebuild();
+            } else {
+                // no recipe to re-derive from: keep the pre-divination doc so a
+                // re-roll or a choice resolution re-applies from a clean base
+                state._preDivinationDoc ??= structuredClone(state.doc);
+                const dr = await api('POST', '/api/chargen/divination', {
+                    doc: state._preDivinationDoc, roll: state.divinationRoll.roll,
+                });
+                state.doc = dr.doc;
+                state.divinationPending = dr.pendingChoices ?? [];
+                state.divinationInfo = { range: dr.range, ref: dr.ref, citation: dr.citation, manual: dr.manual };
+            }
+            const c = state.divinationInfo?.citation;
+            state.divination = `Table 2-9 roll ${state.divinationRoll.roll}`
+                + (c ? ` (${c.book} p.${c.page})` : '');
+            state.doc.tarot = { text: state.divination };
+            logRevision();
+            persistRecipe();
+            advanceStep();
+            return state.divinationInfo;
+        },
+
+        /** Resolve one divination choice point (pick-a-characteristic, the
+         *  Resistance spec, the Hatred write-in). */
+        async setDivinationChoice(key, value, { override = false } = {}) {
+            const logRevision = assertEditable('divination', override);
+            if (!state.divinationRoll) throw new Error('roll a divination first');
+            state.divinationRoll.choices[key] = value;
+            if (state.hasRecipe) {
+                await rebuild();
+            } else {
+                const base = state._preDivinationDoc ?? state.doc;
+                const dr = await api('POST', '/api/chargen/divination', {
+                    doc: base, roll: state.divinationRoll.roll,
+                    choices: state.divinationRoll.choices,
+                });
+                state.doc = dr.doc;
+                state.divinationPending = dr.pendingChoices ?? [];
+            }
+            logRevision();
+            persistRecipe();
+        },
+
         /** The CB-3 advancement API, on the wizard's doc. */
         async advances() {
             const r = await api('POST', '/api/chargen/advances', { doc: state.doc });
@@ -510,6 +596,10 @@ export function createWizard({ pack, api, rng = Math.random, doc = null } = {}) 
             const bg = pack.backgrounds.find((b) => b.ref === state.selections.backgroundRef);
             return {
                 startingEquipmentClass: bg?.startingEquipmentClass ?? '',
+                // the RAW kit (Core box, corpus-extracted): each item parsed
+                // into its pick-one options for the UI's dropdowns
+                kit: (bg?.startingEquipment ?? []).map(parseKitItem),
+                kitApplied: !!state.equipment?.kitApplied,
                 acquisitions: Math.floor((state.doc?.influence ?? 0) / 10),
             };
         },
