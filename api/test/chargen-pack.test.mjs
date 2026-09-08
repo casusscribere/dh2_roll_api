@@ -57,7 +57,12 @@ test('pack: catalog dimensions and required fields', () => {
     assert.ok(CHARGEN_PACK.skills.every((s) => s.characteristic && Array.isArray(s.aptitudes)));
     assert.equal(CHARGEN_PACK.homeworlds.length, 15);
     assert.ok(CHARGEN_PACK.homeworlds.every((h) => h.aptitude && h.woundsFormula));
-    assert.equal(CHARGEN_PACK.backgrounds.length, 13);
+    // 13 → 12 on 2026-09-08: scintillan_nobilite purged from the corpus by
+    // user ruling (legacy fabrication — zero PDF hits; quarantined with a
+    // signed record in the corpus _validation/).
+    assert.equal(CHARGEN_PACK.backgrounds.length, 12);
+    assert.ok(!CHARGEN_PACK.backgrounds.some((b) => b.id === 'scintillan_nobilite'),
+        'the purged fabrication must never come back through a stale sync');
     assert.equal(CHARGEN_PACK.roles.length, 11);
     assert.equal(CHARGEN_PACK.traits.length, 41);
     assert.equal(CHARGEN_PACK.eliteAdvances.length, 5);        // + core Psyker (2026-08-26)

@@ -11082,10 +11082,10 @@ talent "Strong Minded" tier 2 {
   // api/data/chargen/pack.mjs
   var CHARGEN_PACK = {
     "packVersion": 1,
-    "generatedAt": "2026-09-08T13:11:24.332Z",
+    "generatedAt": "2026-09-08T20:11:49.873Z",
     "corpus": {
       "system": "dark_heresy_2e",
-      "commit": "260ebeffe7b1e91489cf92b8dd36889b2b68f15d"
+      "commit": "054c9437d821105eb85df5358fb2b4c99f36398d"
     },
     "startingXp": 1e3,
     "aptitudes": [
@@ -11927,28 +11927,6 @@ talent "Strong Minded" tier 2 {
           "injector",
           "2 doses of obscura or slaught"
         ],
-        "_source": "src_dh2_core_p45",
-        "citation": {
-          "book": "Core Rulebook",
-          "page": null,
-          "source": "src_dh2_core_p45"
-        }
-      },
-      {
-        "id": "scintillan_nobilite",
-        "ref": "dh2:background:scintillan_nobilite",
-        "name": "Scintillan Nobilite",
-        "skillsGranted": [
-          "Charm",
-          "Commerce",
-          "Linguistics (High Gothic)",
-          "Scholastic Lore (Heraldry)"
-        ],
-        "talentsGranted": [
-          "Peer (Imperial Nobles)"
-        ],
-        "startingAptitude": "Social",
-        "startingEquipmentClass": "Scintillan Nobilite",
         "_source": "src_dh2_core_p45",
         "citation": {
           "book": "Core Rulebook",
